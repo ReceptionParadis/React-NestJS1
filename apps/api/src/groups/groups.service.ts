@@ -87,10 +87,12 @@ export class GroupsService {
 
   async update(id: string, input: Partial<CreateGroupInput>) {
     await this.get(id);
-    const data: Prisma.HotelGroupUpdateInput = { ...input };
-    if (input.arrivalDate) data.arrivalDate = new Date(input.arrivalDate);
-    if (input.departureDate) data.departureDate = new Date(input.departureDate);
-    delete (data as Record<string, unknown>).hotelId;
+    const { hotelId: _hotelId, arrivalDate, departureDate, ...rest } = input;
+    const data: Prisma.HotelGroupUpdateInput = {
+      ...rest,
+      ...(arrivalDate ? { arrivalDate: new Date(arrivalDate) } : {}),
+      ...(departureDate ? { departureDate: new Date(departureDate) } : {}),
+    };
     return this.prisma.hotelGroup.update({ where: { id }, data });
   }
 
