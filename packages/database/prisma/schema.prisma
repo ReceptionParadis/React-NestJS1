@@ -35,6 +35,28 @@ enum TicketStatus {
   CLOSED
 }
 
+enum RoomStatus {
+  AVAILABLE
+  OCCUPIED
+  CLEANING
+  INSPECTED
+  OUT_OF_ORDER
+}
+
+enum RoomType {
+  SINGLE
+  DOUBLE
+  TWIN
+  TRIPLE
+  QUADRUPLE
+}
+
+enum RoomView {
+  GAVE
+  PYRENEES
+  COUR_INTERIEURE
+}
+
 model Hotel {
   id        String   @id @default(cuid())
   name      String
@@ -42,10 +64,10 @@ model Hotel {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  users     User[]
-  rooms     Room[]
-  notes     ShiftNote[]
-  tickets   Ticket[]
+  users   User[]
+  rooms   Room[]
+  notes   ShiftNote[]
+  tickets Ticket[]
 }
 
 model Role {
@@ -72,21 +94,36 @@ model User {
   notes          ShiftNote[]
   noteComments   ShiftNoteComment[]
   createdTickets Ticket[]           @relation("TicketCreator")
+  assignedTickets Ticket[]          @relation("TicketAssignee")
+  ticketComments TicketComment[]
+  ticketEvents   TicketEvent[]
 }
 
 model Room {
-  id        String   @id @default(cuid())
-  number    String
-  floor     Int
-  building  String
-  hotelId   String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id              String     @id @default(cuid())
+  number          String
+  floor           Int
+  building        String
+  type            RoomType   @default(DOUBLE)
+  view            RoomView?
+  capacity        Int        @default(2)
+  status          RoomStatus @default(AVAILABLE)
+  guestName       String?
+  groupName       String?
+  arrivalDate     DateTime?
+  departureDate   DateTime?
+  housekeeper     String?
+  lastInspectedAt DateTime?
+  hotelId         String
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
 
-  hotel     Hotel    @relation(fields: [hotelId], references: [id], onDelete: Cascade)
-  tickets   Ticket[]
+  hotel   Hotel    @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  tickets Ticket[]
 
   @@unique([hotelId, number])
+  @@index([hotelId, building, floor])
+  @@index([hotelId, status])
 }
 
 model ShiftNote {
@@ -103,9 +140,9 @@ model ShiftNote {
   createdAt DateTime        @default(now())
   updatedAt DateTime        @updatedAt
 
-  hotel     Hotel              @relation(fields: [hotelId], references: [id], onDelete: Cascade)
-  author    User               @relation(fields: [authorId], references: [id])
-  comments  ShiftNoteComment[]
+  hotel    Hotel              @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  author   User               @relation(fields: [authorId], references: [id])
+  comments ShiftNoteComment[]
 
   @@index([hotelId, createdAt])
   @@index([hotelId, priority, status])
@@ -118,28 +155,66 @@ model ShiftNoteComment {
   authorId  String
   createdAt DateTime @default(now())
 
-  note      ShiftNote @relation(fields: [noteId], references: [id], onDelete: Cascade)
-  author    User      @relation(fields: [authorId], references: [id])
+  note   ShiftNote @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  author User      @relation(fields: [authorId], references: [id])
 
   @@index([noteId, createdAt])
 }
 
 model Ticket {
-  id          String         @id @default(cuid())
-  reference   String         @unique
+  id          String       @id @default(cuid())
+  reference   String       @unique
   title       String
   description String
-  priority    NotePriority   @default(NORMAL)
-  status      TicketStatus   @default(NEW)
+  priority    NotePriority @default(NORMAL)
+  status      TicketStatus @default(NEW)
   service     String
+  location    String?
   hotelId     String
   roomId      String?
   createdById String
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
+  assigneeId  String?
+  dueAt       DateTime?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  resolvedAt  DateTime?
   closedAt    DateTime?
 
-  hotel       Hotel          @relation(fields: [hotelId], references: [id], onDelete: Cascade)
-  room        Room?          @relation(fields: [roomId], references: [id])
-  createdBy   User           @relation("TicketCreator", fields: [createdById], references: [id])
+  hotel     Hotel  @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  room      Room?  @relation(fields: [roomId], references: [id])
+  createdBy User   @relation("TicketCreator", fields: [createdById], references: [id])
+  assignee  User?  @relation("TicketAssignee", fields: [assigneeId], references: [id])
+  comments  TicketComment[]
+  events    TicketEvent[]
+
+  @@index([hotelId, status, priority])
+  @@index([assigneeId, status])
+  @@index([roomId])
+}
+
+model TicketComment {
+  id        String   @id @default(cuid())
+  content   String
+  ticketId  String
+  authorId  String
+  createdAt DateTime @default(now())
+
+  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  author User   @relation(fields: [authorId], references: [id])
+
+  @@index([ticketId, createdAt])
+}
+
+model TicketEvent {
+  id        String   @id @default(cuid())
+  type      String
+  message   String
+  ticketId  String
+  actorId   String
+  createdAt DateTime @default(now())
+
+  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  actor  User   @relation(fields: [actorId], references: [id])
+
+  @@index([ticketId, createdAt])
 }
