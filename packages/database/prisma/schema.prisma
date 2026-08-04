@@ -20,6 +20,12 @@ enum NotePriority {
   CRITICAL
 }
 
+enum ShiftNoteStatus {
+  TO_DO
+  IN_PROGRESS
+  DONE
+}
+
 enum TicketStatus {
   NEW
   ASSIGNED
@@ -61,10 +67,11 @@ model User {
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 
-  hotel        Hotel      @relation(fields: [hotelId], references: [id], onDelete: Cascade)
-  role         Role       @relation(fields: [roleId], references: [id])
-  notes        ShiftNote[]
-  createdTickets Ticket[] @relation("TicketCreator")
+  hotel          Hotel              @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  role           Role               @relation(fields: [roleId], references: [id])
+  notes          ShiftNote[]
+  noteComments   ShiftNoteComment[]
+  createdTickets Ticket[]           @relation("TicketCreator")
 }
 
 model Room {
@@ -83,18 +90,38 @@ model Room {
 }
 
 model ShiftNote {
-  id        String       @id @default(cuid())
+  id        String          @id @default(cuid())
   title     String
   content   String
-  priority  NotePriority @default(NORMAL)
+  priority  NotePriority    @default(NORMAL)
+  status    ShiftNoteStatus @default(TO_DO)
   category  String
+  service   String
+  pinned    Boolean         @default(false)
   hotelId   String
   authorId  String
-  createdAt DateTime     @default(now())
-  updatedAt DateTime     @updatedAt
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
 
-  hotel     Hotel        @relation(fields: [hotelId], references: [id], onDelete: Cascade)
-  author    User         @relation(fields: [authorId], references: [id])
+  hotel     Hotel              @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  author    User               @relation(fields: [authorId], references: [id])
+  comments  ShiftNoteComment[]
+
+  @@index([hotelId, createdAt])
+  @@index([hotelId, priority, status])
+}
+
+model ShiftNoteComment {
+  id        String   @id @default(cuid())
+  content   String
+  noteId    String
+  authorId  String
+  createdAt DateTime @default(now())
+
+  note      ShiftNote @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  author    User      @relation(fields: [authorId], references: [id])
+
+  @@index([noteId, createdAt])
 }
 
 model Ticket {
