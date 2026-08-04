@@ -4,15 +4,24 @@ import { PrismaService } from '../prisma.service';
 
 type AllocationConflict = {
   entryId: string;
-  guest: string;
+  guestName: string;
+  requestedType: RoomType;
   reason: string;
 };
 
 type AllocationProposal = {
   entryId: string;
-  guest: string;
-  roomId: string;
-  roomNumber: string;
+  guestName: string;
+  requestedType: RoomType;
+  specialNeeds?: string;
+  room: {
+    id: string;
+    number: string;
+    type: RoomType;
+    capacity: number;
+    floor: number;
+    building: string;
+  };
   score: number;
   reasons: string[];
 };
@@ -42,7 +51,7 @@ export class AllocationService {
     });
 
     const available = new Map(rooms.map((room) => [room.id, room]));
-    const proposals: AllocationProposal[] = [];
+    const assignments: AllocationProposal[] = [];
     const conflicts: AllocationConflict[] = [];
 
     const entries = [...group.roomingList].sort((a, b) => {
@@ -51,19 +60,19 @@ export class AllocationService {
     });
 
     for (const entry of entries) {
-      const guest = `${entry.firstName} ${entry.lastName}`.trim();
+      const guestName = `${entry.firstName} ${entry.lastName}`.trim();
       const specialNeeds = entry.specialNeeds?.toLowerCase() ?? '';
       const candidates = [...available.values()]
         .map((room) => {
           let score = 0;
           const reasons: string[] = [];
-          if (room.type === entry.roomType) { score += 50; reasons.push('type exact'); }
-          else if (this.isCompatible(entry.roomType, room.type, room.capacity)) { score += 20; reasons.push('capacité compatible'); }
+          if (room.type === entry.roomType) { score += 50; reasons.push('Type exact'); }
+          else if (this.isCompatible(entry.roomType, room.type, room.capacity)) { score += 20; reasons.push('Capacité compatible'); }
           else return null;
 
-          if (entry.requestedRoom && room.number === entry.requestedRoom) { score += 100; reasons.push('chambre demandée'); }
-          if (specialNeeds.includes('pmr') && /pmr/i.test(room.guestName ?? '')) { score += 80; reasons.push('besoin PMR'); }
-          if (room.status === RoomStatus.INSPECTED) { score += 10; reasons.push('chambre contrôlée'); }
+          if (entry.requestedRoom && room.number === entry.requestedRoom) { score += 100; reasons.push('Chambre demandée'); }
+          if (specialNeeds.includes('pmr') && /pmr/i.test(room.guestName ?? '')) { score += 80; reasons.push('Besoin PMR détecté'); }
+          if (room.status === RoomStatus.INSPECTED) { score += 10; reasons.push('Chambre contrôlée'); }
           score -= room.floor;
           return { room, score, reasons };
         })
@@ -72,15 +81,44 @@ export class AllocationService {
 
       const best = candidates[0];
       if (!best) {
-        conflicts.push({ entryId: entry.id, guest, reason: `Aucune chambre ${entry.roomType.toLowerCase()} compatible disponible` });
+        conflicts.push({ entryId: entry.id, guestName, requestedType: entry.roomType, reason: `Aucune chambre ${entry.roomType.toLowerCase()} compatible disponible` });
         continue;
       }
 
-      proposals.push({ entryId: entry.id, guest, roomId: best.room.id, roomNumber: best.room.number, score: best.score, reasons: best.reasons });
+      assignments.push({
+        entryId: entry.id,
+        guestName,
+        requestedType: entry.roomType,
+        specialNeeds: entry.specialNeeds ?? undefined,
+        room: {
+          id: best.room.id,
+          number: best.room.number,
+          type: best.room.type,
+          capacity: best.room.capacity,
+          floor: best.room.floor,
+          building: best.room.building,
+        },
+        score: best.score,
+        reasons: best.reasons,
+      });
       available.delete(best.room.id);
     }
 
-    return { groupId, generatedAt: new Date(), proposals, conflicts, summary: { allocated: proposals.length, conflicts: conflicts.length, total: entries.length } };
+    return {
+      groupId,
+      generatedAt: new Date(),
+      assignments,
+      conflicts,
+      availableRooms: rooms.map((room) => ({
+        id: room.id,
+        number: room.number,
+        type: room.type,
+        capacity: room.capacity,
+        floor: room.floor,
+        building: room.building,
+      })),
+      summary: { allocated: assignments.length, conflicts: conflicts.length, total: entries.length },
+    };
   }
 
   async apply(groupId: string, assignments: Array<{ entryId: string; roomId: string }>) {
