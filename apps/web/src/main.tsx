@@ -2,6 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { AppRouter } from './AppRouter';
 import './styles.css';
+import './executive-dashboard.css';
 import './shift-log.css';
 import './rooms.css';
 import './tickets.css';
