@@ -15,4 +15,4 @@ RUN pnpm build
 ENV NODE_ENV=production
 EXPOSE 10000
 
-CMD ["sh", "-c", "pnpm --filter @hospicore/database prisma:push && pnpm --filter @hospicore/api start"]
+CMD ["sh", "-c", "attempt=1; until pnpm --filter @hospicore/database prisma:push; do if [ $attempt -ge 12 ]; then echo 'Database unavailable after 12 attempts'; exit 1; fi; echo \"Database unavailable, retry $attempt/12 in 5 seconds...\"; attempt=$((attempt+1)); sleep 5; done; exec pnpm --filter @hospicore/api start"]
