@@ -1,3 +1,4 @@
+import { AllocationReviewPage } from './AllocationReviewPage';
 import { App } from './App';
 import { GroupsPage } from './GroupsPage';
 import { MainCourante } from './MainCourante';
@@ -12,6 +13,7 @@ export function AppRouter() {
   if (path.startsWith('/chambres')) return <RoomsPage />;
   if (path.startsWith('/tickets')) return <TicketsPage />;
   if (path.startsWith('/groupes/import-rooming-list')) return <RoomingListImportPage />;
+  if (path.startsWith('/groupes/allocation')) return <AllocationReviewPage />;
   if (path.startsWith('/groupes')) return <GroupsPage />;
 
   return <App />;
