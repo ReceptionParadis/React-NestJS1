@@ -1,12 +1,13 @@
 import { AllocationReviewPage } from './AllocationReviewPage';
 import { App } from './App';
+import { AuthGate } from './AuthGate';
 import { GroupsPage } from './GroupsPage';
 import { MainCourante } from './MainCourante';
 import { RoomingListImportPage } from './RoomingListImportPage';
 import { RoomsPage } from './RoomsPage';
 import { TicketsPage } from './TicketsPage';
 
-export function AppRouter() {
+function CurrentPage() {
   const path = window.location.pathname;
 
   if (path.startsWith('/main-courante')) return <MainCourante />;
@@ -17,4 +18,8 @@ export function AppRouter() {
   if (path.startsWith('/groupes')) return <GroupsPage />;
 
   return <App />;
+}
+
+export function AppRouter() {
+  return <AuthGate><CurrentPage /></AuthGate>;
 }
