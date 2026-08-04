@@ -3,7 +3,7 @@ FROM node:22-alpine AS build
 RUN corepack enable
 WORKDIR /app
 
-COPY package.json pnpm-workspace.yaml pnpm-lock.yaml turbo.json ./
+COPY package.json pnpm-workspace.yaml turbo.json ./
 COPY apps ./apps
 COPY packages ./packages
 
