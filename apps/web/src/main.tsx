@@ -1,12 +1,10 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import { App } from './App';
-import { MainCourante } from './MainCourante';
+import { AppRouter } from './AppRouter';
 import './styles.css';
 import './shift-log.css';
-
-const page = window.location.pathname === '/main-courante' ? <MainCourante /> : <App />;
+import './rooms.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>{page}</React.StrictMode>,
+  <React.StrictMode><AppRouter /></React.StrictMode>,
 );
