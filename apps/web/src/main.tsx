@@ -7,6 +7,7 @@ import './rooms.css';
 import './tickets.css';
 import './groups.css';
 import './rooming-import.css';
+import './allocation-review.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode><AppRouter /></React.StrictMode>,
