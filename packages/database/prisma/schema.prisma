@@ -7,16 +7,78 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum UserStatus { ACTIVE INACTIVE INVITED }
-enum NotePriority { LOW NORMAL HIGH CRITICAL }
-enum ShiftNoteStatus { TO_DO IN_PROGRESS DONE }
-enum TicketStatus { NEW ASSIGNED IN_PROGRESS WAITING RESOLVED CLOSED }
-enum RoomStatus { AVAILABLE OCCUPIED CLEANING INSPECTED OUT_OF_ORDER }
-enum RoomType { SINGLE DOUBLE TWIN TRIPLE QUADRUPLE }
-enum RoomView { GAVE PYRENEES COUR_INTERIEURE }
-enum GroupStatus { PREPARATION CONFIRMED ACTION_REQUIRED IN_HOUSE COMPLETED CANCELLED }
-enum GroupPaymentStatus { PENDING DEPOSIT_RECEIVED PAID OVERDUE }
-enum RoomingEntryStatus { PENDING VALID ALLOCATED ERROR }
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  INVITED
+}
+
+enum NotePriority {
+  LOW
+  NORMAL
+  HIGH
+  CRITICAL
+}
+
+enum ShiftNoteStatus {
+  TO_DO
+  IN_PROGRESS
+  DONE
+}
+
+enum TicketStatus {
+  NEW
+  ASSIGNED
+  IN_PROGRESS
+  WAITING
+  RESOLVED
+  CLOSED
+}
+
+enum RoomStatus {
+  AVAILABLE
+  OCCUPIED
+  CLEANING
+  INSPECTED
+  OUT_OF_ORDER
+}
+
+enum RoomType {
+  SINGLE
+  DOUBLE
+  TWIN
+  TRIPLE
+  QUADRUPLE
+}
+
+enum RoomView {
+  GAVE
+  PYRENEES
+  COUR_INTERIEURE
+}
+
+enum GroupStatus {
+  PREPARATION
+  CONFIRMED
+  ACTION_REQUIRED
+  IN_HOUSE
+  COMPLETED
+  CANCELLED
+}
+
+enum GroupPaymentStatus {
+  PENDING
+  DEPOSIT_RECEIVED
+  PAID
+  OVERDUE
+}
+
+enum RoomingEntryStatus {
+  PENDING
+  VALID
+  ALLOCATED
+  ERROR
+}
 
 model Hotel {
   id String @id @default(cuid())
