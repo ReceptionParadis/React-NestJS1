@@ -4,6 +4,7 @@ import { AppRouter } from './AppRouter';
 import './styles.css';
 import './shift-log.css';
 import './rooms.css';
+import './tickets.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode><AppRouter /></React.StrictMode>,
