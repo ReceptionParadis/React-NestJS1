@@ -21,6 +21,8 @@ type AllocationProposal = {
     capacity: number;
     floor: number;
     building: string;
+    accessible: boolean;
+    connectingGroup: string | null;
   };
   score: number;
   reasons: string[];
@@ -51,28 +53,63 @@ export class AllocationService {
     });
 
     const available = new Map(rooms.map((room) => [room.id, room]));
+    const connectingSelections = new Map<string, string>();
     const assignments: AllocationProposal[] = [];
     const conflicts: AllocationConflict[] = [];
 
     const entries = [...group.roomingList].sort((a, b) => {
-      const weight = (type: RoomType) => ({ QUADRUPLE: 5, TRIPLE: 4, TWIN: 3, DOUBLE: 3, SINGLE: 2 }[type]);
-      return weight(b.roomType) - weight(a.roomType);
+      const constraintWeight = (entry: typeof a) =>
+        (entry.requiresAccessible ? 100 : 0) +
+        (entry.connectingRequest ? 50 : 0) +
+        ({ QUADRUPLE: 5, TRIPLE: 4, TWIN: 3, DOUBLE: 3, SINGLE: 2 }[entry.roomType]);
+      return constraintWeight(b) - constraintWeight(a);
     });
 
     for (const entry of entries) {
       const guestName = `${entry.firstName} ${entry.lastName}`.trim();
-      const specialNeeds = entry.specialNeeds?.toLowerCase() ?? '';
       const candidates = [...available.values()]
         .map((room) => {
-          let score = 0;
-          const reasons: string[] = [];
-          if (room.type === entry.roomType) { score += 50; reasons.push('Type exact'); }
-          else if (this.isCompatible(entry.roomType, room.type, room.capacity)) { score += 20; reasons.push('Capacité compatible'); }
-          else return null;
+          if (entry.requiresAccessible && !room.accessible) return null;
+          if (!this.isCompatible(entry.roomType, room.type, room.capacity)) return null;
 
-          if (entry.requestedRoom && room.number === entry.requestedRoom) { score += 100; reasons.push('Chambre demandée'); }
-          if (specialNeeds.includes('pmr') && /pmr/i.test(room.guestName ?? '')) { score += 80; reasons.push('Besoin PMR détecté'); }
-          if (room.status === RoomStatus.INSPECTED) { score += 10; reasons.push('Chambre contrôlée'); }
+          let score = room.type === entry.roomType ? 50 : 20;
+          const reasons = [room.type === entry.roomType ? 'Type exact' : 'Capacité compatible'];
+
+          if (entry.requestedRoom && room.number === entry.requestedRoom) {
+            score += 100;
+            reasons.push('Chambre demandée');
+          }
+          if (entry.requiresAccessible && room.accessible) {
+            score += 120;
+            reasons.push('Chambre PMR obligatoire');
+          } else if (room.accessible) {
+            score -= 20;
+            reasons.push('Chambre PMR préservée');
+          }
+          if (entry.preferredBuilding && room.building === entry.preferredBuilding) {
+            score += 35;
+            reasons.push(`Bâtiment ${room.building} préféré`);
+          }
+          if (entry.preferredFloor !== null && entry.preferredFloor !== undefined) {
+            const distance = Math.abs(room.floor - entry.preferredFloor);
+            score += Math.max(0, 30 - distance * 10);
+            reasons.push(distance === 0 ? 'Étage préféré' : `À ${distance} étage(s) de la préférence`);
+          }
+          if (entry.connectingRequest) {
+            const selectedGroup = connectingSelections.get(entry.connectingRequest);
+            if (selectedGroup && room.connectingGroup !== selectedGroup) return null;
+            if (!selectedGroup && !room.connectingGroup) return null;
+            score += 80;
+            reasons.push('Chambre communicante');
+          }
+          if (room.preferredForGroups) {
+            score += 15;
+            reasons.push('Chambre privilégiée groupes');
+          }
+          if (room.status === RoomStatus.INSPECTED) {
+            score += 10;
+            reasons.push('Chambre contrôlée');
+          }
           score -= room.floor;
           return { room, score, reasons };
         })
@@ -81,8 +118,22 @@ export class AllocationService {
 
       const best = candidates[0];
       if (!best) {
-        conflicts.push({ entryId: entry.id, guestName, requestedType: entry.roomType, reason: `Aucune chambre ${entry.roomType.toLowerCase()} compatible disponible` });
+        const constraints = [
+          entry.requiresAccessible ? 'PMR' : null,
+          entry.connectingRequest ? 'communicante' : null,
+          entry.preferredFloor !== null && entry.preferredFloor !== undefined ? `étage ${entry.preferredFloor}` : null,
+        ].filter(Boolean).join(', ');
+        conflicts.push({
+          entryId: entry.id,
+          guestName,
+          requestedType: entry.roomType,
+          reason: `Aucune chambre ${entry.roomType.toLowerCase()} compatible${constraints ? ` (${constraints})` : ''} disponible`,
+        });
         continue;
+      }
+
+      if (entry.connectingRequest && best.room.connectingGroup) {
+        connectingSelections.set(entry.connectingRequest, best.room.connectingGroup);
       }
 
       assignments.push({
@@ -97,6 +148,8 @@ export class AllocationService {
           capacity: best.room.capacity,
           floor: best.room.floor,
           building: best.room.building,
+          accessible: best.room.accessible,
+          connectingGroup: best.room.connectingGroup,
         },
         score: best.score,
         reasons: best.reasons,
@@ -116,6 +169,8 @@ export class AllocationService {
         capacity: room.capacity,
         floor: room.floor,
         building: room.building,
+        accessible: room.accessible,
+        connectingGroup: room.connectingGroup,
       })),
       summary: { allocated: assignments.length, conflicts: conflicts.length, total: entries.length },
     };
@@ -135,15 +190,12 @@ export class AllocationService {
         if (!entry) throw new BadRequestException(`Voyageur ${assignment.entryId} invalide`);
         const room = await tx.room.findFirst({ where: { id: assignment.roomId, hotelId: group.hotelId, status: { not: RoomStatus.OUT_OF_ORDER } } });
         if (!room) throw new BadRequestException(`Chambre ${assignment.roomId} indisponible`);
+        if (!this.isCompatible(entry.roomType, room.type, room.capacity)) throw new BadRequestException(`Chambre ${room.number} incompatible avec ${entry.roomType}`);
+        if (entry.requiresAccessible && !room.accessible) throw new BadRequestException(`La chambre ${room.number} n’est pas PMR`);
+        if (entry.connectingRequest && !room.connectingGroup) throw new BadRequestException(`La chambre ${room.number} n’est pas communicante`);
 
-        await tx.roomingListEntry.update({
-          where: { id: entry.id },
-          data: { roomId: room.id, status: RoomingEntryStatus.ALLOCATED },
-        });
-        await tx.room.update({
-          where: { id: room.id },
-          data: { groupName: group.name, arrivalDate: group.arrivalDate, departureDate: group.departureDate },
-        });
+        await tx.roomingListEntry.update({ where: { id: entry.id }, data: { roomId: room.id, status: RoomingEntryStatus.ALLOCATED } });
+        await tx.room.update({ where: { id: room.id }, data: { groupName: group.name, arrivalDate: group.arrivalDate, departureDate: group.departureDate } });
       }
       return tx.hotelGroup.findUnique({ where: { id: groupId }, include: { roomingList: { include: { room: true } } } });
     });
