@@ -1,0 +1,118 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  INVITED
+}
+
+enum NotePriority {
+  LOW
+  NORMAL
+  HIGH
+  CRITICAL
+}
+
+enum TicketStatus {
+  NEW
+  ASSIGNED
+  IN_PROGRESS
+  WAITING
+  RESOLVED
+  CLOSED
+}
+
+model Hotel {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users     User[]
+  rooms     Room[]
+  notes     ShiftNote[]
+  tickets   Ticket[]
+}
+
+model Role {
+  id          String @id @default(cuid())
+  name        String @unique
+  description String?
+  users       User[]
+}
+
+model User {
+  id           String     @id @default(cuid())
+  firstName    String
+  lastName     String
+  email        String     @unique
+  passwordHash String
+  status       UserStatus @default(ACTIVE)
+  hotelId      String
+  roleId       String
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  hotel        Hotel      @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  role         Role       @relation(fields: [roleId], references: [id])
+  notes        ShiftNote[]
+  createdTickets Ticket[] @relation("TicketCreator")
+}
+
+model Room {
+  id        String   @id @default(cuid())
+  number    String
+  floor     Int
+  building  String
+  hotelId   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  hotel     Hotel    @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  tickets   Ticket[]
+
+  @@unique([hotelId, number])
+}
+
+model ShiftNote {
+  id        String       @id @default(cuid())
+  title     String
+  content   String
+  priority  NotePriority @default(NORMAL)
+  category  String
+  hotelId   String
+  authorId  String
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  hotel     Hotel        @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  author    User         @relation(fields: [authorId], references: [id])
+}
+
+model Ticket {
+  id          String         @id @default(cuid())
+  reference   String         @unique
+  title       String
+  description String
+  priority    NotePriority   @default(NORMAL)
+  status      TicketStatus   @default(NEW)
+  service     String
+  hotelId     String
+  roomId      String?
+  createdById String
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  closedAt    DateTime?
+
+  hotel       Hotel          @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  room        Room?          @relation(fields: [roomId], references: [id])
+  createdBy   User           @relation("TicketCreator", fields: [createdById], references: [id])
+}
