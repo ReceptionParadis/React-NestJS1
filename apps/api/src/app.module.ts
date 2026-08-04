@@ -11,7 +11,9 @@ import { TicketsModule } from './tickets/tickets.module';
 @Module({
   imports: [
     ServeStaticModule.forRoot({
-      rootPath: join(process.cwd(), 'apps', 'web', 'dist'),
+      // pnpm executes the API start script from /app/apps/api in production.
+      // The built React app is therefore located one level up in /app/apps/web/dist.
+      rootPath: join(process.cwd(), '..', 'web', 'dist'),
       // Express 5 / path-to-regexp requires named wildcards.
       // This excludes both /api and all nested API routes from the SPA fallback.
       exclude: ['/api/{*path}'],
