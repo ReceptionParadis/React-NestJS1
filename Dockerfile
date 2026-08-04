@@ -8,6 +8,7 @@ COPY apps ./apps
 COPY packages ./packages
 
 RUN pnpm install --no-frozen-lockfile
+ENV DATABASE_URL="postgresql://hospicore:hospicore@localhost:5432/hospicore"
 RUN pnpm db:generate
 RUN pnpm build
 
