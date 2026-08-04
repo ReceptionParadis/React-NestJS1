@@ -5,6 +5,8 @@
   "scripts": {
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
+    "prisma:deploy": "prisma migrate deploy",
+    "prisma:push": "prisma db push",
     "build": "prisma generate",
     "lint": "prisma validate",
     "test": "echo \"No database tests yet\""
