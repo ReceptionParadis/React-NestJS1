@@ -12,7 +12,9 @@ import { TicketsModule } from './tickets/tickets.module';
   imports: [
     ServeStaticModule.forRoot({
       rootPath: join(process.cwd(), 'apps', 'web', 'dist'),
-      exclude: ['/api*'],
+      // Express 5 / path-to-regexp requires named wildcards.
+      // This excludes both /api and all nested API routes from the SPA fallback.
+      exclude: ['/api/{*path}'],
     }),
     ShiftLogModule,
     RoomsModule,
