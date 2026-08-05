@@ -11,6 +11,7 @@ import './auth.css';
 import './meeting-rooms.css';
 import './restaurant-planning.css';
 import './interservice.css';
+import './weekly-planning.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode><AppRouter /></React.StrictMode>,
