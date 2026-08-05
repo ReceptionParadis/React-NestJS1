@@ -47,7 +47,7 @@ export type FunctionSheet = {
   acknowledgements: Partial<Record<OperationalDepartment, string>>;
   updatedAt?: string;
   updatedBy?: string;
-  auditTrail: AuditEntry[];
+  auditTrail?: AuditEntry[];
 };
 
 const KEY = 'hospicore.function-sheets.v1';
@@ -141,6 +141,8 @@ export function saveFunctionSheets(items: FunctionSheet[], action = 'Fiche de fo
   const previous = loadFunctionSheets();
   const next = items.map((item) => {
     const old = previous.find((candidate) => candidate.id === item.id);
+    const hasChanged = !old || JSON.stringify({ ...old, updatedAt: undefined, updatedBy: undefined, auditTrail: undefined }) !== JSON.stringify({ ...item, updatedAt: undefined, updatedBy: undefined, auditTrail: undefined });
+    if (!hasChanged) return old;
     return signed({ ...item, auditTrail: item.auditTrail || old?.auditTrail || [] }, old ? action : 'Fiche de fonction créée');
   });
   persist(next);
