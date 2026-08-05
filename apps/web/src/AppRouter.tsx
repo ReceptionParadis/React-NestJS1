@@ -8,7 +8,7 @@ import { InterserviceControlPage } from './InterserviceControlPage';
 import { InterservicePage } from './InterservicePage';
 import { MainCourante } from './MainCourante';
 import { MeetingRoomsPage } from './MeetingRoomsPage';
-import { OperationsCenterPage } from './OperationsCenterPage';
+import { OperationsCenterSharedPage } from './OperationsCenterSharedPage';
 import { RestaurantPlanningPage } from './RestaurantPlanningPage';
 import { RoomingListImportPage } from './RoomingListImportPage';
 import { TasksPage } from './TasksPage';
@@ -22,7 +22,7 @@ function CurrentPage() {
   if (path.startsWith('/taches')) return <TasksPage />;
   if (path.startsWith('/journal-exploitation') || path.startsWith('/activite')) return <ActivityJournalPage />;
   if (path.startsWith('/consignes-generales')) return <GeneralInstructionsPage />;
-  if (path.startsWith('/centre-operations') || path.startsWith('/cahier-consignes') || path.startsWith('/prets')) return <OperationsCenterPage />;
+  if (path.startsWith('/centre-operations') || path.startsWith('/cahier-consignes') || path.startsWith('/prets') || path.startsWith('/inventaire')) return <OperationsCenterSharedPage />;
   if (path.startsWith('/suivi-interservice')) return <InterserviceControlPage />;
   if (path.startsWith('/planning-hebdomadaire')) return <WeeklyPlanningPage />;
   if (path.startsWith('/reception')) return <InterservicePage department="reception" />;
