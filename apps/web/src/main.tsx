@@ -15,6 +15,7 @@ import './weekly-planning.css';
 import './interservice-control.css';
 import './operations-center.css';
 import './general-instructions.css';
+import './activity-journal.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode><AppRouter /></React.StrictMode>,
