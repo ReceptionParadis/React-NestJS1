@@ -6,6 +6,11 @@ import { OperationalSyncService } from './operational-sync.service';
 export class OperationalSyncController {
   constructor(private readonly service: OperationalSyncService) {}
 
+  @Get('diagnostic/status')
+  diagnostic(@Query('hotelId') hotelId?: string, @Query('userId') userId?: string) {
+    return this.service.diagnostic(hotelId, userId);
+  }
+
   @Get()
   list(@Query('hotelId') hotelId?: string, @Query('userId') userId?: string) {
     return this.service.list(hotelId, userId);
