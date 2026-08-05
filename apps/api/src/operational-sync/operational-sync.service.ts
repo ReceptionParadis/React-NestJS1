@@ -6,6 +6,7 @@ const DEFAULT_STORES: Record<string, Prisma.InputJsonValue> = {
   tasks: [],
   'general-instructions': [],
   'operations-center': { loans: [], equipment: [] },
+  'loans-equipment': { loans: [], equipment: [] },
   'function-sheets': [],
   'meeting-rooms': [],
 };
