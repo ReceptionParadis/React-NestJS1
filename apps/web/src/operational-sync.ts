@@ -1,0 +1,51 @@
+type SessionUser = { id?: string; hotelId?: string };
+type Session = { token?: string; user?: SessionUser };
+
+type StoreEnvelope<T> = {
+  payload: T;
+  version: number;
+  updatedAt: string;
+};
+
+function session(): Session {
+  try { return JSON.parse(localStorage.getItem('hospicore.session') || '{}'); }
+  catch { return {}; }
+}
+
+function headers() {
+  const token = session().token || localStorage.getItem('hospicore.token') || '';
+  return { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) };
+}
+
+export async function loadSharedData<T>(namespace: string, fallback: T): Promise<StoreEnvelope<T>> {
+  const current = session();
+  const hotelId = current.user?.hotelId;
+  if (!hotelId) return { payload: fallback, version: 0, updatedAt: '' };
+
+  try {
+    const response = await fetch(`/api/operational-sync/${encodeURIComponent(namespace)}?hotelId=${encodeURIComponent(hotelId)}`, { headers: headers(), cache: 'no-store' });
+    if (!response.ok) throw new Error('Synchronisation indisponible');
+    const data = await response.json();
+    if (!data) return { payload: fallback, version: 0, updatedAt: '' };
+    return { payload: data.payload as T, version: data.version, updatedAt: data.updatedAt };
+  } catch {
+    return { payload: fallback, version: 0, updatedAt: '' };
+  }
+}
+
+export async function saveSharedData<T>(namespace: string, payload: T, expectedVersion?: number): Promise<StoreEnvelope<T>> {
+  const current = session();
+  const hotelId = current.user?.hotelId;
+  if (!hotelId) throw new Error('Hôtel introuvable dans la session.');
+
+  const response = await fetch(`/api/operational-sync/${encodeURIComponent(namespace)}`, {
+    method: 'PUT',
+    headers: headers(),
+    body: JSON.stringify({ hotelId, payload, updatedById: current.user?.id, expectedVersion }),
+  });
+
+  const data = await response.json();
+  if (response.status === 409) throw new Error('Une autre personne a modifié ces données. Rechargez la page avant de recommencer.');
+  if (!response.ok) throw new Error(data.message || 'Enregistrement impossible.');
+  return { payload: data.payload as T, version: data.version, updatedAt: data.updatedAt };
+}
