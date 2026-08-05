@@ -5,6 +5,7 @@ import { AppController } from './app.controller';
 import { AllocationModule } from './allocation/allocation.module';
 import { AuthModule } from './auth/auth.module';
 import { GroupsModule } from './groups/groups.module';
+import { OperationalSyncModule } from './operational-sync/operational-sync.module';
 import { RoomsModule } from './rooms/rooms.module';
 import { ShiftLogModule } from './shift-log/shift-log.module';
 import { TicketsModule } from './tickets/tickets.module';
@@ -21,6 +22,7 @@ import { TicketsModule } from './tickets/tickets.module';
     TicketsModule,
     GroupsModule,
     AllocationModule,
+    OperationalSyncModule,
   ],
   controllers: [AppController],
 })
