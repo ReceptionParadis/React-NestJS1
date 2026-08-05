@@ -9,6 +9,7 @@ import './groups.css';
 import './rooming-import.css';
 import './auth.css';
 import './meeting-rooms.css';
+import './restaurant-planning.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode><AppRouter /></React.StrictMode>,
