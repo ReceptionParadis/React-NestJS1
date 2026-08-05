@@ -1,5 +1,6 @@
 export type MealService = 'Petit-déjeuner' | 'Déjeuner' | 'Dîner';
 export type GroupArrival = 'Prévu' | 'En route' | 'Arrivé';
+export type HousekeepingStatus = 'À faire' | 'OK propre' | 'OK recouche';
 
 export type MealPlan = {
   service: MealService;
@@ -22,6 +23,8 @@ export type FunctionSheet = {
   arrivalStatus: GroupArrival;
   receptionConfirmedAt?: string;
   meals: MealPlan[];
+  housekeepingStatus: HousekeepingStatus;
+  housekeepingConfirmedAt?: string;
   housekeepingNotes: string;
   kitchenNotes: string;
   receptionNotes: string;
@@ -33,7 +36,7 @@ const KEY = 'hospicore.function-sheets.v1';
 export const demoFunctionSheets: FunctionSheet[] = [
   {
     id: 'marian', groupName: 'Marian Pilgrimages', arrivalDate: '2026-08-05', departureDate: '2026-08-08', arrivalTime: '16:00', pax: 54,
-    agency: 'Marian Pilgrimages', leader: 'John Murphy', arrivalStatus: 'En route',
+    agency: 'Marian Pilgrimages', leader: 'John Murphy', arrivalStatus: 'En route', housekeepingStatus: 'À faire',
     meals: [
       { service: 'Dîner', time: '19:00', pax: 54, room: 'Restaurant principal', diets: '2 sans gluten', notes: 'Service rapide après arrivée' },
       { service: 'Petit-déjeuner', time: '07:00', pax: 54, room: 'Restaurant principal', notes: 'Départ bus à 08:15' },
@@ -42,7 +45,7 @@ export const demoFunctionSheets: FunctionSheet[] = [
   },
   {
     id: 'unitalsi', groupName: 'Unitalsi', arrivalDate: '2026-08-05', departureDate: '2026-08-09', arrivalTime: '17:45', pax: 82,
-    agency: 'Unitalsi', leader: 'Maria Rossi', arrivalStatus: 'Prévu',
+    agency: 'Unitalsi', leader: 'Maria Rossi', arrivalStatus: 'Prévu', housekeepingStatus: 'À faire',
     meals: [
       { service: 'Dîner', time: '19:30', pax: 82, room: 'Salle Gavarnie', diets: '4 mixés · 2 sans lactose', notes: '2 tables PMR proches de l’entrée' },
       { service: 'Petit-déjeuner', time: '07:30', pax: 82, room: 'Salle Gavarnie' },
@@ -52,10 +55,14 @@ export const demoFunctionSheets: FunctionSheet[] = [
   },
 ];
 
+function normalizeSheet(item: FunctionSheet): FunctionSheet {
+  return { ...item, housekeepingStatus: item.housekeepingStatus || 'À faire' };
+}
+
 export function loadFunctionSheets(): FunctionSheet[] {
   try {
     const saved = localStorage.getItem(KEY);
-    return saved ? JSON.parse(saved) : demoFunctionSheets;
+    return saved ? (JSON.parse(saved) as FunctionSheet[]).map(normalizeSheet) : demoFunctionSheets;
   } catch {
     return demoFunctionSheets;
   }
@@ -70,8 +77,26 @@ export function markGroupArrived(id: string) {
   const items = loadFunctionSheets().map((item) => item.id === id ? {
     ...item,
     arrivalStatus: 'Arrivé' as const,
+    housekeepingStatus: 'À faire' as const,
     receptionConfirmedAt: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
   } : item);
   saveFunctionSheets(items);
   return items;
+}
+
+export function markHousekeepingDone(id: string, status: Exclude<HousekeepingStatus, 'À faire'>) {
+  const items = loadFunctionSheets().map((item) => item.id === id ? {
+    ...item,
+    housekeepingStatus: status,
+    housekeepingConfirmedAt: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
+  } : item);
+  saveFunctionSheets(items);
+  return items;
+}
+
+export function getHousekeepingTask(item: FunctionSheet, today = new Date().toISOString().slice(0, 10)) {
+  if (item.arrivalStatus !== 'Arrivé') return 'En attente de l’arrivée' as const;
+  if (today === item.arrivalDate) return 'Propre arrivée' as const;
+  if (today > item.arrivalDate && today < item.departureDate) return 'Recouche' as const;
+  return 'Aucune tâche' as const;
 }
