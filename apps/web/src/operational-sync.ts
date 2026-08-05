@@ -1,4 +1,4 @@
-type SessionUser = { id?: string; hotelId?: string };
+type SessionUser = { id?: string; hotelId?: string; hotel?: { id?: string } };
 type Session = { token?: string; user?: SessionUser };
 
 type StoreEnvelope<T> = {
@@ -12,6 +12,10 @@ function session(): Session {
   catch { return {}; }
 }
 
+function hotelIdFromSession(current: Session) {
+  return current.user?.hotelId || current.user?.hotel?.id || '';
+}
+
 function headers() {
   const token = session().token || localStorage.getItem('hospicore.token') || '';
   return { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) };
@@ -19,7 +23,7 @@ function headers() {
 
 export async function loadSharedData<T>(namespace: string, fallback: T): Promise<StoreEnvelope<T>> {
   const current = session();
-  const hotelId = current.user?.hotelId;
+  const hotelId = hotelIdFromSession(current);
   if (!hotelId) return { payload: fallback, version: 0, updatedAt: '' };
 
   try {
@@ -35,7 +39,7 @@ export async function loadSharedData<T>(namespace: string, fallback: T): Promise
 
 export async function saveSharedData<T>(namespace: string, payload: T, expectedVersion?: number): Promise<StoreEnvelope<T>> {
   const current = session();
-  const hotelId = current.user?.hotelId;
+  const hotelId = hotelIdFromSession(current);
   if (!hotelId) throw new Error('Hôtel introuvable dans la session.');
 
   const response = await fetch(`/api/operational-sync/${encodeURIComponent(namespace)}`, {
