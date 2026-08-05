@@ -17,6 +17,7 @@ import './operations-center.css';
 import './general-instructions.css';
 import './activity-journal.css';
 import './tasks.css';
+import './administration.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode><AppRouter /></React.StrictMode>,
