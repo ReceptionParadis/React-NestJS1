@@ -64,6 +64,31 @@ export class OperationalSyncService {
     });
   }
 
+  async diagnostic(hotelId?: string, userId?: string) {
+    const startedAt = Date.now();
+    const resolvedHotelId = await this.resolveHotelId(hotelId, userId);
+    const [hotel, user, stores, databaseProbe] = await Promise.all([
+      this.prisma.hotel.findUnique({ where: { id: resolvedHotelId }, select: { id: true, name: true, slug: true } }),
+      userId ? this.prisma.user.findUnique({ where: { id: userId }, select: { id: true, firstName: true, lastName: true, email: true, hotelId: true, role: { select: { name: true } } } }) : null,
+      this.prisma.operationalStore.findMany({
+        where: { hotelId: resolvedHotelId },
+        select: { namespace: true, version: true, updatedAt: true, updatedById: true },
+        orderBy: { namespace: 'asc' },
+      }),
+      this.prisma.$queryRaw<Array<{ now: Date }>>`SELECT NOW() as now`,
+    ]);
+
+    return {
+      status: 'ok',
+      checkedAt: new Date().toISOString(),
+      responseTimeMs: Date.now() - startedAt,
+      database: { connected: true, serverTime: databaseProbe[0]?.now ?? null },
+      hotel,
+      user,
+      operationalStore: { available: true, namespaces: stores },
+    };
+  }
+
   private async resolveHotelId(hotelId?: string, userId?: string) {
     if (hotelId) return hotelId;
     if (!userId) throw new BadRequestException('Hôtel et utilisateur absents.');
