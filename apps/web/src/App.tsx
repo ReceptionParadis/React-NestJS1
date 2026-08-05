@@ -3,7 +3,6 @@ import {
   AlertTriangle,
   BedDouble,
   Bell,
-  Building2,
   CalendarDays,
   CheckCircle2,
   ChevronRight,
@@ -22,7 +21,7 @@ const nav = [
   { label: 'Tableau de bord', icon: LayoutDashboard, href: '/', active: true },
   { label: 'Main courante', icon: MessageSquareText, href: '/main-courante' },
   { label: 'Tickets', icon: ClipboardList, href: '/tickets' },
-  { label: 'Chambres', icon: BedDouble, href: '/chambres' },
+  { label: 'Salles de réunion', icon: CalendarDays, href: '/salles-reunion' },
   { label: 'Groupes', icon: UsersRound, href: '/groupes' },
 ];
 
@@ -31,8 +30,8 @@ const metrics = [
   { label: 'Arrivées', value: '128', detail: '9 groupes · 61 chambres', delta: 'Pic entre 16h et 19h', tone: 'gold' },
   { label: 'Départs', value: '112', detail: '26 avant 08h00', delta: '74 chambres libérées', tone: 'blue' },
   { label: 'Clients présents', value: '589', detail: '38 nationalités', delta: '75 % clientèle groupes', tone: 'green' },
-  { label: 'À nettoyer', value: '76', detail: '42 déjà en cours', delta: '18 contrôles terminés', tone: 'orange' },
-  { label: 'Hors service', value: '4', detail: '2 maintenance urgente', delta: '298 chambres vendables', tone: 'red' },
+  { label: 'Salles réservées', value: '7', detail: '3 événements aujourd’hui', delta: '1 option à confirmer', tone: 'orange' },
+  { label: 'Tickets ouverts', value: '6', detail: '2 interventions urgentes', delta: '4 services concernés', tone: 'red' },
 ];
 
 const arrivals = [
@@ -44,14 +43,14 @@ const arrivals = [
 
 const alerts = [
   { icon: Wrench, title: 'Ascenseur bâtiment B', text: 'Intervention prévue à 14h00', tone: 'critical' },
-  { icon: BedDouble, title: '8 chambres non contrôlées', text: 'Groupe Marian · arrivée 16h00', tone: 'warning' },
+  { icon: CalendarDays, title: 'Salle Gavarnie en option', text: 'Conférence ORP · confirmation attendue', tone: 'warning' },
   { icon: ClipboardList, title: 'Rooming list incomplète', text: 'ORP · 4 voyageurs sans type de chambre', tone: 'warning' },
   { icon: CheckCircle2, title: 'Parking bus confirmé', text: '3 emplacements réservés cet après-midi', tone: 'success' },
 ];
 
 const services = [
   { name: 'Réception', status: 'Opérationnel', detail: '3 postes ouverts', score: 92 },
-  { name: 'Étages', status: 'Sous tension', detail: '76 chambres restantes', score: 64 },
+  { name: 'Communication', status: 'À suivre', detail: '4 transmissions prioritaires', score: 78 },
   { name: 'Maintenance', status: '2 urgences', detail: '6 tickets ouverts', score: 71 },
   { name: 'Restaurant', status: 'Prêt', detail: '287 couverts au dîner', score: 88 },
 ];
@@ -85,7 +84,7 @@ export function App() {
         <header className="topbar executive-topbar">
           <div className="heading-wrap">
             <button className="mobile-menu" onClick={() => setSidebarOpen(true)} aria-label="Menu"><Menu size={22} /></button>
-            <div><p className="eyebrow">Mercredi 5 août 2026 · 01h35</p><h1>Centre opérationnel</h1></div>
+            <div><p className="eyebrow">Mercredi 5 août 2026 · 16h18</p><h1>Centre opérationnel</h1></div>
           </div>
           <div className="topbar-actions">
             <span className="live-badge"><span /> Données de démonstration</span>
@@ -98,11 +97,11 @@ export function App() {
           <div>
             <p className="eyebrow light">Briefing HospiCore AI</p>
             <h2>Une journée dense, mais maîtrisable.</h2>
-            <p>Priorité aux 8 chambres du groupe Marian et au règlement Joe Walsh. Le pic d’activité est estimé à 17h45.</p>
+            <p>Priorité à la coordination des arrivées, aux transmissions interservices et à la confirmation de la salle Gavarnie.</p>
           </div>
           <div className="hero-actions">
             <button onClick={() => navigate('/groupes')}><UsersRound size={18} />Voir les groupes</button>
-            <button onClick={() => navigate('/chambres')}><Building2 size={18} />Plan des chambres</button>
+            <button onClick={() => navigate('/salles-reunion')}><CalendarDays size={18} />Agenda des salles</button>
           </div>
         </section>
 
@@ -148,7 +147,7 @@ export function App() {
             <div className="panel-header compact"><div><p className="eyebrow">Accès rapide</p><h2>Modules de la démo</h2></div></div>
             <div className="quick-grid">
               {nav.slice(1).map(({ label, icon: Icon, href }) => <button key={label} onClick={() => navigate(href)}><Icon size={22} /><span>{label}</span><ChevronRight size={16} /></button>)}
-              <button><CalendarDays size={22} /><span>Planning</span><em>Bientôt</em></button>
+              <button><BedDouble size={22} /><span>Housekeeping</span><em>Bientôt</em></button>
             </div>
           </article>
         </section>
