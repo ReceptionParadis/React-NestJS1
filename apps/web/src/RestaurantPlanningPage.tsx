@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, CheckCircle2, ChefHat, Clock3, Coffee, Filter, Salad, Search, Soup, UsersRound } from 'lucide-react';
-import { FunctionSheet, loadFunctionSheets, markMealRestaurantStatus, MealService, RestaurantStatus } from './interservice-data';
+import { ArrowLeft, CheckCircle2, ChefHat, Clock3, Coffee, Eye, Filter, Salad, Search, Soup, UsersRound } from 'lucide-react';
+import { acknowledgeFunctionSheet, FunctionSheet, loadFunctionSheets, markMealRestaurantStatus, MealService, RestaurantStatus } from './interservice-data';
 
 const mealIcons = { 'Petit-déjeuner': Coffee, 'Déjeuner': Salad, 'Dîner': Soup };
 
@@ -33,6 +33,10 @@ export function RestaurantPlanningPage() {
     setGroups(markMealRestaurantStatus(groupId, service, status));
   }
 
+  function acknowledge(groupId: string) {
+    setGroups(acknowledgeFunctionSheet(groupId, 'restaurant'));
+  }
+
   return <div className="restaurant-page">
     <header className="restaurant-header">
       <div><button className="restaurant-back" onClick={() => { window.location.href = '/'; }}><ArrowLeft size={18}/> Tableau de bord</button><p className="restaurant-eyebrow">Communication Réception · Cuisine · Restaurant</p><h1>Planning Restaurant</h1><p>Suivez les groupes arrivés, les horaires de repas et l’état de préparation transmis par la cuisine.</p></div>
@@ -51,9 +55,14 @@ export function RestaurantPlanningPage() {
     <section className="restaurant-list">{rows.map(({ group, mealPlan }) => {
       const Icon = mealIcons[mealPlan.service];
       const arrivalLabel = group.arrivalStatus === 'Arrivé' ? (mealPlan.time ? 'Prévu' : 'En attente de l’horaire') : group.arrivalStatus;
+      const acknowledgedAt = group.acknowledgements.restaurant;
       return <article className="restaurant-group-card" key={`${group.id}-${mealPlan.service}`}>
         <div className="meal-icon"><Icon size={22}/></div>
-        <div className="group-main"><div className="group-heading"><div><span className="meal-label">{mealPlan.service}</span><h2>{group.groupName}</h2></div><span className={`arrival-badge ${group.arrivalStatus.toLowerCase().replace(' ', '-')}`}>{arrivalLabel}</span></div><div className="group-details"><span><Clock3 size={16}/><strong>{mealPlan.time || 'Horaire à confirmer'}</strong></span><span><UsersRound size={16}/><strong>{mealPlan.pax} pax</strong></span><span><ChefHat size={16}/>{mealPlan.room}</span></div>{(mealPlan.diets || mealPlan.notes) && <div className="group-notes">{mealPlan.diets && <span><strong>Régimes :</strong> {mealPlan.diets}</span>}{mealPlan.notes && <span><strong>Consigne :</strong> {mealPlan.notes}</span>}</div>}</div>
+        <div className="group-main">
+          <div className="group-heading"><div><span className="meal-label">{mealPlan.service}</span><h2>{group.groupName}</h2></div><span className={`arrival-badge ${group.arrivalStatus.toLowerCase().replace(' ', '-')}`}>{arrivalLabel}</span></div>
+          <div className={`acknowledgement-box compact${acknowledgedAt ? ' acknowledged' : ''}`}><div><Eye size={16}/><span>{acknowledgedAt ? `Fiche validée le ${acknowledgedAt}` : 'Fiche de fonction non encore validée par le restaurant.'}</span></div>{!acknowledgedAt && <button onClick={() => acknowledge(group.id)}><CheckCircle2 size={15}/> J’ai lu</button>}</div>
+          <div className="group-details"><span><Clock3 size={16}/><strong>{mealPlan.time || 'Horaire à confirmer'}</strong></span><span><UsersRound size={16}/><strong>{mealPlan.pax} pax</strong></span><span><ChefHat size={16}/>{mealPlan.room}</span></div>{(mealPlan.diets || mealPlan.notes) && <div className="group-notes">{mealPlan.diets && <span><strong>Régimes :</strong> {mealPlan.diets}</span>}{mealPlan.notes && <span><strong>Consigne :</strong> {mealPlan.notes}</span>}</div>}
+        </div>
         <div className="reception-status"><span>Cuisine</span><strong>{mealPlan.kitchenStatus}</strong><small>{mealPlan.kitchenConfirmedAt ? `Validé à ${mealPlan.kitchenConfirmedAt}` : 'En cours de préparation'}</small><span>Restaurant</span><strong>{mealPlan.restaurantStatus}</strong>{group.arrivalStatus === 'Arrivé' && mealPlan.kitchenStatus === 'Prêt à servir' && mealPlan.restaurantStatus === 'Prévu' && <button onClick={() => updateService(group.id, mealPlan.service, 'En salle')}>Groupe en salle</button>}{mealPlan.restaurantStatus === 'En salle' && <button onClick={() => updateService(group.id, mealPlan.service, 'Terminé')}>Service terminé</button>}{mealPlan.restaurantStatus === 'Terminé' && <small>Terminé à {mealPlan.restaurantConfirmedAt}</small>}</div>
       </article>;
     })}</section>
