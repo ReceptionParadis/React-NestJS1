@@ -1,6 +1,7 @@
 import { App } from './App';
 import { AuthGate } from './AuthGate';
 import { GroupsPage } from './GroupsPage';
+import { InterserviceControlPage } from './InterserviceControlPage';
 import { InterservicePage } from './InterservicePage';
 import { MainCourante } from './MainCourante';
 import { MeetingRoomsPage } from './MeetingRoomsPage';
@@ -12,6 +13,7 @@ import { WeeklyPlanningPage } from './WeeklyPlanningPage';
 function CurrentPage() {
   const path = window.location.pathname;
 
+  if (path.startsWith('/suivi-interservice')) return <InterserviceControlPage />;
   if (path.startsWith('/planning-hebdomadaire')) return <WeeklyPlanningPage />;
   if (path.startsWith('/reception')) return <InterservicePage department="reception" />;
   if (path.startsWith('/restaurant')) return <RestaurantPlanningPage />;
