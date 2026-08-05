@@ -1,3 +1,4 @@
+import { ActivityJournalPage } from './ActivityJournalPage';
 import { App } from './App';
 import { AuthGate } from './AuthGate';
 import { GeneralInstructionsPage } from './GeneralInstructionsPage';
@@ -15,6 +16,7 @@ import { WeeklyPlanningPage } from './WeeklyPlanningPage';
 function CurrentPage() {
   const path = window.location.pathname;
 
+  if (path.startsWith('/journal-exploitation') || path.startsWith('/activite')) return <ActivityJournalPage />;
   if (path.startsWith('/consignes-generales')) return <GeneralInstructionsPage />;
   if (path.startsWith('/centre-operations') || path.startsWith('/cahier-consignes') || path.startsWith('/prets')) return <OperationsCenterPage />;
   if (path.startsWith('/suivi-interservice')) return <InterserviceControlPage />;
