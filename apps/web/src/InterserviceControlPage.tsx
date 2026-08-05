@@ -73,8 +73,8 @@ export function InterserviceControlPage() {
 
           <div className="control-progress">
             {services.map(({ key, label, icon: Icon }) => {
-              const ack = item.acknowledgements?.[key];
-              return <div className={ack ? 'done' : ''} key={key}><Icon size={18}/><span>{label}</span><strong>{ack ? 'Lu' : 'À lire'}</strong>{ack && <small>{ack.at}</small>}</div>;
+              const acknowledgement = item.acknowledgements?.[key];
+              return <div className={acknowledgement ? 'done' : ''} key={key}><Icon size={18}/><span>{label}</span><strong>{acknowledgement ? 'Lu' : 'À lire'}</strong>{acknowledgement && <small>{acknowledgement}</small>}</div>;
             })}
           </div>
 
