@@ -1,8 +1,8 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, BedDouble, CheckCircle2, ChefHat, ClipboardEdit, Clock3, Hotel, Plus, Printer, Save, Sparkles, UsersRound } from 'lucide-react';
+import { ArrowLeft, BedDouble, CheckCircle2, ChefHat, ClipboardEdit, Clock3, Eye, Hotel, Plus, Printer, Save, Sparkles, UsersRound } from 'lucide-react';
 import {
-  FunctionSheet, getHousekeepingTask, loadFunctionSheets, markGroupArrived,
-  markHousekeepingDone, markMealKitchenReady, MealService, saveFunctionSheets,
+  acknowledgeFunctionSheet, FunctionSheet, getHousekeepingTask, loadFunctionSheets, markGroupArrived,
+  markHousekeepingDone, markMealKitchenReady, MealService, OperationalDepartment, saveFunctionSheets,
 } from './interservice-data';
 
 type Department = 'reception' | 'housekeeping' | 'cuisine' | 'commercial';
@@ -11,11 +11,15 @@ const departmentConfig = {
   reception: { title: 'Interface Réception', subtitle: 'Confirmez les arrivées et diffusez l’information aux services.', icon: Hotel },
   housekeeping: { title: 'Interface Housekeeping', subtitle: 'Validez les chambres propres à l’arrivée et les recouches des groupes en séjour.', icon: BedDouble },
   cuisine: { title: 'Interface Cuisine', subtitle: 'Préparez les services groupes et informez le restaurant lorsque tout est prêt.', icon: ChefHat },
-  commercial: { title: 'Interface Commercial', subtitle: 'Éditez les fiches de fonction hebdomadaires des groupes.', icon: ClipboardEdit },
+  commercial: { title: 'Interface Commercial', subtitle: 'Éditez les fiches et vérifiez leur lecture par chaque service.', icon: ClipboardEdit },
+};
+
+const acknowledgementLabels: Record<OperationalDepartment, string> = {
+  reception: 'Réception', restaurant: 'Restaurant', housekeeping: 'Housekeeping', cuisine: 'Cuisine',
 };
 
 function emptyFunctionSheet(): FunctionSheet {
-  return { id: crypto.randomUUID(), groupName: '', arrivalDate: '', departureDate: '', arrivalTime: '', pax: 0, agency: '', leader: '', arrivalStatus: 'Prévu', meals: [], housekeepingStatus: 'À faire', receptionNotes: '', housekeepingNotes: '', kitchenNotes: '', commercialNotes: '' };
+  return { id: crypto.randomUUID(), groupName: '', arrivalDate: '', departureDate: '', arrivalTime: '', pax: 0, agency: '', leader: '', arrivalStatus: 'Prévu', meals: [], housekeepingStatus: 'À faire', receptionNotes: '', housekeepingNotes: '', kitchenNotes: '', commercialNotes: '', acknowledgements: {} };
 }
 
 export function InterservicePage({ department }: { department: Department }) {
@@ -45,6 +49,9 @@ export function InterservicePage({ department }: { department: Department }) {
   const confirmArrival = (id: string) => setItems(markGroupArrived(id));
   const confirmHousekeeping = (id: string, status: 'OK propre' | 'OK recouche') => setItems(markHousekeepingDone(id, status));
   const confirmKitchen = (id: string, service: MealService) => setItems(markMealKitchenReady(id, service));
+  const acknowledge = (id: string) => {
+    if (department !== 'commercial') setItems(acknowledgeFunctionSheet(id, department));
+  };
 
   function saveSheet(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -79,8 +86,18 @@ export function InterservicePage({ department }: { department: Department }) {
 
     <section className="function-sheet-list">{items.map((item) => {
       const housekeepingTask = getHousekeepingTask(item);
+      const departmentAcknowledged = department !== 'commercial' ? item.acknowledgements[department] : undefined;
       return <article className="function-sheet-card" key={item.id}>
         <div className="function-sheet-title"><div><span className={`workflow-status ${item.arrivalStatus.toLowerCase().replace(' ', '-')}`}>{item.arrivalStatus}</span><h2>{item.groupName}</h2><small>{item.agency} · {item.pax} pax · {item.arrivalDate} au {item.departureDate}</small></div><UsersRound size={24}/></div>
+
+        {department !== 'commercial' && <div className={`acknowledgement-box${departmentAcknowledged ? ' acknowledged' : ''}`}>
+          <div><Eye size={18}/><span>{departmentAcknowledged ? `Fiche consultée et validée le ${departmentAcknowledged}` : 'Merci de confirmer la lecture de cette fiche de fonction.'}</span></div>
+          {!departmentAcknowledged && <button className="interservice-primary" onClick={() => acknowledge(item.id)}><CheckCircle2 size={16}/> J’ai lu et pris connaissance</button>}
+        </div>}
+
+        {department === 'commercial' && <div className="acknowledgement-summary">
+          {(Object.keys(acknowledgementLabels) as OperationalDepartment[]).map((key) => <span className={item.acknowledgements[key] ? 'done' : 'pending'} key={key}><CheckCircle2 size={14}/>{acknowledgementLabels[key]}<small>{item.acknowledgements[key] || 'Non lu'}</small></span>)}
+        </div>}
 
         {department === 'reception' && <div className="department-block"><strong>Arrivée prévue à {item.arrivalTime || 'confirmer'}</strong><p>{item.receptionNotes || 'Aucune consigne réception.'}</p>{item.arrivalStatus !== 'Arrivé' ? <button className="interservice-primary" onClick={() => confirmArrival(item.id)}><CheckCircle2 size={17}/> Marquer le groupe arrivé</button> : <small>Arrivée confirmée à {item.receptionConfirmedAt}</small>}</div>}
 
