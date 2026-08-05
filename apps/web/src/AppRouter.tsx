@@ -10,12 +10,14 @@ import { MeetingRoomsPage } from './MeetingRoomsPage';
 import { OperationsCenterPage } from './OperationsCenterPage';
 import { RestaurantPlanningPage } from './RestaurantPlanningPage';
 import { RoomingListImportPage } from './RoomingListImportPage';
+import { TasksPage } from './TasksPage';
 import { TicketsPage } from './TicketsPage';
 import { WeeklyPlanningPage } from './WeeklyPlanningPage';
 
 function CurrentPage() {
   const path = window.location.pathname;
 
+  if (path.startsWith('/taches')) return <TasksPage />;
   if (path.startsWith('/journal-exploitation') || path.startsWith('/activite')) return <ActivityJournalPage />;
   if (path.startsWith('/consignes-generales')) return <GeneralInstructionsPage />;
   if (path.startsWith('/centre-operations') || path.startsWith('/cahier-consignes') || path.startsWith('/prets')) return <OperationsCenterPage />;
