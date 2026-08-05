@@ -1,0 +1,32 @@
+import { Body, Controller, Get, Param, Put, Query } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
+import { OperationalSyncService } from './operational-sync.service';
+
+@Controller('operational-sync')
+export class OperationalSyncController {
+  constructor(private readonly service: OperationalSyncService) {}
+
+  @Get()
+  list(@Query('hotelId') hotelId: string) {
+    return this.service.list(hotelId);
+  }
+
+  @Get(':namespace')
+  get(@Param('namespace') namespace: string, @Query('hotelId') hotelId: string) {
+    return this.service.get(hotelId, namespace);
+  }
+
+  @Put(':namespace')
+  save(
+    @Param('namespace') namespace: string,
+    @Body()
+    body: {
+      hotelId: string;
+      payload: Prisma.InputJsonValue;
+      updatedById?: string;
+      expectedVersion?: number;
+    },
+  ) {
+    return this.service.save({ ...body, namespace });
+  }
+}
