@@ -91,6 +91,22 @@ model Hotel {
   notes ShiftNote[]
   tickets Ticket[]
   groups HotelGroup[]
+  operationalStores OperationalStore[]
+}
+
+model OperationalStore {
+  id String @id @default(cuid())
+  hotelId String
+  namespace String
+  payload Json
+  version Int @default(1)
+  updatedById String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  hotel Hotel @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  updatedBy User? @relation(fields: [updatedById], references: [id], onDelete: SetNull)
+  @@unique([hotelId, namespace])
+  @@index([hotelId, updatedAt])
 }
 
 model Role {
@@ -119,6 +135,7 @@ model User {
   assignedTickets Ticket[] @relation("TicketAssignee")
   ticketComments TicketComment[]
   ticketEvents TicketEvent[]
+  operationalUpdates OperationalStore[]
 }
 
 model Room {
