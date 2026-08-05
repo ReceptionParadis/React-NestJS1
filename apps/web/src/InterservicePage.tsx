@@ -1,15 +1,34 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, BedDouble, CheckCircle2, ChefHat, ClipboardEdit, Clock3, Plus, Printer, Reception, Save, UsersRound } from 'lucide-react';
+import { ArrowLeft, BedDouble, CheckCircle2, ChefHat, ClipboardEdit, Clock3, Hotel, Plus, Printer, Save, UsersRound } from 'lucide-react';
 import { FunctionSheet, loadFunctionSheets, markGroupArrived, MealService, saveFunctionSheets } from './interservice-data';
 
 type Department = 'reception' | 'housekeeping' | 'cuisine' | 'commercial';
 
 const departmentConfig = {
-  reception: { title: 'Interface Réception', subtitle: 'Confirmez les arrivées et diffusez l’information aux services.', icon: Reception },
+  reception: { title: 'Interface Réception', subtitle: 'Confirmez les arrivées et diffusez l’information aux services.', icon: Hotel },
   housekeeping: { title: 'Interface Housekeeping', subtitle: 'Consultez les groupes, priorités et consignes d’étages.', icon: BedDouble },
   cuisine: { title: 'Interface Cuisine', subtitle: 'Anticipez les volumes, régimes et horaires de service.', icon: ChefHat },
   commercial: { title: 'Interface Commercial', subtitle: 'Éditez les fiches de fonction hebdomadaires des groupes.', icon: ClipboardEdit },
 };
+
+function emptyFunctionSheet(): FunctionSheet {
+  return {
+    id: crypto.randomUUID(),
+    groupName: '',
+    arrivalDate: '',
+    departureDate: '',
+    arrivalTime: '',
+    pax: 0,
+    agency: '',
+    leader: '',
+    arrivalStatus: 'Prévu',
+    meals: [],
+    receptionNotes: '',
+    housekeepingNotes: '',
+    kitchenNotes: '',
+    commercialNotes: '',
+  };
+}
 
 export function InterservicePage({ department }: { department: Department }) {
   const config = departmentConfig[department];
@@ -35,9 +54,7 @@ export function InterservicePage({ department }: { department: Department }) {
   function saveSheet(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
-    const base = editing || {
-      id: crypto.randomUUID(), arrivalStatus: 'Prévu', meals: [], receptionNotes: '', housekeepingNotes: '', kitchenNotes: '', commercialNotes: '',
-    } as FunctionSheet;
+    const base: FunctionSheet = editing ?? emptyFunctionSheet();
     const meals: FunctionSheet['meals'] = (['Petit-déjeuner', 'Déjeuner', 'Dîner'] as MealService[]).flatMap((service) => {
       const enabled = form.get(`${service}-enabled`) === 'on';
       return enabled ? [{
@@ -64,7 +81,7 @@ export function InterservicePage({ department }: { department: Department }) {
   return <div className="interservice-page">
     <header className="interservice-header">
       <div><button onClick={() => { window.location.href = '/'; }}><ArrowLeft size={18} /> Tableau de bord</button><p>HospiCore · Communication interservice</p><h1><Icon size={30} /> {config.title}</h1><span>{config.subtitle}</span></div>
-      {department === 'commercial' && <button className="interservice-primary" onClick={() => setEditing({} as FunctionSheet)}><Plus size={18} /> Nouvelle fiche de fonction</button>}
+      {department === 'commercial' && <button className="interservice-primary" onClick={() => setEditing(emptyFunctionSheet())}><Plus size={18} /> Nouvelle fiche de fonction</button>}
     </header>
 
     {department === 'cuisine' && <section className="interservice-kpis">
@@ -82,7 +99,7 @@ export function InterservicePage({ department }: { department: Department }) {
         {department === 'cuisine' && <div className="department-block"><strong>Préparation cuisine</strong><p>{item.kitchenNotes || 'Aucune consigne particulière.'}</p></div>}
 
         <div className="meal-function-grid">
-          {item.meals.map((meal) => <div className="meal-function" key={`${item.id}-${meal.service}`}><span>{meal.service}</span><strong><Clock3 size={15} /> {meal.time || (item.arrivalStatus === 'Arrivé' ? 'En attente de l’horaire' : 'Horaire à confirmer')}</strong><small>{meal.pax} pax · {meal.room}</small>{meal.diets && <em>{meal.diets}</em>}{meal.notes && <p>{meal.notes}</p>}{department === 'restaurant' && null}</div>)}
+          {item.meals.map((meal) => <div className="meal-function" key={`${item.id}-${meal.service}`}><span>{meal.service}</span><strong><Clock3 size={15} /> {meal.time || (item.arrivalStatus === 'Arrivé' ? 'En attente de l’horaire' : 'Horaire à confirmer')}</strong><small>{meal.pax} pax · {meal.room}</small>{meal.diets && <em>{meal.diets}</em>}{meal.notes && <p>{meal.notes}</p>}</div>)}
         </div>
 
         {department === 'commercial' && <div className="commercial-actions"><button onClick={() => setEditing(item)}><ClipboardEdit size={16} /> Modifier</button><button onClick={() => window.print()}><Printer size={16} /> Imprimer</button></div>}
@@ -91,7 +108,7 @@ export function InterservicePage({ department }: { department: Department }) {
 
     {editing && <div className="function-modal"><form onSubmit={saveSheet} className="function-form"><header><div><p>Commercial</p><h2>Fiche de fonction groupe</h2></div><button type="button" onClick={() => setEditing(null)}>Fermer</button></header>
       <div className="form-grid"><label>Nom du groupe<input name="groupName" defaultValue={editing.groupName} required /></label><label>Agence<input name="agency" defaultValue={editing.agency} /></label><label>Chef de groupe<input name="leader" defaultValue={editing.leader} /></label><label>Nombre de personnes<input name="pax" type="number" defaultValue={editing.pax} required /></label><label>Arrivée<input name="arrivalDate" type="date" defaultValue={editing.arrivalDate} required /></label><label>Heure arrivée<input name="arrivalTime" type="time" defaultValue={editing.arrivalTime} /></label><label>Départ<input name="departureDate" type="date" defaultValue={editing.departureDate} required /></label></div>
-      <h3>Services repas</h3>{(['Petit-déjeuner', 'Déjeuner', 'Dîner'] as MealService[]).map((service) => { const meal = editing.meals?.find((m) => m.service === service); return <fieldset key={service}><legend><label><input type="checkbox" name={`${service}-enabled`} defaultChecked={Boolean(meal)} /> {service}</label></legend><div className="form-grid"><label>Heure<input type="time" name={`${service}-time`} defaultValue={meal?.time} /></label><label>Pax<input type="number" name={`${service}-pax`} defaultValue={meal?.pax || editing.pax} /></label><label>Salle<input name={`${service}-room`} defaultValue={meal?.room || 'Restaurant principal'} /></label><label>Régimes<input name={`${service}-diets`} defaultValue={meal?.diets} /></label><label className="wide">Consignes<input name={`${service}-notes`} defaultValue={meal?.notes} /></label></div></fieldset>; })}
+      <h3>Services repas</h3>{(['Petit-déjeuner', 'Déjeuner', 'Dîner'] as MealService[]).map((service) => { const meal = editing.meals.find((m) => m.service === service); return <fieldset key={service}><legend><label><input type="checkbox" name={`${service}-enabled`} defaultChecked={Boolean(meal)} /> {service}</label></legend><div className="form-grid"><label>Heure<input type="time" name={`${service}-time`} defaultValue={meal?.time} /></label><label>Pax<input type="number" name={`${service}-pax`} defaultValue={meal?.pax || editing.pax} /></label><label>Salle<input name={`${service}-room`} defaultValue={meal?.room || 'Restaurant principal'} /></label><label>Régimes<input name={`${service}-diets`} defaultValue={meal?.diets} /></label><label className="wide">Consignes<input name={`${service}-notes`} defaultValue={meal?.notes} /></label></div></fieldset>; })}
       <div className="form-grid"><label className="wide">Réception<textarea name="receptionNotes" defaultValue={editing.receptionNotes} /></label><label className="wide">Housekeeping<textarea name="housekeepingNotes" defaultValue={editing.housekeepingNotes} /></label><label className="wide">Cuisine<textarea name="kitchenNotes" defaultValue={editing.kitchenNotes} /></label><label className="wide">Commercial<textarea name="commercialNotes" defaultValue={editing.commercialNotes} /></label></div>
       <footer><button type="button" onClick={() => setEditing(null)}>Annuler</button><button className="interservice-primary" type="submit"><Save size={17} /> Enregistrer la fiche</button></footer>
     </form></div>}
