@@ -1,7 +1,8 @@
 import { FormEvent, useMemo, useState } from 'react';
-import { ArrowLeft, CheckCircle2, Clock3, CreditCard, PackagePlus, Plus, Search, UserRound, X } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Clock3, CreditCard, Package, PackagePlus, Plus, Search, ShieldAlert, UserRound, Wrench, X } from 'lucide-react';
 
 type LoanStatus = 'En cours' | 'Restitué' | 'En retard';
+type EquipmentStatus = 'Disponible' | 'Prêté' | 'Maintenance';
 type HistoryEntry = { id: string; action: string; actor: string; role: string; at: string };
 type Loan = {
   id: string; reference: string; itemType: string; inventoryNumber: string; clientName: string; room: string;
@@ -9,8 +10,14 @@ type Loan = {
   depositAmount: number; cardBrand: string; cardLast4: string; preauthorizationReference: string;
   notes: string; status: LoanStatus; history: HistoryEntry[];
 };
+type Equipment = {
+  id: string; inventoryNumber: string; itemType: string; label: string; location: string;
+  condition: string; status: EquipmentStatus; notes: string; updatedBy: string; updatedAt: string;
+};
 
-const KEY = 'hospicore.operations.loans.v1';
+const LOANS_KEY = 'hospicore.operations.loans.v1';
+const EQUIPMENT_KEY = 'hospicore.operations.equipment.v1';
+
 const demoLoans: Loan[] = [{
   id: 'loan-1', reference: 'OP-2026-000128', itemType: 'Fauteuil roulant', inventoryNumber: 'FR-03',
   clientName: 'John Smith', room: '315', phone: '+44 7700 900000', nationality: 'Britannique',
@@ -18,6 +25,13 @@ const demoLoans: Loan[] = [{
   cardBrand: 'Visa', cardLast4: '4587', preauthorizationReference: 'PREAUTH-78451', notes: 'Roue avant légèrement marquée.',
   status: 'En cours', history: [{ id: 'h1', action: 'Prêt créé et matériel remis', actor: 'Thomas PETRISSANS', role: 'Directeur Hébergement', at: '05/08/2026 18:15:22' }],
 }];
+
+const demoEquipment: Equipment[] = [
+  { id:'eq1', inventoryNumber:'FR-01', itemType:'Fauteuil roulant', label:'Fauteuil roulant n°1', location:'Réception A', condition:'Bon état', status:'Disponible', notes:'', updatedBy:'Thomas PETRISSANS', updatedAt:'05/08/2026 18:00:00' },
+  { id:'eq2', inventoryNumber:'FR-03', itemType:'Fauteuil roulant', label:'Fauteuil roulant n°3', location:'Chambre 315', condition:'Roue avant marquée', status:'Prêté', notes:'Prêt OP-2026-000128', updatedBy:'Thomas PETRISSANS', updatedAt:'05/08/2026 18:15:22' },
+  { id:'eq3', inventoryNumber:'AD-14', itemType:'Adaptateur', label:'Adaptateur universel n°14', location:'Réception A', condition:'Bon état', status:'Disponible', notes:'', updatedBy:'Thomas PETRISSANS', updatedAt:'05/08/2026 17:30:00' },
+  { id:'eq4', inventoryNumber:'AD-08', itemType:'Adaptateur', label:'Adaptateur universel n°8', location:'Atelier', condition:'À contrôler', status:'Maintenance', notes:'Faux contact signalé', updatedBy:'Service technique', updatedAt:'05/08/2026 16:40:00' },
+];
 
 function currentUser() {
   try {
@@ -27,22 +41,30 @@ function currentUser() {
   } catch { return { name: 'Utilisateur HospiCore', role: 'Collaborateur' }; }
 }
 function nowStamp() { return new Date().toLocaleString('fr-FR', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit', second:'2-digit' }); }
-function loadLoans(): Loan[] { try { return JSON.parse(localStorage.getItem(KEY) || 'null') || demoLoans; } catch { return demoLoans; } }
-function persist(items: Loan[]) { localStorage.setItem(KEY, JSON.stringify(items)); }
+function loadLoans(): Loan[] { try { return JSON.parse(localStorage.getItem(LOANS_KEY) || 'null') || demoLoans; } catch { return demoLoans; } }
+function loadEquipment(): Equipment[] { try { return JSON.parse(localStorage.getItem(EQUIPMENT_KEY) || 'null') || demoEquipment; } catch { return demoEquipment; } }
+function persistLoans(items: Loan[]) { localStorage.setItem(LOANS_KEY, JSON.stringify(items)); }
+function persistEquipment(items: Equipment[]) { localStorage.setItem(EQUIPMENT_KEY, JSON.stringify(items)); }
 
 export function OperationsCenterPage() {
+  const [tab, setTab] = useState<'consignes' | 'inventaire'>('consignes');
   const [loans, setLoans] = useState<Loan[]>(loadLoans);
-  const [open, setOpen] = useState(false);
+  const [equipment, setEquipment] = useState<Equipment[]>(loadEquipment);
+  const [loanOpen, setLoanOpen] = useState(false);
+  const [equipmentOpen, setEquipmentOpen] = useState(false);
   const [query, setQuery] = useState('');
-  const filtered = useMemo(() => loans.filter((loan) => `${loan.reference} ${loan.itemType} ${loan.clientName} ${loan.room}`.toLowerCase().includes(query.toLowerCase())), [loans, query]);
+
+  const filteredLoans = useMemo(() => loans.filter((loan) => `${loan.reference} ${loan.itemType} ${loan.clientName} ${loan.room}`.toLowerCase().includes(query.toLowerCase())), [loans, query]);
+  const filteredEquipment = useMemo(() => equipment.filter((item) => `${item.inventoryNumber} ${item.itemType} ${item.label} ${item.location}`.toLowerCase().includes(query.toLowerCase())), [equipment, query]);
   const overdue = loans.filter((loan) => loan.status !== 'Restitué' && new Date(loan.expectedEndAt) < new Date()).length;
 
   function createLoan(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); const form = new FormData(event.currentTarget); const user = currentUser();
+    const inventoryNumber = String(form.get('inventoryNumber') || '');
     const sequence = String(loans.length + 129).padStart(6, '0');
     const value: Loan = {
       id: crypto.randomUUID(), reference: `OP-${new Date().getFullYear()}-${sequence}`,
-      itemType: String(form.get('itemType') || ''), inventoryNumber: String(form.get('inventoryNumber') || ''),
+      itemType: String(form.get('itemType') || ''), inventoryNumber,
       clientName: String(form.get('clientName') || ''), room: String(form.get('room') || ''), phone: String(form.get('phone') || ''),
       nationality: String(form.get('nationality') || ''), startAt: String(form.get('startAt') || ''), expectedEndAt: String(form.get('expectedEndAt') || ''),
       depositAmount: Number(form.get('depositAmount') || 0), cardBrand: String(form.get('cardBrand') || ''),
@@ -50,31 +72,59 @@ export function OperationsCenterPage() {
       notes: String(form.get('notes') || ''), status: 'En cours',
       history: [{ id: crypto.randomUUID(), action: 'Prêt créé et matériel remis', actor: user.name, role: user.role, at: nowStamp() }],
     };
-    const next = [value, ...loans]; persist(next); setLoans(next); setOpen(false);
+    const nextLoans = [value, ...loans]; persistLoans(nextLoans); setLoans(nextLoans);
+    const nextEquipment = equipment.map((item) => item.inventoryNumber === inventoryNumber ? { ...item, status:'Prêté' as const, location:`Chambre ${value.room}`, notes:`Prêt ${value.reference}`, updatedBy:user.name, updatedAt:nowStamp() } : item);
+    persistEquipment(nextEquipment); setEquipment(nextEquipment); setLoanOpen(false);
   }
 
   function closeLoan(id: string) {
-    const user = currentUser(); const next = loans.map((loan) => loan.id === id ? {
-      ...loan, status: 'Restitué' as const, actualEndAt: new Date().toISOString().slice(0,16),
-      history: [...loan.history, { id: crypto.randomUUID(), action: 'Matériel restitué et dossier clôturé', actor: user.name, role: user.role, at: nowStamp() }],
-    } : loan); persist(next); setLoans(next);
+    const user = currentUser(); const loan = loans.find((item) => item.id === id); if (!loan) return;
+    const nextLoans = loans.map((item) => item.id === id ? {
+      ...item, status: 'Restitué' as const, actualEndAt: new Date().toISOString().slice(0,16),
+      history: [...item.history, { id: crypto.randomUUID(), action: 'Matériel restitué et dossier clôturé', actor: user.name, role: user.role, at: nowStamp() }],
+    } : item); persistLoans(nextLoans); setLoans(nextLoans);
+    const nextEquipment = equipment.map((item) => item.inventoryNumber === loan.inventoryNumber ? { ...item, status:'Disponible' as const, location:'Réception A', notes:'Restitué et disponible', updatedBy:user.name, updatedAt:nowStamp() } : item);
+    persistEquipment(nextEquipment); setEquipment(nextEquipment);
+  }
+
+  function createEquipment(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault(); const form = new FormData(event.currentTarget); const user = currentUser();
+    const value: Equipment = {
+      id:crypto.randomUUID(), inventoryNumber:String(form.get('inventoryNumber') || ''), itemType:String(form.get('itemType') || ''),
+      label:String(form.get('label') || ''), location:String(form.get('location') || ''), condition:String(form.get('condition') || 'Bon état'),
+      status:String(form.get('status') || 'Disponible') as EquipmentStatus, notes:String(form.get('notes') || ''), updatedBy:user.name, updatedAt:nowStamp(),
+    };
+    const next = [value, ...equipment]; persistEquipment(next); setEquipment(next); setEquipmentOpen(false);
+  }
+
+  function toggleMaintenance(id: string) {
+    const user = currentUser();
+    const next = equipment.map((item) => item.id === id ? { ...item, status:item.status === 'Maintenance' ? 'Disponible' as const : 'Maintenance' as const, updatedBy:user.name, updatedAt:nowStamp() } : item);
+    persistEquipment(next); setEquipment(next);
   }
 
   return <div className="operations-page">
-    <header className="operations-header"><div><button onClick={() => { window.location.href = '/'; }}><ArrowLeft size={18}/> Tableau de bord</button><p>HospiCore · Centre des opérations</p><h1>Cahier de consignes & prêts</h1><span>Suivi sécurisé, signé et horodaté du matériel confié aux clients.</span></div><button className="operations-primary" onClick={() => setOpen(true)}><Plus size={18}/> Nouveau prêt</button></header>
-    <section className="operations-kpis"><article><PackagePlus/><span>Prêts actifs</span><strong>{loans.filter(l=>l.status==='En cours').length}</strong></article><article><Clock3/><span>Retours en retard</span><strong>{overdue}</strong></article><article><CheckCircle2/><span>Restitués</span><strong>{loans.filter(l=>l.status==='Restitué').length}</strong></article></section>
+    <header className="operations-header"><div><button onClick={() => { window.location.href = '/'; }}><ArrowLeft size={18}/> Tableau de bord</button><p>HospiCore · Centre des opérations</p><h1>Cahier de consignes & inventaire</h1><span>Suivi signé et horodaté du matériel confié aux clients.</span></div><button className="operations-primary" onClick={() => tab === 'consignes' ? setLoanOpen(true) : setEquipmentOpen(true)}><Plus size={18}/> {tab === 'consignes' ? 'Nouveau prêt' : 'Ajouter du matériel'}</button></header>
+
+    <div className="operations-tabs"><button className={tab === 'consignes' ? 'active' : ''} onClick={() => setTab('consignes')}><PackagePlus size={17}/> Cahier de consignes & prêts</button><button className={tab === 'inventaire' ? 'active' : ''} onClick={() => setTab('inventaire')}><Package size={17}/> Inventaire du matériel</button></div>
+
+    <section className="operations-kpis"><article><PackagePlus/><span>Prêts actifs</span><strong>{loans.filter(l=>l.status==='En cours').length}</strong></article><article><Clock3/><span>Retours en retard</span><strong>{overdue}</strong></article><article><CheckCircle2/><span>Disponibles</span><strong>{equipment.filter(i=>i.status==='Disponible').length}</strong></article><article><Wrench/><span>Maintenance</span><strong>{equipment.filter(i=>i.status==='Maintenance').length}</strong></article></section>
     <div className="operations-search"><Search size={18}/><input value={query} onChange={(e)=>setQuery(e.target.value)} placeholder="Rechercher par client, chambre, matériel ou référence…"/></div>
-    <section className="operations-list">{filtered.map((loan) => <article className="loan-card" key={loan.id}><div className="loan-title"><div><span className={`loan-status ${loan.status.toLowerCase().replace(' ','-')}`}>{loan.status}</span><h2>{loan.itemType} · {loan.inventoryNumber}</h2><small>{loan.reference}</small></div><div className="loan-client"><UserRound size={20}/><strong>{loan.clientName}</strong><span>Chambre {loan.room}</span></div></div>
+
+    {tab === 'consignes' ? <section className="operations-list">{filteredLoans.map((loan) => <article className="loan-card" key={loan.id}><div className="loan-title"><div><span className={`loan-status ${loan.status.toLowerCase().replace(' ','-')}`}>{loan.status}</span><h2>{loan.itemType} · {loan.inventoryNumber}</h2><small>{loan.reference}</small></div><div className="loan-client"><UserRound size={20}/><strong>{loan.clientName}</strong><span>Chambre {loan.room}</span></div></div>
       <div className="loan-grid"><div><span>Début</span><strong>{loan.startAt.replace('T',' ')}</strong></div><div><span>Retour prévu</span><strong>{loan.expectedEndAt.replace('T',' ')}</strong></div><div><span>Caution</span><strong>{loan.depositAmount.toFixed(2)} €</strong></div><div><span>Garantie CB</span><strong><CreditCard size={15}/> {loan.cardBrand} •••• {loan.cardLast4 || '—'}</strong><small>{loan.preauthorizationReference || 'Sans référence de préautorisation'}</small></div></div>
       <p className="loan-notes">{loan.notes || 'Aucune observation.'}</p><div className="loan-history"><strong>Historique signé</strong>{loan.history.map((h)=><div key={h.id}><span>{h.at}</span><p>{h.action}</p><small>{h.actor} · {h.role}</small></div>)}</div>
       {loan.status !== 'Restitué' && <button className="operations-secondary" onClick={()=>closeLoan(loan.id)}><CheckCircle2 size={17}/> Enregistrer la restitution</button>}
-    </article>)}</section>
-    {open && <div className="operations-modal"><form onSubmit={createLoan}><header><div><p>Nouvelle consigne</p><h2>Prêt de matériel</h2></div><button type="button" onClick={()=>setOpen(false)}><X/></button></header><div className="operations-form-grid">
-      <label>Matériel<select name="itemType" required><option>Adaptateur</option><option>Fauteuil roulant</option><option>Chargeur</option><option>Parapluie</option><option>Lit bébé</option><option>Autre</option></select></label><label>N° inventaire<input name="inventoryNumber" required/></label>
+    </article>)}</section> : <section className="equipment-grid">{filteredEquipment.map((item) => <article className="equipment-card" key={item.id}><div className="equipment-heading"><div><span className={`equipment-status ${item.status.toLowerCase()}`}>{item.status}</span><h2>{item.label}</h2><small>{item.inventoryNumber} · {item.itemType}</small></div>{item.status === 'Maintenance' ? <ShieldAlert size={23}/> : <Package size={23}/>}</div><div className="equipment-details"><div><span>Emplacement</span><strong>{item.location}</strong></div><div><span>État</span><strong>{item.condition}</strong></div></div><p>{item.notes || 'Aucune observation.'}</p><small>Mis à jour par {item.updatedBy} · {item.updatedAt}</small>{item.status !== 'Prêté' && <button className="operations-secondary" onClick={() => toggleMaintenance(item.id)}>{item.status === 'Maintenance' ? <CheckCircle2 size={17}/> : <Wrench size={17}/>} {item.status === 'Maintenance' ? 'Remettre disponible' : 'Passer en maintenance'}</button>}</article>)}</section>}
+
+    {loanOpen && <div className="operations-modal"><form onSubmit={createLoan}><header><div><p>Nouvelle consigne</p><h2>Prêt de matériel</h2></div><button type="button" onClick={()=>setLoanOpen(false)}><X/></button></header><div className="operations-form-grid">
+      <label>Matériel<select name="itemType" required><option>Adaptateur</option><option>Fauteuil roulant</option><option>Chargeur</option><option>Parapluie</option><option>Lit bébé</option><option>Autre</option></select></label><label>N° inventaire<select name="inventoryNumber" required defaultValue=""><option value="" disabled>Sélectionner…</option>{equipment.filter(i=>i.status==='Disponible').map(i=><option key={i.id} value={i.inventoryNumber}>{i.inventoryNumber} · {i.label}</option>)}</select></label>
       <label>Nom complet du client<input name="clientName" required/></label><label>Chambre<input name="room" required/></label><label>Téléphone<input name="phone"/></label><label>Nationalité<input name="nationality"/></label>
       <label>Date et heure de début<input name="startAt" type="datetime-local" required/></label><label>Date et heure de retour prévue<input name="expectedEndAt" type="datetime-local" required/></label>
       <label>Montant caution (€)<input name="depositAmount" type="number" min="0" step="0.01"/></label><label>Type de carte<select name="cardBrand"><option value="">Aucune</option><option>Visa</option><option>Mastercard</option><option>Amex</option></select></label>
       <label>4 derniers chiffres<input name="cardLast4" inputMode="numeric" maxLength={4} pattern="[0-9]{4}" placeholder="4587"/></label><label>Référence préautorisation<input name="preauthorizationReference"/></label>
-      <label className="wide">Observations<textarea name="notes"/></label></div><p className="card-warning">Le numéro complet de carte et le cryptogramme ne doivent jamais être saisis dans HospiCore.</p><footer><button type="button" onClick={()=>setOpen(false)}>Annuler</button><button className="operations-primary" type="submit">Créer et signer le prêt</button></footer></form></div>}
+      <label className="wide">Observations<textarea name="notes"/></label></div><p className="card-warning">Le numéro complet de carte et le cryptogramme ne doivent jamais être saisis dans HospiCore.</p><footer><button type="button" onClick={()=>setLoanOpen(false)}>Annuler</button><button className="operations-primary" type="submit">Créer et signer le prêt</button></footer></form></div>}
+
+    {equipmentOpen && <div className="operations-modal"><form onSubmit={createEquipment}><header><div><p>Inventaire</p><h2>Ajouter un équipement</h2></div><button type="button" onClick={()=>setEquipmentOpen(false)}><X/></button></header><div className="operations-form-grid"><label>N° inventaire<input name="inventoryNumber" required/></label><label>Type<select name="itemType"><option>Adaptateur</option><option>Fauteuil roulant</option><option>Chargeur</option><option>Parapluie</option><option>Lit bébé</option><option>Autre</option></select></label><label>Nom du matériel<input name="label" required/></label><label>Emplacement<input name="location" required/></label><label>État<input name="condition" defaultValue="Bon état"/></label><label>Statut<select name="status"><option>Disponible</option><option>Maintenance</option></select></label><label className="wide">Observations<textarea name="notes"/></label></div><footer><button type="button" onClick={()=>setEquipmentOpen(false)}>Annuler</button><button className="operations-primary" type="submit">Ajouter et signer</button></footer></form></div>}
   </div>;
 }
