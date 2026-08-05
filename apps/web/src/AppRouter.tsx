@@ -2,6 +2,7 @@ import { ActivityJournalPage } from './ActivityJournalPage';
 import { AdministrationPage } from './AdministrationPage';
 import { App } from './App';
 import { AuthGate } from './AuthGate';
+import { DiagnosticPage } from './DiagnosticPage';
 import { GeneralInstructionsPage } from './GeneralInstructionsPage';
 import { GroupsPage } from './GroupsPage';
 import { InterserviceControlPage } from './InterserviceControlPage';
@@ -18,6 +19,7 @@ import { WeeklyPlanningPage } from './WeeklyPlanningPage';
 function CurrentPage() {
   const path = window.location.pathname;
 
+  if (path.startsWith('/diagnostic')) return <DiagnosticPage />;
   if (path.startsWith('/administration') || path.startsWith('/parametres')) return <AdministrationPage />;
   if (path.startsWith('/taches')) return <TasksPage />;
   if (path.startsWith('/journal-exploitation') || path.startsWith('/activite')) return <ActivityJournalPage />;
