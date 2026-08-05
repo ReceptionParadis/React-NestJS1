@@ -1,4 +1,4 @@
-import { ConflictException, Injectable } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 
@@ -6,9 +6,10 @@ import { PrismaService } from '../prisma.service';
 export class OperationalSyncService {
   constructor(private readonly prisma: PrismaService) {}
 
-  get(hotelId: string, namespace: string) {
+  async get(hotelId: string | undefined, namespace: string, userId?: string) {
+    const resolvedHotelId = await this.resolveHotelId(hotelId, userId);
     return this.prisma.operationalStore.findUnique({
-      where: { hotelId_namespace: { hotelId, namespace } },
+      where: { hotelId_namespace: { hotelId: resolvedHotelId, namespace } },
       include: {
         updatedBy: { select: { id: true, firstName: true, lastName: true, role: { select: { name: true } } } },
       },
@@ -16,14 +17,15 @@ export class OperationalSyncService {
   }
 
   async save(input: {
-    hotelId: string;
+    hotelId?: string;
     namespace: string;
     payload: Prisma.InputJsonValue;
     updatedById?: string;
     expectedVersion?: number;
   }) {
+    const hotelId = await this.resolveHotelId(input.hotelId, input.updatedById);
     const current = await this.prisma.operationalStore.findUnique({
-      where: { hotelId_namespace: { hotelId: input.hotelId, namespace: input.namespace } },
+      where: { hotelId_namespace: { hotelId, namespace: input.namespace } },
     });
 
     if (current && input.expectedVersion !== undefined && current.version !== input.expectedVersion) {
@@ -35,9 +37,9 @@ export class OperationalSyncService {
     }
 
     return this.prisma.operationalStore.upsert({
-      where: { hotelId_namespace: { hotelId: input.hotelId, namespace: input.namespace } },
+      where: { hotelId_namespace: { hotelId, namespace: input.namespace } },
       create: {
-        hotelId: input.hotelId,
+        hotelId,
         namespace: input.namespace,
         payload: input.payload,
         updatedById: input.updatedById,
@@ -53,11 +55,20 @@ export class OperationalSyncService {
     });
   }
 
-  list(hotelId: string) {
+  async list(hotelId?: string, userId?: string) {
+    const resolvedHotelId = await this.resolveHotelId(hotelId, userId);
     return this.prisma.operationalStore.findMany({
-      where: { hotelId },
+      where: { hotelId: resolvedHotelId },
       select: { namespace: true, version: true, updatedAt: true, updatedById: true },
       orderBy: { updatedAt: 'desc' },
     });
+  }
+
+  private async resolveHotelId(hotelId?: string, userId?: string) {
+    if (hotelId) return hotelId;
+    if (!userId) throw new BadRequestException('Hôtel et utilisateur absents.');
+    const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { hotelId: true } });
+    if (!user) throw new BadRequestException('Utilisateur introuvable.');
+    return user.hotelId;
   }
 }
