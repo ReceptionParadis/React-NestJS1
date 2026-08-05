@@ -2,14 +2,39 @@ import { BadRequestException, ConflictException, Injectable } from '@nestjs/comm
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 
+const DEFAULT_STORES: Record<string, Prisma.InputJsonValue> = {
+  tasks: [],
+  'general-instructions': [],
+  'operations-center': { loans: [], equipment: [] },
+  'function-sheets': [],
+  'meeting-rooms': [],
+};
+
 @Injectable()
 export class OperationalSyncService {
   constructor(private readonly prisma: PrismaService) {}
 
   async get(hotelId: string | undefined, namespace: string, userId?: string) {
     const resolvedHotelId = await this.resolveHotelId(hotelId, userId);
-    return this.prisma.operationalStore.findUnique({
+    const existing = await this.prisma.operationalStore.findUnique({
       where: { hotelId_namespace: { hotelId: resolvedHotelId, namespace } },
+      include: {
+        updatedBy: { select: { id: true, firstName: true, lastName: true, role: { select: { name: true } } } },
+      },
+    });
+
+    if (existing) return existing;
+
+    const defaultPayload = DEFAULT_STORES[namespace];
+    if (defaultPayload === undefined) return null;
+
+    return this.prisma.operationalStore.create({
+      data: {
+        hotelId: resolvedHotelId,
+        namespace,
+        payload: defaultPayload,
+        updatedById: userId,
+      },
       include: {
         updatedBy: { select: { id: true, firstName: true, lastName: true, role: { select: { name: true } } } },
       },
@@ -57,6 +82,7 @@ export class OperationalSyncService {
 
   async list(hotelId?: string, userId?: string) {
     const resolvedHotelId = await this.resolveHotelId(hotelId, userId);
+    await this.ensureDefaultStores(resolvedHotelId, userId);
     return this.prisma.operationalStore.findMany({
       where: { hotelId: resolvedHotelId },
       select: { namespace: true, version: true, updatedAt: true, updatedById: true },
@@ -67,6 +93,8 @@ export class OperationalSyncService {
   async diagnostic(hotelId?: string, userId?: string) {
     const startedAt = Date.now();
     const resolvedHotelId = await this.resolveHotelId(hotelId, userId);
+    await this.ensureDefaultStores(resolvedHotelId, userId);
+
     const [hotel, user, stores, databaseProbe] = await Promise.all([
       this.prisma.hotel.findUnique({ where: { id: resolvedHotelId }, select: { id: true, name: true, slug: true } }),
       userId ? this.prisma.user.findUnique({ where: { id: userId }, select: { id: true, firstName: true, lastName: true, email: true, hotelId: true, role: { select: { name: true } } } }) : null,
@@ -87,6 +115,18 @@ export class OperationalSyncService {
       user,
       operationalStore: { available: true, namespaces: stores },
     };
+  }
+
+  private async ensureDefaultStores(hotelId: string, userId?: string) {
+    await this.prisma.$transaction(
+      Object.entries(DEFAULT_STORES).map(([namespace, payload]) =>
+        this.prisma.operationalStore.upsert({
+          where: { hotelId_namespace: { hotelId, namespace } },
+          create: { hotelId, namespace, payload, updatedById: userId },
+          update: {},
+        }),
+      ),
+    );
   }
 
   private async resolveHotelId(hotelId?: string, userId?: string) {
