@@ -3,6 +3,7 @@ export type GroupArrival = 'Prévu' | 'En route' | 'Arrivé';
 export type HousekeepingStatus = 'À faire' | 'OK propre' | 'OK recouche';
 export type KitchenStatus = 'À préparer' | 'Prêt à servir';
 export type RestaurantStatus = 'Prévu' | 'En salle' | 'Terminé';
+export type OperationalDepartment = 'reception' | 'restaurant' | 'housekeeping' | 'cuisine';
 
 export type MealPlan = {
   service: MealService;
@@ -35,6 +36,7 @@ export type FunctionSheet = {
   kitchenNotes: string;
   receptionNotes: string;
   commercialNotes: string;
+  acknowledgements: Partial<Record<OperationalDepartment, string>>;
 };
 
 const KEY = 'hospicore.function-sheets.v1';
@@ -42,7 +44,7 @@ const KEY = 'hospicore.function-sheets.v1';
 export const demoFunctionSheets: FunctionSheet[] = [
   {
     id: 'marian', groupName: 'Marian Pilgrimages', arrivalDate: '2026-08-05', departureDate: '2026-08-08', arrivalTime: '16:00', pax: 54,
-    agency: 'Marian Pilgrimages', leader: 'John Murphy', arrivalStatus: 'En route', housekeepingStatus: 'À faire',
+    agency: 'Marian Pilgrimages', leader: 'John Murphy', arrivalStatus: 'En route', housekeepingStatus: 'À faire', acknowledgements: {},
     meals: [
       { service: 'Dîner', time: '19:00', pax: 54, room: 'Restaurant principal', diets: '2 sans gluten', notes: 'Service rapide après arrivée', kitchenStatus: 'À préparer', restaurantStatus: 'Prévu' },
       { service: 'Petit-déjeuner', time: '07:00', pax: 54, room: 'Restaurant principal', notes: 'Départ bus à 08:15', kitchenStatus: 'À préparer', restaurantStatus: 'Prévu' },
@@ -51,7 +53,7 @@ export const demoFunctionSheets: FunctionSheet[] = [
   },
   {
     id: 'unitalsi', groupName: 'Unitalsi', arrivalDate: '2026-08-05', departureDate: '2026-08-09', arrivalTime: '17:45', pax: 82,
-    agency: 'Unitalsi', leader: 'Maria Rossi', arrivalStatus: 'Prévu', housekeepingStatus: 'À faire',
+    agency: 'Unitalsi', leader: 'Maria Rossi', arrivalStatus: 'Prévu', housekeepingStatus: 'À faire', acknowledgements: {},
     meals: [
       { service: 'Dîner', time: '19:30', pax: 82, room: 'Salle Gavarnie', diets: '4 mixés · 2 sans lactose', notes: '2 tables PMR proches de l’entrée', kitchenStatus: 'À préparer', restaurantStatus: 'Prévu' },
       { service: 'Petit-déjeuner', time: '07:30', pax: 82, room: 'Salle Gavarnie', kitchenStatus: 'À préparer', restaurantStatus: 'Prévu' },
@@ -65,6 +67,7 @@ function normalizeSheet(item: FunctionSheet): FunctionSheet {
   return {
     ...item,
     housekeepingStatus: item.housekeepingStatus || 'À faire',
+    acknowledgements: item.acknowledgements || {},
     meals: (item.meals || []).map((meal) => ({
       ...meal,
       kitchenStatus: meal.kitchenStatus || 'À préparer',
@@ -85,6 +88,16 @@ export function loadFunctionSheets(): FunctionSheet[] {
 export function saveFunctionSheets(items: FunctionSheet[]) {
   localStorage.setItem(KEY, JSON.stringify(items));
   window.dispatchEvent(new CustomEvent('hospicore:function-sheets'));
+}
+
+export function acknowledgeFunctionSheet(id: string, department: OperationalDepartment) {
+  const now = new Date().toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+  const items = loadFunctionSheets().map((item) => item.id === id ? {
+    ...item,
+    acknowledgements: { ...item.acknowledgements, [department]: now },
+  } : item);
+  saveFunctionSheets(items);
+  return items;
 }
 
 export function markGroupArrived(id: string) {
