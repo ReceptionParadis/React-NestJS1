@@ -19,6 +19,7 @@ import './activity-journal.css';
 import './tasks.css';
 import './administration.css';
 import './diagnostic.css';
+import './hospicore-live.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode><AppRouter /></React.StrictMode>,
