@@ -1,4 +1,5 @@
 import { ActivityJournalPage } from './ActivityJournalPage';
+import { AdministrationPage } from './AdministrationPage';
 import { App } from './App';
 import { AuthGate } from './AuthGate';
 import { GeneralInstructionsPage } from './GeneralInstructionsPage';
@@ -17,6 +18,7 @@ import { WeeklyPlanningPage } from './WeeklyPlanningPage';
 function CurrentPage() {
   const path = window.location.pathname;
 
+  if (path.startsWith('/administration') || path.startsWith('/parametres')) return <AdministrationPage />;
   if (path.startsWith('/taches')) return <TasksPage />;
   if (path.startsWith('/journal-exploitation') || path.startsWith('/activite')) return <ActivityJournalPage />;
   if (path.startsWith('/consignes-generales')) return <GeneralInstructionsPage />;
