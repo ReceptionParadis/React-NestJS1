@@ -7,13 +7,17 @@ export class OperationalSyncController {
   constructor(private readonly service: OperationalSyncService) {}
 
   @Get()
-  list(@Query('hotelId') hotelId: string) {
-    return this.service.list(hotelId);
+  list(@Query('hotelId') hotelId?: string, @Query('userId') userId?: string) {
+    return this.service.list(hotelId, userId);
   }
 
   @Get(':namespace')
-  get(@Param('namespace') namespace: string, @Query('hotelId') hotelId: string) {
-    return this.service.get(hotelId, namespace);
+  get(
+    @Param('namespace') namespace: string,
+    @Query('hotelId') hotelId?: string,
+    @Query('userId') userId?: string,
+  ) {
+    return this.service.get(hotelId, namespace, userId);
   }
 
   @Put(':namespace')
@@ -21,7 +25,7 @@ export class OperationalSyncController {
     @Param('namespace') namespace: string,
     @Body()
     body: {
-      hotelId: string;
+      hotelId?: string;
       payload: Prisma.InputJsonValue;
       updatedById?: string;
       expectedVersion?: number;
