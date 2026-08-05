@@ -5,6 +5,7 @@ import { InterserviceControlPage } from './InterserviceControlPage';
 import { InterservicePage } from './InterservicePage';
 import { MainCourante } from './MainCourante';
 import { MeetingRoomsPage } from './MeetingRoomsPage';
+import { OperationsCenterPage } from './OperationsCenterPage';
 import { RestaurantPlanningPage } from './RestaurantPlanningPage';
 import { RoomingListImportPage } from './RoomingListImportPage';
 import { TicketsPage } from './TicketsPage';
@@ -13,6 +14,7 @@ import { WeeklyPlanningPage } from './WeeklyPlanningPage';
 function CurrentPage() {
   const path = window.location.pathname;
 
+  if (path.startsWith('/centre-operations') || path.startsWith('/cahier-consignes') || path.startsWith('/prets')) return <OperationsCenterPage />;
   if (path.startsWith('/suivi-interservice')) return <InterserviceControlPage />;
   if (path.startsWith('/planning-hebdomadaire')) return <WeeklyPlanningPage />;
   if (path.startsWith('/reception')) return <InterservicePage department="reception" />;
