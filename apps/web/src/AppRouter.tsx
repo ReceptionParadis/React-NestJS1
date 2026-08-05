@@ -7,10 +7,12 @@ import { MeetingRoomsPage } from './MeetingRoomsPage';
 import { RestaurantPlanningPage } from './RestaurantPlanningPage';
 import { RoomingListImportPage } from './RoomingListImportPage';
 import { TicketsPage } from './TicketsPage';
+import { WeeklyPlanningPage } from './WeeklyPlanningPage';
 
 function CurrentPage() {
   const path = window.location.pathname;
 
+  if (path.startsWith('/planning-hebdomadaire')) return <WeeklyPlanningPage />;
   if (path.startsWith('/reception')) return <InterservicePage department="reception" />;
   if (path.startsWith('/restaurant')) return <RestaurantPlanningPage />;
   if (path.startsWith('/housekeeping')) return <InterservicePage department="housekeeping" />;
