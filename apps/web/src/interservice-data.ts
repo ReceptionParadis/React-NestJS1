@@ -1,6 +1,8 @@
 export type MealService = 'Petit-déjeuner' | 'Déjeuner' | 'Dîner';
 export type GroupArrival = 'Prévu' | 'En route' | 'Arrivé';
 export type HousekeepingStatus = 'À faire' | 'OK propre' | 'OK recouche';
+export type KitchenStatus = 'À préparer' | 'Prêt à servir';
+export type RestaurantStatus = 'Prévu' | 'En salle' | 'Terminé';
 
 export type MealPlan = {
   service: MealService;
@@ -9,6 +11,10 @@ export type MealPlan = {
   room: string;
   diets?: string;
   notes?: string;
+  kitchenStatus?: KitchenStatus;
+  kitchenConfirmedAt?: string;
+  restaurantStatus?: RestaurantStatus;
+  restaurantConfirmedAt?: string;
 };
 
 export type FunctionSheet = {
@@ -38,8 +44,8 @@ export const demoFunctionSheets: FunctionSheet[] = [
     id: 'marian', groupName: 'Marian Pilgrimages', arrivalDate: '2026-08-05', departureDate: '2026-08-08', arrivalTime: '16:00', pax: 54,
     agency: 'Marian Pilgrimages', leader: 'John Murphy', arrivalStatus: 'En route', housekeepingStatus: 'À faire',
     meals: [
-      { service: 'Dîner', time: '19:00', pax: 54, room: 'Restaurant principal', diets: '2 sans gluten', notes: 'Service rapide après arrivée' },
-      { service: 'Petit-déjeuner', time: '07:00', pax: 54, room: 'Restaurant principal', notes: 'Départ bus à 08:15' },
+      { service: 'Dîner', time: '19:00', pax: 54, room: 'Restaurant principal', diets: '2 sans gluten', notes: 'Service rapide après arrivée', kitchenStatus: 'À préparer', restaurantStatus: 'Prévu' },
+      { service: 'Petit-déjeuner', time: '07:00', pax: 54, room: 'Restaurant principal', notes: 'Départ bus à 08:15', kitchenStatus: 'À préparer', restaurantStatus: 'Prévu' },
     ],
     housekeepingNotes: 'Priorité bagages et chambres du 4e étage.', kitchenNotes: 'Prévoir 2 repas sans gluten.', receptionNotes: 'Cartes à finaliser avant 15h30.', commercialNotes: 'Demi-pension confirmée.',
   },
@@ -47,24 +53,32 @@ export const demoFunctionSheets: FunctionSheet[] = [
     id: 'unitalsi', groupName: 'Unitalsi', arrivalDate: '2026-08-05', departureDate: '2026-08-09', arrivalTime: '17:45', pax: 82,
     agency: 'Unitalsi', leader: 'Maria Rossi', arrivalStatus: 'Prévu', housekeepingStatus: 'À faire',
     meals: [
-      { service: 'Dîner', time: '19:30', pax: 82, room: 'Salle Gavarnie', diets: '4 mixés · 2 sans lactose', notes: '2 tables PMR proches de l’entrée' },
-      { service: 'Petit-déjeuner', time: '07:30', pax: 82, room: 'Salle Gavarnie' },
-      { service: 'Déjeuner', time: '12:15', pax: 82, room: 'Salle Gavarnie' },
+      { service: 'Dîner', time: '19:30', pax: 82, room: 'Salle Gavarnie', diets: '4 mixés · 2 sans lactose', notes: '2 tables PMR proches de l’entrée', kitchenStatus: 'À préparer', restaurantStatus: 'Prévu' },
+      { service: 'Petit-déjeuner', time: '07:30', pax: 82, room: 'Salle Gavarnie', kitchenStatus: 'À préparer', restaurantStatus: 'Prévu' },
+      { service: 'Déjeuner', time: '12:15', pax: 82, room: 'Salle Gavarnie', kitchenStatus: 'À préparer', restaurantStatus: 'Prévu' },
     ],
     housekeepingNotes: 'Prévoir 2 chambres PMR contrôlées.', kitchenNotes: '4 textures mixées.', receptionNotes: 'Deux bus et assistance PMR.', commercialNotes: 'Pension complète.',
   },
 ];
 
 function normalizeSheet(item: FunctionSheet): FunctionSheet {
-  return { ...item, housekeepingStatus: item.housekeepingStatus || 'À faire' };
+  return {
+    ...item,
+    housekeepingStatus: item.housekeepingStatus || 'À faire',
+    meals: (item.meals || []).map((meal) => ({
+      ...meal,
+      kitchenStatus: meal.kitchenStatus || 'À préparer',
+      restaurantStatus: meal.restaurantStatus || 'Prévu',
+    })),
+  };
 }
 
 export function loadFunctionSheets(): FunctionSheet[] {
   try {
     const saved = localStorage.getItem(KEY);
-    return saved ? (JSON.parse(saved) as FunctionSheet[]).map(normalizeSheet) : demoFunctionSheets;
+    return saved ? (JSON.parse(saved) as FunctionSheet[]).map(normalizeSheet) : demoFunctionSheets.map(normalizeSheet);
   } catch {
-    return demoFunctionSheets;
+    return demoFunctionSheets.map(normalizeSheet);
   }
 }
 
@@ -89,6 +103,26 @@ export function markHousekeepingDone(id: string, status: Exclude<HousekeepingSta
     ...item,
     housekeepingStatus: status,
     housekeepingConfirmedAt: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
+  } : item);
+  saveFunctionSheets(items);
+  return items;
+}
+
+export function markMealKitchenReady(groupId: string, service: MealService) {
+  const now = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+  const items = loadFunctionSheets().map((item) => item.id === groupId ? {
+    ...item,
+    meals: item.meals.map((meal) => meal.service === service ? { ...meal, kitchenStatus: 'Prêt à servir' as const, kitchenConfirmedAt: now } : meal),
+  } : item);
+  saveFunctionSheets(items);
+  return items;
+}
+
+export function markMealRestaurantStatus(groupId: string, service: MealService, status: RestaurantStatus) {
+  const now = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+  const items = loadFunctionSheets().map((item) => item.id === groupId ? {
+    ...item,
+    meals: item.meals.map((meal) => meal.service === service ? { ...meal, restaurantStatus: status, restaurantConfirmedAt: now } : meal),
   } : item);
   saveFunctionSheets(items);
   return items;
