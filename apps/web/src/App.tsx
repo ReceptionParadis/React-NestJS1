@@ -1,12 +1,19 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
-  AlertTriangle, BedDouble, Bell, BookOpenCheck, BriefcaseBusiness, CalendarDays, CheckCircle2, ChefHat, ChevronRight,
-  ClipboardList, Clock3, ConciergeBell, History, LayoutDashboard, ListTodo, Menu, MessageSquareText, Settings, Sparkles,
-  UtensilsCrossed, Wrench, X,
+  AlertTriangle, BedDouble, Bell, BookOpenCheck, BriefcaseBusiness, CalendarDays, ChefHat, ChevronRight,
+  ClipboardList, ConciergeBell, History, LayoutDashboard, ListTodo, Menu, Package, RefreshCw, Settings,
+  Sparkles, UtensilsCrossed, Wrench, X,
 } from 'lucide-react';
+import { loadSharedData } from './operational-sync';
+
+type Session = { user?: { firstName?: string; lastName?: string; role?: string; hotel?: { name?: string } } };
+type Task = { id?: string; title?: string; service?: string; status?: string; priority?: string; dueAt?: string; linkedTo?: string };
+type Instruction = { id?: string; title?: string; category?: string; priority?: string; status?: string; dueAt?: string; room?: string };
+type OperationsPayload = { loans?: Array<{ status?: string; expectedEndAt?: string }>; equipment?: Array<{ status?: string }> };
+type Group = { id?: string; name?: string; pax?: number; arrivalDate?: string; departureDate?: string; arrivalTime?: string; status?: string; dinnerTime?: string };
 
 const nav = [
-  { label: 'Tableau de bord', icon: LayoutDashboard, href: '/', active: true },
+  { label: 'HospiCore Live', icon: LayoutDashboard, href: '/', active: true },
   { label: 'Tâches', icon: ListTodo, href: '/taches' },
   { label: 'Journal d’exploitation', icon: History, href: '/journal-exploitation' },
   { label: 'Centre des opérations', icon: BookOpenCheck, href: '/centre-operations' },
@@ -16,59 +23,141 @@ const nav = [
   { label: 'Housekeeping', icon: BedDouble, href: '/housekeeping' },
   { label: 'Cuisine', icon: ChefHat, href: '/cuisine' },
   { label: 'Commercial', icon: BriefcaseBusiness, href: '/commercial' },
-  { label: 'Main courante', icon: MessageSquareText, href: '/main-courante' },
   { label: 'Tickets', icon: Wrench, href: '/tickets' },
   { label: 'Salles de réunion', icon: CalendarDays, href: '/salles-reunion' },
+  { label: 'Diagnostic', icon: RefreshCw, href: '/diagnostic' },
   { label: 'Administration', icon: Settings, href: '/administration' },
 ];
 
-const metrics = [
-  { label: 'Tâches ouvertes', value: '12', detail: '4 services concernés', delta: '2 priorités critiques', tone: 'wine' },
-  { label: 'Couverts groupes', value: '175', detail: '3 services aujourd’hui', delta: 'Prochain service 19h00', tone: 'gold' },
-  { label: 'Consignes ouvertes', value: '6', detail: '2 hautes priorités', delta: '1 échéance dépassée', tone: 'orange' },
-  { label: 'Salles réservées', value: '7', detail: '3 événements aujourd’hui', delta: '1 option à confirmer', tone: 'green' },
-  { label: 'Actions tracées', value: '24', detail: '8 collaborateurs actifs', delta: 'Mise à jour en temps réel', tone: 'blue' },
-  { label: 'Utilisateurs actifs', value: '8', detail: '7 services configurés', delta: 'Administration disponible', tone: 'red' },
-];
+function readSession(): Session {
+  try { return JSON.parse(localStorage.getItem('hospicore.session') || '{}'); }
+  catch { return {}; }
+}
 
-const arrivals = [
-  { time: '14h30', name: 'Hermès Tours', meta: '42 pax · déjeuner 12h15', state: 'Arrivé', tone: 'success' },
-  { time: '16h00', name: 'Marian Pilgrimages', meta: '54 pax · dîner 19h00', state: 'En route', tone: 'warning' },
-  { time: '17h45', name: 'Unitalsi', meta: '82 pax · dîner 19h30', state: 'Prévu', tone: 'info' },
-];
+function isToday(value?: string) {
+  if (!value) return false;
+  const date = new Date(value);
+  const today = new Date();
+  return date.getFullYear() === today.getFullYear() && date.getMonth() === today.getMonth() && date.getDate() === today.getDate();
+}
 
-const alerts = [
-  { icon: ListTodo, title: 'Salle Gavarnie à préparer', text: 'Restaurant · échéance 14h30', tone: 'critical' },
-  { icon: ClipboardList, title: 'Taxi VIP à confirmer', text: 'Chambre 518 · départ prévu à 07h15', tone: 'critical' },
-  { icon: Settings, title: '2 comptes à compléter', text: 'Postes internes et rôles à vérifier', tone: 'warning' },
-  { icon: CheckCircle2, title: 'Marian arrivé', text: 'Information diffusée au restaurant et à la cuisine', tone: 'success' },
-];
-
-const services = [
-  { name: 'Réception', status: 'Opérationnel', detail: '3 arrivées à confirmer', score: 92 },
-  { name: 'Restaurant', status: 'À suivre', detail: '3 tâches ouvertes', score: 82 },
-  { name: 'Housekeeping', status: 'En cours', detail: '2 tâches à terminer', score: 78 },
-  { name: 'Cuisine', status: 'Préparation', detail: '6 régimes particuliers', score: 86 },
-  { name: 'Commercial', status: 'Mise à jour', detail: '2 fiches incomplètes', score: 74 },
-];
+function timeLabel(value?: string) {
+  if (!value) return 'À confirmer';
+  if (/^\d{1,2}:\d{2}/.test(value)) return value.slice(0, 5).replace(':', 'h');
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }).replace(':', 'h');
+}
 
 export function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [now, setNow] = useState(new Date());
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [lastSync, setLastSync] = useState('');
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [instructions, setInstructions] = useState<Instruction[]>([]);
+  const [operations, setOperations] = useState<OperationsPayload>({});
+  const [meetingRooms, setMeetingRooms] = useState<unknown[]>([]);
+  const [groups, setGroups] = useState<Group[]>([]);
+  const session = readSession();
+  const userName = `${session.user?.firstName || 'Utilisateur'} ${session.user?.lastName || ''}`.trim();
+  const initials = `${session.user?.firstName?.[0] || 'H'}${session.user?.lastName?.[0] || 'C'}`.toUpperCase();
   const navigate = (href: string) => { window.location.href = href; };
 
+  async function refresh() {
+    setLoading(true); setError('');
+    try {
+      const [taskData, instructionData, operationData, roomData, groupResponse] = await Promise.all([
+        loadSharedData<Task[]>('tasks', []),
+        loadSharedData<Instruction[]>('general-instructions', []),
+        loadSharedData<OperationsPayload>('operations-center', { loans: [], equipment: [] }),
+        loadSharedData<unknown[]>('meeting-rooms', []),
+        fetch('/api/groups', { cache: 'no-store' }).then(async response => response.ok ? response.json() : []),
+      ]);
+      setTasks(Array.isArray(taskData.payload) ? taskData.payload : []);
+      setInstructions(Array.isArray(instructionData.payload) ? instructionData.payload : []);
+      setOperations(operationData.payload && typeof operationData.payload === 'object' ? operationData.payload : {});
+      setMeetingRooms(Array.isArray(roomData.payload) ? roomData.payload : []);
+      setGroups(Array.isArray(groupResponse) ? groupResponse : Array.isArray(groupResponse?.items) ? groupResponse.items : []);
+      const timestamps = [taskData.updatedAt, instructionData.updatedAt, operationData.updatedAt, roomData.updatedAt].filter(Boolean).sort();
+      setLastSync(timestamps.at(-1) || new Date().toISOString());
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Impossible de charger les données opérationnelles.');
+    } finally { setLoading(false); }
+  }
+
+  useEffect(() => {
+    void refresh();
+    const clock = window.setInterval(() => setNow(new Date()), 1000);
+    const sync = window.setInterval(() => void refresh(), 30000);
+    return () => { window.clearInterval(clock); window.clearInterval(sync); };
+  }, []);
+
+  const openTasks = tasks.filter(task => task.status !== 'Terminée');
+  const criticalTasks = openTasks.filter(task => task.priority === 'Critique' || task.priority === 'Haute');
+  const openInstructions = instructions.filter(item => item.status !== 'Terminée' && item.status !== 'Clôturée');
+  const activeLoans = (operations.loans || []).filter(loan => loan.status !== 'Restitué');
+  const overdueLoans = activeLoans.filter(loan => loan.expectedEndAt && new Date(loan.expectedEndAt) < now);
+  const todayArrivals = groups.filter(group => isToday(group.arrivalDate));
+  const todayDepartures = groups.filter(group => isToday(group.departureDate));
+  const inHouse = groups.filter(group => ['IN_HOUSE', 'En séjour', 'Arrivé'].includes(group.status || ''));
+
+  const alerts = useMemo(() => {
+    const rows: Array<{ title: string; detail: string; tone: string; href: string }> = [];
+    criticalTasks.slice(0, 3).forEach(task => rows.push({ title: task.title || 'Tâche prioritaire', detail: `${task.service || 'Service'}${task.dueAt ? ` · ${timeLabel(task.dueAt)}` : ''}`, tone: 'critical', href: '/taches' }));
+    overdueLoans.slice(0, 2).forEach(() => rows.push({ title: 'Matériel non restitué', detail: 'Retour prévu dépassé', tone: 'critical', href: '/centre-operations' }));
+    openInstructions.filter(item => item.priority === 'Critique' || item.priority === 'Haute').slice(0, 2).forEach(item => rows.push({ title: item.title || item.category || 'Consigne prioritaire', detail: item.room ? `Chambre ${item.room}` : 'Consigne générale', tone: 'warning', href: '/consignes-generales' }));
+    if (!rows.length) rows.push({ title: 'Aucun point critique', detail: 'Les flux opérationnels sont sous contrôle.', tone: 'success', href: '/diagnostic' });
+    return rows.slice(0, 5);
+  }, [criticalTasks, overdueLoans, openInstructions]);
+
+  const serviceCards = [
+    { name: 'Réception', detail: `${todayArrivals.length} arrivée(s) · ${todayDepartures.length} départ(s)`, href: '/reception', icon: ConciergeBell },
+    { name: 'Restaurant', detail: `${todayArrivals.reduce((sum, group) => sum + (group.pax || 0), 0)} couverts groupes attendus`, href: '/restaurant', icon: UtensilsCrossed },
+    { name: 'Housekeeping', detail: `${inHouse.length} groupe(s) en séjour`, href: '/housekeeping', icon: BedDouble },
+    { name: 'Cuisine', detail: `${todayArrivals.filter(group => group.dinnerTime).length} dîner(s) renseigné(s)`, href: '/cuisine', icon: ChefHat },
+    { name: 'Commercial', detail: `${groups.length} dossier(s) groupe`, href: '/commercial', icon: BriefcaseBusiness },
+  ];
+
   return <div className="app-shell executive-shell">
-    <aside className={`sidebar${sidebarOpen ? ' open' : ''}`}><div className="brand"><div className="brand-mark">H</div><div><strong>HospiCore</strong><span>Hôtel Paradis · Lourdes</span></div><button className="sidebar-close" onClick={() => setSidebarOpen(false)} aria-label="Fermer"><X size={20}/></button></div><nav className="nav-list">{nav.map(({ label, icon: Icon, href, active }) => <button key={label} className={`nav-item${active ? ' active' : ''}`} onClick={() => navigate(href)}><Icon size={19}/>{label}</button>)}</nav><div className="demo-version"><Sparkles size={16}/><div><strong>Executive Demo</strong><span>HospiCore v0.7</span></div></div></aside>
-    <main className="main-content executive-main">
-      <header className="topbar executive-topbar"><div className="heading-wrap"><button className="mobile-menu" onClick={() => setSidebarOpen(true)} aria-label="Menu"><Menu size={22}/></button><div><p className="eyebrow">Mercredi 5 août 2026 · 23h15</p><h1>Centre opérationnel interservice</h1></div></div><div className="topbar-actions"><span className="live-badge"><span/> Données de démonstration</span><button className="icon-button" aria-label="Notifications"><Bell size={20}/><span className="notification-dot">4</span></button><div className="avatar">TP</div></div></header>
-      <section className="executive-hero"><div><p className="eyebrow light">Briefing HospiCore</p><h2>HospiCore devient configurable par l’hôtel.</h2><p>Le module Administration centralise les utilisateurs, rôles, services, salles de réunion et catégories opérationnelles.</p></div><div className="hero-actions"><button onClick={() => navigate('/administration')}><Settings size={18}/>Administration</button><button onClick={() => navigate('/taches')}><ListTodo size={18}/>Ouvrir les tâches</button></div></section>
-      <section className="executive-metrics">{metrics.map((metric) => <article className={`executive-metric ${metric.tone}`} key={metric.label}><span>{metric.label}</span><strong>{metric.value}</strong><small>{metric.detail}</small><em>{metric.delta}</em></article>)}</section>
-      <section className="executive-grid">
-        <article className="panel arrivals-panel"><div className="panel-header compact"><div><p className="eyebrow">Réception</p><h2>Prochaines arrivées groupes</h2></div><button className="text-button" onClick={() => navigate('/reception')}>Gérer les arrivées</button></div><div className="arrival-list">{arrivals.map((arrival) => <button className="arrival-row" key={arrival.name} onClick={() => navigate('/reception')}><time>{arrival.time}</time><div><strong>{arrival.name}</strong><small>{arrival.meta}</small></div><span className={`pill ${arrival.tone}`}>{arrival.state}</span><ChevronRight size={17}/></button>)}</div></article>
-        <article className="panel alerts-panel"><div className="panel-header compact"><div><p className="eyebrow">À traiter</p><h2>Alertes interservices</h2></div><span className="count-badge">4</span></div><div className="executive-alerts">{alerts.map(({icon:Icon,title,text,tone}) => <div className={`executive-alert ${tone}`} key={title}><span><Icon size={18}/></span><div><strong>{title}</strong><small>{text}</small></div></div>)}</div></article>
-        <article className="panel services-panel"><div className="panel-header compact"><div><p className="eyebrow">Pilotage</p><h2>État des services</h2></div><Clock3 size={19}/></div><div className="service-list">{services.map((service) => <div className="service-row" key={service.name}><div className="service-title"><strong>{service.name}</strong><span>{service.status}</span></div><small>{service.detail}</small><div className="service-progress"><i style={{width:`${service.score}%`}}/></div></div>)}</div></article>
-        <article className="panel quick-panel"><div className="panel-header compact"><div><p className="eyebrow">Accès rapide</p><h2>Modules opérationnels</h2></div></div><div className="quick-grid">{nav.slice(1).map(({label,icon:Icon,href}) => <button key={label} onClick={() => navigate(href)}><Icon size={22}/><span>{label}</span><ChevronRight size={16}/></button>)}</div></article>
-      </section>
-      <footer className="demo-footer"><AlertTriangle size={16}/>Version pilote : les paramètres sont enregistrés localement dans le navigateur jusqu’à la synchronisation PostgreSQL multi-utilisateur.</footer>
+    <aside className={`sidebar${sidebarOpen ? ' open' : ''}`}>
+      <div className="brand"><div className="brand-mark">H</div><div><strong>HospiCore</strong><span>Hôtel Paradis · Lourdes</span></div><button className="sidebar-close" onClick={() => setSidebarOpen(false)} aria-label="Fermer"><X size={20}/></button></div>
+      <nav className="nav-list">{nav.map(({ label, icon: Icon, href, active }) => <button key={label} className={`nav-item${active ? ' active' : ''}`} onClick={() => navigate(href)}><Icon size={19}/>{label}</button>)}</nav>
+      <div className="demo-version"><Sparkles size={16}/><div><strong>HospiCore V2</strong><span>Cockpit opérationnel</span></div></div>
+    </aside>
+
+    <main className="live-v2-main">
+      <header className="live-v2-topbar">
+        <div className="live-v2-title"><button className="live-v2-menu" onClick={() => setSidebarOpen(true)}><Menu size={22}/></button><div><h1>HospiCore Live</h1><p>{session.user?.hotel?.name || 'Hôtel Paradis'} · centre opérationnel</p></div></div>
+        <div className="live-v2-user"><div className={`live-v2-sync${loading ? ' loading' : ''}`}><RefreshCw size={15}/>{loading ? 'Synchronisation…' : 'PostgreSQL à jour'}</div><button className="icon-button" onClick={() => navigate('/taches')}><Bell size={19}/>{alerts.length > 0 && <span className="notification-dot">{alerts.length}</span>}</button><div className="live-v2-avatar" title={userName}>{initials}</div></div>
+      </header>
+
+      <div className="live-v2-content">
+        <section className="live-v2-hero"><div><p>Bonjour {session.user?.firstName || ''}</p><h2>Voici ce qui se passe à l’hôtel.</h2><p>Une vue unique des groupes, tâches, consignes, prêts et activités interservices.</p></div><div className="live-v2-clock"><strong>{now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</strong><span>{now.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</span></div></section>
+
+        {error && <div className="live-v2-error"><AlertTriangle size={17}/> {error}</div>}
+
+        <section className="live-v2-kpis">
+          <button className="live-v2-kpi" onClick={() => navigate('/groupes')}><span className="icon"><ConciergeBell/></span><span>Arrivées aujourd’hui</span><strong>{todayArrivals.length}</strong><small>{todayArrivals.reduce((sum, group) => sum + (group.pax || 0), 0)} personnes attendues</small></button>
+          <button className="live-v2-kpi" onClick={() => navigate('/taches')}><span className="icon"><ListTodo/></span><span>Tâches ouvertes</span><strong>{openTasks.length}</strong><small>{criticalTasks.length} prioritaire(s)</small></button>
+          <button className="live-v2-kpi" onClick={() => navigate('/consignes-generales')}><span className="icon"><ClipboardList/></span><span>Consignes ouvertes</span><strong>{openInstructions.length}</strong><small>Partagées entre les services</small></button>
+          <button className="live-v2-kpi" onClick={() => navigate('/centre-operations')}><span className="icon"><Package/></span><span>Prêts en cours</span><strong>{activeLoans.length}</strong><small>{overdueLoans.length} retour(s) dépassé(s)</small></button>
+        </section>
+
+        <section className="live-v2-grid">
+          <article className="live-v2-panel"><div className="live-v2-panel-head"><div><p>Réception</p><h3>Groupes du jour</h3></div><button className="live-v2-link" onClick={() => navigate('/groupes')}>Tous les groupes</button></div><div className="live-v2-list">{todayArrivals.length ? todayArrivals.slice(0, 5).map((group, index) => <button className="live-v2-row" key={group.id || index} onClick={() => navigate('/groupes')}><time>{timeLabel(group.arrivalTime)}</time><div><strong>{group.name || 'Groupe sans nom'}</strong><small>{group.pax || 0} pax{group.dinnerTime ? ` · dîner ${timeLabel(group.dinnerTime)}` : ''}</small></div><span className={`live-v2-status ${group.status === 'IN_HOUSE' ? 'success' : 'info'}`}>{group.status || 'Prévu'}</span></button>) : <div className="live-v2-alert"><div><strong>Aucune arrivée enregistrée aujourd’hui</strong><small>Ajoutez ou mettez à jour les dossiers groupes.</small></div></div>}</div></article>
+
+          <article className="live-v2-panel"><div className="live-v2-panel-head"><div><p>Priorités</p><h3>Alertes interservices</h3></div><button className="live-v2-link" onClick={() => navigate('/taches')}>Traiter</button></div><div className="live-v2-list">{alerts.map((alert, index) => <button className={`live-v2-alert ${alert.tone}`} key={`${alert.title}-${index}`} onClick={() => navigate(alert.href)}><span className="alert-icon"><AlertTriangle size={18}/></span><div><strong>{alert.title}</strong><small>{alert.detail}</small></div><ChevronRight size={17}/></button>)}</div></article>
+
+          <article className="live-v2-panel wide"><div className="live-v2-panel-head"><div><p>Pilotage</p><h3>État des services</h3></div><button className="live-v2-link" onClick={() => void refresh()}><RefreshCw size={15}/> Actualiser</button></div><div className="live-v2-services">{serviceCards.map(({ name, detail, href, icon: Icon }) => <button className="live-v2-service" key={name} onClick={() => navigate(href)}><Icon size={24}/><strong>{name}</strong><span>{detail}</span><small>Ouvrir le service →</small></button>)}</div></article>
+
+          <article className="live-v2-panel"><div className="live-v2-panel-head"><div><p>Réunions</p><h3>Salles réservées</h3></div><button className="live-v2-link" onClick={() => navigate('/salles-reunion')}>Agenda</button></div><div className="live-v2-kpi" onClick={() => navigate('/salles-reunion')}><span className="icon"><CalendarDays/></span><span>Réservations enregistrées</span><strong>{meetingRooms.length}</strong><small>Agenda partagé PostgreSQL</small></div></article>
+
+          <article className="live-v2-panel"><div className="live-v2-panel-head"><div><p>Système</p><h3>Stabilité HospiCore</h3></div><button className="live-v2-link" onClick={() => navigate('/diagnostic')}>Diagnostic</button></div><div className="live-v2-alert success"><span className="alert-icon"><RefreshCw size={18}/></span><div><strong>Synchronisation opérationnelle</strong><small>Dernière mise à jour : {lastSync ? new Date(lastSync).toLocaleString('fr-FR') : 'en cours'}</small></div></div></article>
+        </section>
+
+        <footer className="live-v2-footer"><span>Connecté en tant que <strong>{userName}</strong> · {session.user?.role || 'Collaborateur'}</span><span>Actualisation automatique toutes les 30 secondes</span></footer>
+      </div>
     </main>
   </div>;
 }
