@@ -1,5 +1,6 @@
 import { FormEvent, useMemo, useState } from 'react';
-import { CalendarDays, ChevronLeft, ChevronRight, Clock3, MapPin, Plus, UsersRound, X } from 'lucide-react';
+import { CalendarDays, ChevronLeft, ChevronRight, Clock3, Cloud, LoaderCircle, MapPin, Plus, RefreshCw, UsersRound, X } from 'lucide-react';
+import { useOperationalStore } from './useOperationalStore';
 
 type BookingStatus = 'CONFIRMED' | 'OPTION' | 'BLOCKED';
 type Booking = {
@@ -15,15 +16,12 @@ type Booking = {
   setup: string;
   notes: string;
   status: BookingStatus;
+  updatedBy?: string;
+  updatedAt?: string;
 };
 
 const rooms = ['Salle Bernadette', 'Salle Massabielle', 'Salle Gavarnie', 'Salle Pic du Midi', 'Salle Gave'];
-const demoBookings: Booking[] = [
-  { id: '1', title: 'Briefing guides Unitalsi', room: 'Salle Bernadette', date: '2026-08-05', start: '09:00', end: '10:30', attendees: 38, organiser: 'Maria Rossi', service: 'Groupes', setup: 'Théâtre', notes: 'Vidéoprojecteur et eau minérale.', status: 'CONFIRMED' },
-  { id: '2', title: 'Réunion équipe réception', room: 'Salle Massabielle', date: '2026-08-05', start: '14:00', end: '15:00', attendees: 10, organiser: 'Thomas', service: 'Réception', setup: 'U', notes: 'Point arrivées groupes.', status: 'CONFIRMED' },
-  { id: '3', title: 'Conférence pèlerinage', room: 'Salle Gavarnie', date: '2026-08-06', start: '10:00', end: '12:30', attendees: 95, organiser: 'ORP', service: 'Commercial', setup: 'Théâtre', notes: 'Micro, pupitre et écran.', status: 'OPTION' },
-  { id: '4', title: 'Formation sécurité', room: 'Salle Pic du Midi', date: '2026-08-07', start: '08:30', end: '11:30', attendees: 24, organiser: 'Direction', service: 'Direction', setup: 'Classe', notes: 'Salle bloquée pour le personnel.', status: 'BLOCKED' },
-];
+const EMPTY_BOOKINGS: Booking[] = [];
 
 function localDate(value: Date) {
   const year = value.getFullYear();
@@ -40,25 +38,28 @@ function startOfWeek(value: Date) {
   return date;
 }
 
+function actorName() {
+  try {
+    const session = JSON.parse(localStorage.getItem('hospicore.session') || '{}');
+    const user = session.user || {};
+    return `${user.firstName || 'Utilisateur'} ${user.lastName || 'HospiCore'}`.trim();
+  } catch {
+    return 'Utilisateur HospiCore';
+  }
+}
+
 export function MeetingRoomsPage() {
-  const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date('2026-08-05T12:00:00')));
-  const [bookings, setBookings] = useState<Booking[]>(() => {
-    const stored = localStorage.getItem('hospicore.meeting-bookings');
-    return stored ? JSON.parse(stored) : demoBookings;
-  });
+  const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
+  const { data: bookings, state, message, updatedAt, refresh, save } = useOperationalStore<Booking[]>('meeting-rooms', EMPTY_BOOKINGS);
   const [modalOpen, setModalOpen] = useState(false);
   const [selected, setSelected] = useState<Booking | null>(null);
 
+  const busy = state === 'loading' || state === 'saving';
   const days = useMemo(() => Array.from({ length: 7 }, (_, index) => {
     const date = new Date(weekStart);
     date.setDate(date.getDate() + index);
     return date;
   }), [weekStart]);
-
-  function save(next: Booking[]) {
-    setBookings(next);
-    localStorage.setItem('hospicore.meeting-bookings', JSON.stringify(next));
-  }
 
   function openCreate(date?: string, room?: string) {
     setSelected({
@@ -68,7 +69,7 @@ export function MeetingRoomsPage() {
     setModalOpen(true);
   }
 
-  function submit(event: FormEvent<HTMLFormElement>) {
+  async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!selected) return;
     const form = new FormData(event.currentTarget);
@@ -86,9 +87,16 @@ export function MeetingRoomsPage() {
       setup: String(form.get('setup') || ''),
       notes: String(form.get('notes') || ''),
       status: String(form.get('status') || 'CONFIRMED') as BookingStatus,
+      updatedBy: actorName(),
+      updatedAt: new Date().toISOString(),
     };
-    save(selected.id ? bookings.map((item) => item.id === selected.id ? booking : item) : [...bookings, booking]);
-    setModalOpen(false);
+    const next = selected.id ? bookings.map((item) => item.id === selected.id ? booking : item) : [...bookings, booking];
+    if (await save(next)) setModalOpen(false);
+  }
+
+  async function removeSelected() {
+    if (!selected?.id) return;
+    if (await save(bookings.filter((item) => item.id !== selected.id))) setModalOpen(false);
   }
 
   function changeWeek(offset: number) {
@@ -97,11 +105,18 @@ export function MeetingRoomsPage() {
     setWeekStart(next);
   }
 
+  const SyncIcon = state === 'synced' ? Cloud : state === 'loading' || state === 'saving' ? LoaderCircle : RefreshCw;
+
   return <div className="meeting-page">
     <header className="meeting-header">
       <div><p className="eyebrow">Communication interservice</p><h1>Agenda des salles de réunion</h1><p>Centralisez les réservations, besoins techniques et consignes de mise en place.</p></div>
-      <button className="meeting-primary" onClick={() => openCreate()}><Plus size={18} />Nouvelle réservation</button>
+      <button className="meeting-primary" disabled={busy} onClick={() => openCreate()}><Plus size={18} />Nouvelle réservation</button>
     </header>
+
+    <section className={`sync-banner ${state === 'synced' ? 'shared' : state}`}>
+      <span><SyncIcon size={17} className={busy ? 'spin' : ''}/><strong>{message}</strong>{updatedAt && <small> · {new Date(updatedAt).toLocaleString('fr-FR')}</small>}</span>
+      <button onClick={() => void refresh()} disabled={busy}><RefreshCw size={15}/>Actualiser</button>
+    </section>
 
     <section className="meeting-toolbar">
       <div className="week-navigation">
@@ -109,12 +124,12 @@ export function MeetingRoomsPage() {
         <strong>{days[0].toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })} — {days[6].toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}</strong>
         <button onClick={() => changeWeek(1)} aria-label="Semaine suivante"><ChevronRight size={19} /></button>
       </div>
-      <button className="meeting-secondary" onClick={() => setWeekStart(startOfWeek(new Date('2026-08-05T12:00:00')))}>Aujourd’hui</button>
+      <button className="meeting-secondary" onClick={() => setWeekStart(startOfWeek(new Date()))}>Aujourd’hui</button>
     </section>
 
     <section className="meeting-summary">
       <article><CalendarDays size={20} /><div><strong>{bookings.filter((item) => days.some((day) => localDate(day) === item.date)).length}</strong><span>réservations cette semaine</span></div></article>
-      <article><UsersRound size={20} /><div><strong>{bookings.reduce((sum, item) => sum + item.attendees, 0)}</strong><span>participants prévus</span></div></article>
+      <article><UsersRound size={20} /><div><strong>{bookings.filter((item) => days.some((day) => localDate(day) === item.date)).reduce((sum, item) => sum + item.attendees, 0)}</strong><span>participants cette semaine</span></div></article>
       <article><Clock3 size={20} /><div><strong>{bookings.filter((item) => item.status === 'OPTION').length}</strong><span>options à confirmer</span></div></article>
     </section>
 
@@ -150,9 +165,9 @@ export function MeetingRoomsPage() {
         <label>Statut<select name="status" defaultValue={selected.status}><option value="CONFIRMED">Confirmée</option><option value="OPTION">Option</option><option value="BLOCKED">Bloquée</option></select></label>
         <label className="meeting-wide">Consignes interservices<textarea name="notes" defaultValue={selected.notes} placeholder="Mise en place, matériel, restauration, nettoyage…" /></label>
         <div className="meeting-modal-actions">
-          {selected.id && <button type="button" className="meeting-delete" onClick={() => { save(bookings.filter((item) => item.id !== selected.id)); setModalOpen(false); }}>Supprimer</button>}
+          {selected.id && <button type="button" className="meeting-delete" disabled={busy} onClick={() => void removeSelected()}>Supprimer</button>}
           <button type="button" className="meeting-secondary" onClick={() => setModalOpen(false)}>Annuler</button>
-          <button className="meeting-primary" type="submit">Enregistrer</button>
+          <button className="meeting-primary" disabled={busy} type="submit">Enregistrer et partager</button>
         </div>
       </form>
     </div>}
