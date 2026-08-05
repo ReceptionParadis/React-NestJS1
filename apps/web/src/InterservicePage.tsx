@@ -1,12 +1,20 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, BedDouble, CheckCircle2, ChefHat, ClipboardEdit, Clock3, Hotel, Plus, Printer, Save, UsersRound } from 'lucide-react';
-import { FunctionSheet, loadFunctionSheets, markGroupArrived, MealService, saveFunctionSheets } from './interservice-data';
+import { ArrowLeft, BedDouble, CheckCircle2, ChefHat, ClipboardEdit, Clock3, Hotel, Plus, Printer, Save, Sparkles, UsersRound } from 'lucide-react';
+import {
+  FunctionSheet,
+  getHousekeepingTask,
+  loadFunctionSheets,
+  markGroupArrived,
+  markHousekeepingDone,
+  MealService,
+  saveFunctionSheets,
+} from './interservice-data';
 
 type Department = 'reception' | 'housekeeping' | 'cuisine' | 'commercial';
 
 const departmentConfig = {
   reception: { title: 'Interface Réception', subtitle: 'Confirmez les arrivées et diffusez l’information aux services.', icon: Hotel },
-  housekeeping: { title: 'Interface Housekeeping', subtitle: 'Consultez les groupes, priorités et consignes d’étages.', icon: BedDouble },
+  housekeeping: { title: 'Interface Housekeeping', subtitle: 'Validez les chambres propres à l’arrivée et les recouches des groupes en séjour.', icon: BedDouble },
   cuisine: { title: 'Interface Cuisine', subtitle: 'Anticipez les volumes, régimes et horaires de service.', icon: ChefHat },
   commercial: { title: 'Interface Commercial', subtitle: 'Éditez les fiches de fonction hebdomadaires des groupes.', icon: ClipboardEdit },
 };
@@ -23,6 +31,7 @@ function emptyFunctionSheet(): FunctionSheet {
     leader: '',
     arrivalStatus: 'Prévu',
     meals: [],
+    housekeepingStatus: 'À faire',
     receptionNotes: '',
     housekeepingNotes: '',
     kitchenNotes: '',
@@ -47,8 +56,18 @@ export function InterservicePage({ department }: { department: Department }) {
     return acc;
   }, {} as Record<MealService, number>), [items]);
 
+  const housekeepingTotals = useMemo(() => ({
+    todo: items.filter((item) => getHousekeepingTask(item) !== 'Aucune tâche' && item.housekeepingStatus === 'À faire').length,
+    clean: items.filter((item) => item.housekeepingStatus === 'OK propre').length,
+    stayover: items.filter((item) => item.housekeepingStatus === 'OK recouche').length,
+  }), [items]);
+
   function confirmArrival(id: string) {
     setItems(markGroupArrived(id));
+  }
+
+  function confirmHousekeeping(id: string, status: 'OK propre' | 'OK recouche') {
+    setItems(markHousekeepingDone(id, status));
   }
 
   function saveSheet(event: FormEvent<HTMLFormElement>) {
@@ -88,22 +107,42 @@ export function InterservicePage({ department }: { department: Department }) {
       {(['Petit-déjeuner', 'Déjeuner', 'Dîner'] as MealService[]).map((service) => <article key={service}><span>{service}</span><strong>{mealTotals[service] || 0}</strong><small>couverts groupes</small></article>)}
     </section>}
 
+    {department === 'housekeeping' && <section className="interservice-kpis">
+      <article><BedDouble size={20} /><span>À terminer</span><strong>{housekeepingTotals.todo}</strong><small>groupes en attente</small></article>
+      <article><CheckCircle2 size={20} /><span>OK propre</span><strong>{housekeepingTotals.clean}</strong><small>arrivées prêtes</small></article>
+      <article><Sparkles size={20} /><span>OK recouche</span><strong>{housekeepingTotals.stayover}</strong><small>groupes en séjour</small></article>
+    </section>}
+
     <section className="function-sheet-list">
-      {items.map((item) => <article className="function-sheet-card" key={item.id}>
-        <div className="function-sheet-title"><div><span className={`workflow-status ${item.arrivalStatus.toLowerCase().replace(' ', '-')}`}>{item.arrivalStatus}</span><h2>{item.groupName}</h2><small>{item.agency} · {item.pax} pax · {item.arrivalDate} au {item.departureDate}</small></div><UsersRound size={24} /></div>
+      {items.map((item) => {
+        const housekeepingTask = getHousekeepingTask(item);
+        return <article className="function-sheet-card" key={item.id}>
+          <div className="function-sheet-title"><div><span className={`workflow-status ${item.arrivalStatus.toLowerCase().replace(' ', '-')}`}>{item.arrivalStatus}</span><h2>{item.groupName}</h2><small>{item.agency} · {item.pax} pax · {item.arrivalDate} au {item.departureDate}</small></div><UsersRound size={24} /></div>
 
-        {department === 'reception' && <div className="department-block"><strong>Arrivée prévue à {item.arrivalTime || 'confirmer'}</strong><p>{item.receptionNotes || 'Aucune consigne réception.'}</p>{item.arrivalStatus !== 'Arrivé' ? <button className="interservice-primary" onClick={() => confirmArrival(item.id)}><CheckCircle2 size={17} /> Marquer le groupe arrivé</button> : <small>Arrivée confirmée à {item.receptionConfirmedAt}</small>}</div>}
+          {department === 'reception' && <div className="department-block"><strong>Arrivée prévue à {item.arrivalTime || 'confirmer'}</strong><p>{item.receptionNotes || 'Aucune consigne réception.'}</p>{item.arrivalStatus !== 'Arrivé' ? <button className="interservice-primary" onClick={() => confirmArrival(item.id)}><CheckCircle2 size={17} /> Marquer le groupe arrivé</button> : <small>Arrivée confirmée à {item.receptionConfirmedAt}</small>}</div>}
 
-        {department === 'housekeeping' && <div className="department-block"><strong>Consignes Housekeeping</strong><p>{item.housekeepingNotes || 'Aucune consigne particulière.'}</p><small>Arrivée : {item.arrivalStatus} · {item.arrivalTime || 'horaire à confirmer'}</small></div>}
+          {department === 'housekeeping' && <div className="department-block housekeeping-workflow">
+            <div><strong>Consignes Housekeeping</strong><p>{item.housekeepingNotes || 'Aucune consigne particulière.'}</p></div>
+            <div className="housekeeping-task-status">
+              <span>Tâche du jour</span>
+              <strong>{housekeepingTask}</strong>
+              <small>Statut : {item.housekeepingStatus}{item.housekeepingConfirmedAt ? ` · confirmé à ${item.housekeepingConfirmedAt}` : ''}</small>
+            </div>
+            {housekeepingTask === 'En attente de l’arrivée' && <p className="housekeeping-waiting">La validation sera disponible dès que la réception aura marqué le groupe arrivé.</p>}
+            {housekeepingTask === 'Propre arrivée' && item.housekeepingStatus !== 'OK propre' && <button className="interservice-primary" onClick={() => confirmHousekeeping(item.id, 'OK propre')}><CheckCircle2 size={17} /> Toutes les chambres sont faites — OK propre</button>}
+            {housekeepingTask === 'Recouche' && item.housekeepingStatus !== 'OK recouche' && <button className="interservice-primary" onClick={() => confirmHousekeeping(item.id, 'OK recouche')}><Sparkles size={17} /> Toutes les recouches sont faites — OK recouche</button>}
+            {(item.housekeepingStatus === 'OK propre' || item.housekeepingStatus === 'OK recouche') && <div className="housekeeping-complete"><CheckCircle2 size={18} /> {item.housekeepingStatus} transmis aux autres services</div>}
+          </div>}
 
-        {department === 'cuisine' && <div className="department-block"><strong>Préparation cuisine</strong><p>{item.kitchenNotes || 'Aucune consigne particulière.'}</p></div>}
+          {department === 'cuisine' && <div className="department-block"><strong>Préparation cuisine</strong><p>{item.kitchenNotes || 'Aucune consigne particulière.'}</p><small>Housekeeping : {item.housekeepingStatus}</small></div>}
 
-        <div className="meal-function-grid">
-          {item.meals.map((meal) => <div className="meal-function" key={`${item.id}-${meal.service}`}><span>{meal.service}</span><strong><Clock3 size={15} /> {meal.time || (item.arrivalStatus === 'Arrivé' ? 'En attente de l’horaire' : 'Horaire à confirmer')}</strong><small>{meal.pax} pax · {meal.room}</small>{meal.diets && <em>{meal.diets}</em>}{meal.notes && <p>{meal.notes}</p>}</div>)}
-        </div>
+          <div className="meal-function-grid">
+            {item.meals.map((meal) => <div className="meal-function" key={`${item.id}-${meal.service}`}><span>{meal.service}</span><strong><Clock3 size={15} /> {meal.time || (item.arrivalStatus === 'Arrivé' ? 'En attente de l’horaire' : 'Horaire à confirmer')}</strong><small>{meal.pax} pax · {meal.room}</small>{meal.diets && <em>{meal.diets}</em>}{meal.notes && <p>{meal.notes}</p>}</div>)}
+          </div>
 
-        {department === 'commercial' && <div className="commercial-actions"><button onClick={() => setEditing(item)}><ClipboardEdit size={16} /> Modifier</button><button onClick={() => window.print()}><Printer size={16} /> Imprimer</button></div>}
-      </article>)}
+          {department === 'commercial' && <div className="commercial-actions"><button onClick={() => setEditing(item)}><ClipboardEdit size={16} /> Modifier</button><button onClick={() => window.print()}><Printer size={16} /> Imprimer</button></div>}
+        </article>;
+      })}
     </section>
 
     {editing && <div className="function-modal"><form onSubmit={saveSheet} className="function-form"><header><div><p>Commercial</p><h2>Fiche de fonction groupe</h2></div><button type="button" onClick={() => setEditing(null)}>Fermer</button></header>
