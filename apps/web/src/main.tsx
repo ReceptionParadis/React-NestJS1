@@ -18,6 +18,7 @@ import './general-instructions.css';
 import './activity-journal.css';
 import './tasks.css';
 import './administration.css';
+import './diagnostic.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode><AppRouter /></React.StrictMode>,
