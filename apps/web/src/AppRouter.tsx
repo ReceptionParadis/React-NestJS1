@@ -11,6 +11,7 @@ import { InterserviceControlPage } from './InterserviceControlPage';
 import { InterservicePage } from './InterservicePage';
 import { MainCourante } from './MainCourante';
 import { MeetingRoomsPage } from './MeetingRoomsPage';
+import { OperationalPlanningPage } from './OperationalPlanningPage';
 import { OperationsCenterV2Page } from './OperationsCenterV2Page';
 import { ReceptionDailyPage } from './ReceptionDailyPage';
 import { RestaurantPlanningPage } from './RestaurantPlanningPage';
@@ -23,6 +24,7 @@ function CurrentPage(){
  const path=window.location.pathname;
  if(path.startsWith('/diagnostic'))return <DiagnosticPage/>;
  if(path.startsWith('/administration')||path.startsWith('/parametres'))return <AdministrationPage/>;
+ if(path.startsWith('/planning-operationnel'))return <OperationalPlanningPage/>;
  if(path.startsWith('/taches'))return <TasksPage/>;
  if(path.startsWith('/journal-exploitation')||path.startsWith('/activite'))return <ActivityJournalPage/>;
  if(path.startsWith('/consignes-generales'))return <GeneralInstructionsPage/>;
