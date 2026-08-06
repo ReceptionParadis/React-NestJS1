@@ -6,15 +6,12 @@ import { CommercialHubPage } from './CommercialHubPage';
 import { DiagnosticPage } from './DiagnosticPage';
 import { GeneralInstructionsPage } from './GeneralInstructionsPage';
 import { GroupsPage } from './GroupsPage';
-import { HousekeepingDashboardPage } from './HousekeepingDashboardPage';
 import { InterserviceControlPage } from './InterserviceControlPage';
-import { InterservicePage } from './InterservicePage';
 import { MainCourante } from './MainCourante';
 import { MeetingRoomsPage } from './MeetingRoomsPage';
 import { OperationalPlanningPage } from './OperationalPlanningPage';
 import { OperationsCenterV2Page } from './OperationsCenterV2Page';
 import { ReceptionDailyPage } from './ReceptionDailyPage';
-import { RestaurantPlanningPage } from './RestaurantPlanningPage';
 import { RoomingListImportPage } from './RoomingListImportPage';
 import { TasksPage } from './TasksPage';
 import { TicketsPage } from './TicketsPage';
@@ -35,9 +32,10 @@ function CurrentPage(){
  if(path==='/commercial'||path==='/commercial/')return <CommercialHubPage/>;
  if(path.startsWith('/planning-hebdomadaire'))return <WeeklyPlanningPage/>;
  if(path.startsWith('/reception'))return <ReceptionDailyPage/>;
- if(path.startsWith('/restaurant'))return <RestaurantPlanningPage/>;
- if(path.startsWith('/housekeeping'))return <HousekeepingDashboardPage/>;
- if(path.startsWith('/cuisine'))return <InterservicePage department="cuisine"/>;
+ if(path.startsWith('/restaurant')||path.startsWith('/cuisine')||path.startsWith('/housekeeping')){
+  window.history.replaceState({},'','/');
+  return <App/>;
+ }
  if(path.startsWith('/main-courante'))return <MainCourante/>;
  if(path.startsWith('/salles-reunion'))return <MeetingRoomsPage/>;
  if(path.startsWith('/chambres')||path.startsWith('/groupes/allocation')){window.history.replaceState({},'','/salles-reunion');return <MeetingRoomsPage/>}
