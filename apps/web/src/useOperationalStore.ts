@@ -17,13 +17,20 @@ export type OperationalStore<T> = {
   save: (next: T) => Promise<boolean>;
 };
 
-export function useOperationalStore<T>(namespace: string, initialValue: T, refreshMs = 30000): OperationalStore<T> {
+const DEFAULT_REFRESH_MS = 10_000;
+
+export function useOperationalStore<T>(
+  namespace: string,
+  initialValue: T,
+  refreshMs = DEFAULT_REFRESH_MS,
+): OperationalStore<T> {
   const initialValueRef = useRef(initialValue);
   const [data, setData] = useState<T>(() => initialValueRef.current);
   const [version, setVersion] = useState(0);
   const versionRef = useRef(0);
   const refreshInFlightRef = useRef(false);
   const mountedRef = useRef(true);
+  const channelRef = useRef<BroadcastChannel | null>(null);
   const [updatedAt, setUpdatedAt] = useState('');
   const [lastSuccessAt, setLastSuccessAt] = useState('');
   const [state, setState] = useState<OperationalSyncState>('loading');
@@ -82,6 +89,7 @@ export function useOperationalStore<T>(namespace: string, initialValue: T, refre
       const result = await saveSharedData<T>(namespace, next, versionRef.current);
       if (!mountedRef.current) return false;
       markSuccess(result.payload, result.version, 'Enregistré pour tous les services');
+      channelRef.current?.postMessage({ namespace, version: result.version, at: Date.now() });
       return true;
     } catch (error) {
       if (!mountedRef.current) return false;
@@ -95,12 +103,35 @@ export function useOperationalStore<T>(namespace: string, initialValue: T, refre
   useEffect(() => {
     mountedRef.current = true;
     void refresh();
-    const timer = window.setInterval(() => void refresh(true), refreshMs);
+
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === 'visible' && navigator.onLine) void refresh(true);
+    }, Math.max(5_000, refreshMs));
+
+    const refreshWhenActive = () => {
+      if (document.visibilityState === 'visible' && navigator.onLine) void refresh(true);
+    };
+
+    window.addEventListener('focus', refreshWhenActive);
+    window.addEventListener('online', refreshWhenActive);
+    document.addEventListener('visibilitychange', refreshWhenActive);
+
+    if ('BroadcastChannel' in window) {
+      const channel = new BroadcastChannel(`hospicore-sync-${namespace}`);
+      channelRef.current = channel;
+      channel.onmessage = () => void refresh(true);
+    }
+
     return () => {
       mountedRef.current = false;
       window.clearInterval(timer);
+      window.removeEventListener('focus', refreshWhenActive);
+      window.removeEventListener('online', refreshWhenActive);
+      document.removeEventListener('visibilitychange', refreshWhenActive);
+      channelRef.current?.close();
+      channelRef.current = null;
     };
-  }, [refresh, refreshMs]);
+  }, [namespace, refresh, refreshMs]);
 
   const publicState: OperationalSyncState = state === 'loading' && !lastSuccessAt
     ? 'loading'
