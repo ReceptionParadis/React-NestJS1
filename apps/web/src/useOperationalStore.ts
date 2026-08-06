@@ -29,17 +29,6 @@ export function useOperationalStore<T>(namespace: string, initialValue: T, refre
     setMessage(successMessage);
   }, []);
 
-  const preservePreviousSuccess = useCallback(() => {
-    if (!mountedRef.current || !lastSuccessRef.current) return false;
-    setState('synced');
-    setMessage(`Dernière synchronisation réussie · ${new Date(lastSuccessRef.current).toLocaleTimeString('fr-FR', {
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-    })}`);
-    return true;
-  }, []);
-
   const refresh = useCallback(async (silent = false) => {
     if (refreshInFlightRef.current) return false;
     refreshInFlightRef.current = true;
@@ -54,7 +43,6 @@ export function useOperationalStore<T>(namespace: string, initialValue: T, refre
       if (!mountedRef.current) return false;
 
       if (!result.connected) {
-        if (preservePreviousSuccess()) return false;
         setState('error');
         setMessage(result.error || 'Synchronisation PostgreSQL indisponible.');
         return false;
@@ -64,15 +52,13 @@ export function useOperationalStore<T>(namespace: string, initialValue: T, refre
       return true;
     } catch (error) {
       if (!mountedRef.current) return false;
-      const text = error instanceof Error ? error.message : 'Synchronisation PostgreSQL indisponible.';
-      if (preservePreviousSuccess()) return false;
       setState('error');
-      setMessage(text);
+      setMessage(error instanceof Error ? error.message : 'Synchronisation PostgreSQL indisponible.');
       return false;
     } finally {
       refreshInFlightRef.current = false;
     }
-  }, [markSuccess, namespace, preservePreviousSuccess]);
+  }, [markSuccess, namespace]);
 
   const save = useCallback(async (next: T) => {
     if (mountedRef.current) {
@@ -104,16 +90,25 @@ export function useOperationalStore<T>(namespace: string, initialValue: T, refre
     };
   }, [refresh, refreshMs]);
 
-  const publicState: OperationalSyncState = lastSuccessAt && (state === 'error' || state === 'conflict')
-    ? 'synced'
-    : state;
+  // The command center needs an operational status, not every transient read error.
+  // Keep the raw state for the Diagnostic screen, but only expose blocking states:
+  // initial loading, active saving, or a genuine write conflict.
+  const publicState: OperationalSyncState = state === 'loading' && !lastSuccessAt
+    ? 'loading'
+    : state === 'saving'
+      ? 'saving'
+      : state === 'conflict'
+        ? 'conflict'
+        : 'synced';
 
-  const publicMessage = publicState === 'synced' && state !== 'synced'
-    ? `PostgreSQL joignable · dernière réussite ${new Date(lastSuccessAt).toLocaleTimeString('fr-FR', {
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-      })}`
+  const publicMessage = publicState === 'synced'
+    ? lastSuccessAt
+      ? `PostgreSQL à jour · ${new Date(lastSuccessAt).toLocaleTimeString('fr-FR', {
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+        })}`
+      : 'Données opérationnelles disponibles'
     : message;
 
   return {
@@ -124,6 +119,7 @@ export function useOperationalStore<T>(namespace: string, initialValue: T, refre
     lastSuccessAt,
     state: publicState,
     rawState: state,
+    rawMessage: message,
     message: publicMessage,
     refresh,
     save,
