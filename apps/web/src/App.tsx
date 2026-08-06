@@ -44,6 +44,11 @@ function checklist(group:Group){
 }
 function roleName(session:Session){return String(typeof session.user?.role==='object'?session.user?.role?.name:session.user?.role||'Utilisateur')}
 function maintenanceLocation(item:MaintenanceIntervention){return item.room?`Chambre ${item.room}`:[item.building,item.floor,item.zone].filter(Boolean).join(' · ')||'Zone à préciser'}
+function isStaleSync(updatedAt:string,maxAgeMs=120000){
+ if(!updatedAt)return true;
+ const timestamp=Date.parse(updatedAt);
+ return !Number.isFinite(timestamp)||Date.now()-timestamp>maxAgeMs;
+}
 
 export function App(){
  const[sidebarOpen,setSidebarOpen]=useState(false);
@@ -79,7 +84,10 @@ export function App(){
   ...todayRooms.map(r=>({id:`room-${r.id}`,label:`${r.room} · ${r.title}`,detail:`${r.start}–${r.end} · ${r.attendees} pers.`,href:'/salles-reunion',level:'info' as const})),
  ].slice(0,12),[blockedDepartures,maintenanceUrgent,maintenanceBlocked,controlsToDo,controlsCommercial,todayRooms]);
  const forecast=[0,1,2].map(offset=>{const date=addDays(today,offset);const a=groups.filter(g=>g.arrival===date).length;const d=groups.filter(g=>g.departure===date).length;const p=groups.filter(g=>String(g.arrival)<=date&&String(g.departure)>=date&&g.status!=='Parti').length;const c=groups.filter(g=>g.arrival===date).length;const m=roomsStore.data.filter(r=>r.date===date).length;const score=a*3+d*2+m*2;return{date,a,d,p,c,m,level:score>=18?'Critique':score>=10?'Élevée':score>=5?'Modérée':'Faible'}});
- const stores=[groupsStore,roomsStore,sheetsStore,maintenanceStore],loading=stores.some(s=>s.state==='loading'||s.state==='saving'),syncError=stores.find(s=>s.state==='error'||s.state==='conflict');
+ const stores=[groupsStore,roomsStore,sheetsStore,maintenanceStore];
+ const loading=stores.some(s=>s.state==='loading'||s.state==='saving');
+ const reportedError=stores.find(s=>s.state==='error'||s.state==='conflict');
+ const syncError=reportedError&&isStaleSync(reportedError.updatedAt)?reportedError:undefined;
  const syncLabel=loading?'Synchronisation…':syncError?'Synchronisation en erreur':'PostgreSQL à jour';
  const refresh=()=>{void groupsStore.refresh();void roomsStore.refresh();void sheetsStore.refresh();void maintenanceStore.refresh()};
  return <div className="app-shell executive-shell command-shell">
