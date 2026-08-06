@@ -13,6 +13,9 @@ type GroupControl={validatedAt?:string;locked?:boolean;commercialValidation?:'À
 type Group={id:string;name?:string;pax?:number;rooms?:number;arrival?:string;departure?:string;arrivalTime?:string;departureTime?:string;status?:string;agency?:string;directAgency?:string;groupControl?:GroupControl;departureChecklist?:DepartureChecklist;audit?:Audit[]};
 type Booking={id:string;title:string;room:string;date:string;start:string;end:string;attendees:number;status?:string};
 type Sheet={status?:string;lines?:Array<{groupId:string}>};
+type MaintenanceStatus='À traiter'|'En cours'|'En attente de pièce'|'Terminée';
+type MaintenancePriority='Basse'|'Normale'|'Haute'|'Urgente';
+type MaintenanceIntervention={id:string;reference?:string;title:string;status:MaintenanceStatus;priority:MaintenancePriority;building?:string;floor?:string;room?:string;zone?:string;assignee?:string;blocked?:boolean;returnedToServiceAt?:string;createdAt?:string;dueAt?:string};
 type NavItem={label:string;icon:typeof LayoutDashboard;href:string};
 type ActionItem={id:string;label:string;detail:string;href:string;level:'urgent'|'warning'|'info'|'done'};
 
@@ -40,12 +43,14 @@ function checklist(group:Group){
  return{payment,keys,control,complete:payment&&keys&&control};
 }
 function roleName(session:Session){return String(typeof session.user?.role==='object'?session.user?.role?.name:session.user?.role||'Utilisateur')}
+function maintenanceLocation(item:MaintenanceIntervention){return item.room?`Chambre ${item.room}`:[item.building,item.floor,item.zone].filter(Boolean).join(' · ')||'Zone à préciser'}
 
 export function App(){
  const[sidebarOpen,setSidebarOpen]=useState(false);
  const groupsStore=useOperationalStore<Group[]>('group-360',[]);
  const roomsStore=useOperationalStore<Booking[]>('meeting-rooms',[]);
  const sheetsStore=useOperationalStore<Sheet[]>('function-sheets',[]);
+ const maintenanceStore=useOperationalStore<MaintenanceIntervention[]>('maintenance-interventions',[]);
  const session=readSession(),today=isoDate(new Date());
  const userName=`${session.user?.firstName||'Utilisateur'} ${session.user?.lastName||''}`.trim();
  const initials=`${session.user?.firstName?.[0]||'H'}${session.user?.lastName?.[0]||'C'}`.toUpperCase();
@@ -59,17 +64,24 @@ export function App(){
  const controlsCommercial=groups.filter(g=>g.groupControl?.commercialValidation==='À valider');
  const controlsVega=groups.filter(g=>g.groupControl?.commercialValidation==='Validé');
  const blockedDepartures=departures.filter(g=>g.status!=='Parti'&&!checklist(g).complete);
+ const maintenanceOpen=maintenanceStore.data.filter(i=>i.status!=='Terminée');
+ const maintenanceUrgent=maintenanceOpen.filter(i=>i.priority==='Urgente');
+ const maintenanceBlocked=maintenanceOpen.filter(i=>i.blocked&&!i.returnedToServiceAt);
+ const maintenanceActive=maintenanceOpen.filter(i=>i.status==='En cours'||i.status==='En attente de pièce');
+ const maintenancePreview=[...maintenanceUrgent,...maintenanceBlocked.filter(i=>!maintenanceUrgent.some(u=>u.id===i.id)),...maintenanceActive.filter(i=>!maintenanceUrgent.some(u=>u.id===i.id)&&!maintenanceBlocked.some(b=>b.id===i.id))].slice(0,5);
  const audit=useMemo(()=>groups.flatMap(g=>(g.audit||[]).map(a=>({...a,group:g.name||'Groupe'}))).sort((a,b)=>b.at.localeCompare(a.at,'fr')).slice(0,20),[groups]);
  const actions=useMemo<ActionItem[]>(()=>[
   ...blockedDepartures.map(g=>({id:`dep-${g.id}`,label:`Départ bloqué · ${g.name||'Groupe'}`,detail:'Solde, clés ou contrôle à compléter',href:'/reception',level:'urgent' as const})),
+  ...maintenanceUrgent.map(i=>({id:`maint-${i.id}`,label:`Maintenance urgente · ${i.title}`,detail:`${maintenanceLocation(i)}${i.assignee?` · ${i.assignee}`:''}`,href:'/tickets',level:'urgent' as const})),
+  ...maintenanceBlocked.map(i=>({id:`block-${i.id}`,label:`Chambre ou zone bloquée · ${maintenanceLocation(i)}`,detail:i.title,href:'/tickets',level:'warning' as const})),
   ...controlsToDo.map(g=>({id:`ctl-${g.id}`,label:`Contrôle Groupe · ${g.name||'Groupe'}`,detail:'À réaliser par la Réception',href:'/reception',level:'warning' as const})),
   ...controlsCommercial.map(g=>({id:`com-${g.id}`,label:`Validation commerciale · ${g.name||'Groupe'}`,detail:'Contrôle prêt à valider',href:'/commercial',level:'warning' as const})),
   ...todayRooms.map(r=>({id:`room-${r.id}`,label:`${r.room} · ${r.title}`,detail:`${r.start}–${r.end} · ${r.attendees} pers.`,href:'/salles-reunion',level:'info' as const})),
- ].slice(0,12),[blockedDepartures,controlsToDo,controlsCommercial,todayRooms]);
+ ].slice(0,12),[blockedDepartures,maintenanceUrgent,maintenanceBlocked,controlsToDo,controlsCommercial,todayRooms]);
  const forecast=[0,1,2].map(offset=>{const date=addDays(today,offset);const a=groups.filter(g=>g.arrival===date).length;const d=groups.filter(g=>g.departure===date).length;const p=groups.filter(g=>String(g.arrival)<=date&&String(g.departure)>=date&&g.status!=='Parti').length;const c=groups.filter(g=>g.arrival===date).length;const m=roomsStore.data.filter(r=>r.date===date).length;const score=a*3+d*2+m*2;return{date,a,d,p,c,m,level:score>=18?'Critique':score>=10?'Élevée':score>=5?'Modérée':'Faible'}});
- const stores=[groupsStore,roomsStore,sheetsStore],loading=stores.some(s=>s.state==='loading'||s.state==='saving'),syncError=stores.find(s=>s.state==='error'||s.state==='conflict');
+ const stores=[groupsStore,roomsStore,sheetsStore,maintenanceStore],loading=stores.some(s=>s.state==='loading'||s.state==='saving'),syncError=stores.find(s=>s.state==='error'||s.state==='conflict');
  const syncLabel=loading?'Synchronisation…':syncError?'Synchronisation en erreur':'PostgreSQL à jour';
- const refresh=()=>{void groupsStore.refresh();void roomsStore.refresh();void sheetsStore.refresh()};
+ const refresh=()=>{void groupsStore.refresh();void roomsStore.refresh();void sheetsStore.refresh();void maintenanceStore.refresh()};
  return <div className="app-shell executive-shell command-shell">
   <aside className={`sidebar${sidebarOpen?' open':''}`}>
    <div className="brand"><div className="brand-mark">H</div><div><strong>HospiCore</strong><span>Hôtel Paradis · Lourdes</span></div><button className="sidebar-close" onClick={()=>setSidebarOpen(false)}><X size={20}/></button></div>
@@ -88,7 +100,7 @@ export function App(){
     <section className="command-alerts">
      <button className={blockedDepartures.length?'critical':'ok'} onClick={()=>location.href='/reception'}><AlertTriangle size={18}/><strong>{blockedDepartures.length}</strong><span>départ(s) bloqué(s)</span></button>
      <button className={controlsToDo.length?'warning':'ok'} onClick={()=>location.href='/reception'}><ClipboardCheck size={18}/><strong>{controlsToDo.length}</strong><span>contrôle(s) à réaliser</span></button>
-     <button className={controlsCommercial.length?'warning':'ok'} onClick={()=>location.href='/commercial'}><BriefcaseBusiness size={18}/><strong>{controlsCommercial.length}</strong><span>validation(s) commerciale(s)</span></button>
+     <button className={maintenanceUrgent.length||maintenanceBlocked.length?'critical':'ok'} onClick={()=>location.href='/tickets'}><Wrench size={18}/><strong>{maintenanceUrgent.length+maintenanceBlocked.length}</strong><span>alerte(s) maintenance</span></button>
      <button className={syncError?'critical':'ok'} onClick={()=>location.href='/diagnostic'}><RefreshCw size={18}/><strong>{syncError?'!':'✓'}</strong><span>{syncError?'synchronisation en erreur':'PostgreSQL synchronisé'}</span></button>
     </section>
 
@@ -97,7 +109,7 @@ export function App(){
      <article><span>Arrivées</span><strong>{arrivals.length}</strong><small>{arrivals.reduce((n,g)=>n+Number(g.pax||0),0)} personnes</small></article>
      <article><span>Départs</span><strong>{departures.length}</strong><small>{departures.filter(g=>g.status==='Parti').length} terminés</small></article>
      <article><span>Contrôles</span><strong>{groups.filter(g=>g.groupControl?.validatedAt).length}</strong><small>{controlsToDo.length} à réaliser</small></article>
-     <article><span>Salles aujourd’hui</span><strong>{todayRooms.length}</strong><small>{todayRooms.reduce((n,r)=>n+Number(r.attendees||0),0)} participants</small></article>
+     <article><span>Maintenance ouverte</span><strong>{maintenanceOpen.length}</strong><small>{maintenanceBlocked.length} chambre(s) ou zone(s) bloquée(s)</small></article>
     </section>
 
     <section className="command-grid primary">
@@ -108,7 +120,7 @@ export function App(){
     <section className="command-grid secondary">
      <article className="command-panel command-controls"><header><div><p>Contrôles Groupe</p><h2>Suivi de facturation</h2></div><button onClick={()=>location.href='/commercial'}>Commercial</button></header><div><button onClick={()=>location.href='/reception'}><span>À réaliser</span><strong>{controlsToDo.length}</strong></button><button onClick={()=>location.href='/commercial'}><span>En validation</span><strong>{controlsCommercial.length}</strong></button><button onClick={()=>location.href='/commercial'}><span>Prêts pour VEGA</span><strong>{controlsVega.length}</strong></button></div></article>
      <article className="command-panel command-meetings"><header><div><p>Planning du jour</p><h2>Salles de réunion</h2></div><button onClick={()=>location.href='/salles-reunion'}>Agenda</button></header><div>{todayRooms.map(r=><button key={r.id} onClick={()=>location.href='/salles-reunion'}><time>{r.start}</time><div><strong>{r.room}</strong><span>{r.title} · {r.attendees} pers.</span></div></button>)}{!todayRooms.length&&<p className="command-empty">Aucune salle réservée.</p>}</div></article>
-     <article className="command-panel command-maintenance"><header><div><p>Maintenance</p><h2>Interventions</h2></div><button onClick={()=>location.href='/tickets'}>Ouvrir</button></header><div className="maintenance-placeholder"><Wrench size={30}/><strong>Centre maintenance</strong><span>Consulter les urgences, interventions en cours et travaux terminés.</span><button onClick={()=>location.href='/tickets'}>Accéder au Kanban</button></div></article>
+     <article className="command-panel command-maintenance"><header><div><p>Maintenance</p><h2>Interventions</h2></div><button onClick={()=>location.href='/tickets'}>Ouvrir</button></header><div className="command-maintenance-summary"><div><span>Urgentes</span><strong>{maintenanceUrgent.length}</strong></div><div><span>En cours</span><strong>{maintenanceActive.length}</strong></div><div><span>Bloquées</span><strong>{maintenanceBlocked.length}</strong></div></div><div className="command-maintenance-list">{maintenancePreview.map(item=><button key={item.id} className={item.priority==='Urgente'?'urgent':item.blocked?'blocked':''} onClick={()=>location.href='/tickets'}><div><strong>{item.title}</strong><span>{maintenanceLocation(item)} · {item.status}</span></div><b>{item.priority}</b></button>)}{!maintenancePreview.length&&<p className="command-empty"><CheckCircle2 size={18}/>Aucune intervention ouverte.</p>}</div></article>
     </section>
 
     <section className="command-grid lower">
