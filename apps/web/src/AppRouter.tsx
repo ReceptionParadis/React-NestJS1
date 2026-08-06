@@ -3,6 +3,7 @@ import { AdministrationPage } from './AdministrationPage';
 import { App } from './App';
 import { AuthGate } from './AuthGate';
 import { CommercialHubPage } from './CommercialHubPage';
+import { DailyGroupBoard } from './DailyGroupBoard';
 import { DiagnosticPage } from './DiagnosticPage';
 import { GeneralInstructionsPage } from './GeneralInstructionsPage';
 import { GroupsPage } from './GroupsPage';
@@ -41,7 +42,7 @@ function CurrentPage() {
   if (path.startsWith('/tickets')) return <TicketsPage />;
   if (path.startsWith('/groupes/import-rooming-list')) return <RoomingListImportPage />;
   if (path.startsWith('/groupes')) { window.history.replaceState({}, '', '/commercial/groupes'); return <GroupsPage />; }
-  return <App />;
+  return <><App/><div className="dashboard-daily-embed"><DailyGroupBoard compact/></div></>;
 }
 
 export function AppRouter() { return <AuthGate><CurrentPage /></AuthGate>; }
