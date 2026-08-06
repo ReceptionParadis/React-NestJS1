@@ -1,125 +1,120 @@
-import { ArrowLeft, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import {
+  AlertTriangle, ArrowLeft, Baby, CheckCircle2, ChevronDown, ChevronUp,
+  ClipboardCheck, LockKeyhole, Printer, UsersRound,
+} from 'lucide-react';
 import { DailyGroupBoard } from './DailyGroupBoard';
 import { useOperationalStore } from './useOperationalStore';
 
-type StayoverException = {
-  room: string;
-  reason: 'Refus service' | 'Ne pas déranger';
+type StayoverException={room:string;reason:'Refus service'|'Ne pas déranger'};
+type MealCell={pax?:number;time?:string;water?:boolean;wine?:boolean};
+type MealDay={date:string;breakfast?:MealCell;lunch?:MealCell;packedLunch?:MealCell;dinner?:MealCell;packedDinner?:MealCell;lodging?:MealCell};
+type Audit={id:string;action:string;actor:string;role:string;at:string};
+type GroupControl={
+ single:number;double:number;twin:number;triple:number;quadruple:number;
+ babies:number;children3to6:number;children7to10:number;minors11to17:number;
+ totalRooms:number;totalPax:number;adults:number;taxableAdults:number;
+ validatedBy:string;validatedAt:string;printedBy?:string;printedAt?:string;locked:boolean;
 };
-
-type Group = {
-  id: string;
-  name?: string;
-  arrival?: string;
-  departure?: string;
-  arrivalTime?: string;
-  rooms?: number;
-  housekeepingArrivalStatus?: string;
-  stayoverStatus?: string;
-  stayoverExceptions?: StayoverException[];
+type Group={
+ id:string;name?:string;agency?:string;arrival?:string;departure?:string;arrivalTime?:string;departureTime?:string;
+ rooms?:number;pax?:number;status?:string;paymentStatus?:string;amountDue?:number;debtor?:string;rooming?:boolean;
+ leaderFirstName?:string;leaderLastName?:string;leaderPhone?:string;leaderEmail?:string;language?:string;buses?:number;parking?:boolean;
+ stayType?:string;breakfastType?:string;housekeepingType?:string;dietary?:string;luggageArrival?:string;luggageDeparture?:string;
+ mealDays?:MealDay[];receptionNotes?:string;commercialNotes?:string;housekeepingArrivalStatus?:string;
+ stayoverStatus?:string;stayoverExceptions?:StayoverException[];audit?:Audit[];groupControl?:GroupControl;
 };
+type Booking={id:string;groupId?:string;title?:string;room:string;date:string;start:string;end:string;attendees?:number;setup?:string;notes?:string;status?:string};
+type SessionUser={name:string;role:string};
 
-function todayIso() {
-  const date = new Date();
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+const capacities={single:1,double:2,twin:2,triple:3,quadruple:4} as const;
+const emptyControl:GroupControl={single:0,double:0,twin:0,triple:0,quadruple:0,babies:0,children3to6:0,children7to10:0,minors11to17:0,totalRooms:0,totalPax:0,adults:0,taxableAdults:0,validatedBy:'',validatedAt:'',locked:false};
+
+function todayIso(){const d=new Date();return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}
+function stamp(){return new Date().toLocaleString('fr-FR')}
+function sessionUser():SessionUser{try{const s=JSON.parse(localStorage.getItem('hospicore.session')||'{}');const u=s.user||{};return{name:`${u.firstName||'Utilisateur'} ${u.lastName||'HospiCore'}`.trim(),role:String(u.role?.name||u.role||'Collaborateur')}}catch{return{name:'Utilisateur HospiCore',role:'Collaborateur'}}}
+function roleRights(role:string){const r=role.toLowerCase();return{
+ access:r.includes('réception')||r.includes('reception')||r.includes('commercial')||r.includes('direction')||r.includes('admin'),
+ unlock:r.includes('chef de réception')||r.includes('chef de reception')||r.includes('commercial')||r.includes('direction')||r.includes('admin'),
+};}
+function calcControl(value:GroupControl):GroupControl{
+ const totalRooms=value.single+value.double+value.twin+value.triple+value.quadruple;
+ const totalPax=value.single*capacities.single+value.double*capacities.double+value.twin*capacities.twin+value.triple*capacities.triple+value.quadruple*capacities.quadruple;
+ const nonAdults=value.babies+value.children3to6+value.children7to10+value.minors11to17;
+ const adults=Math.max(0,totalPax-nonAdults);
+ return{...value,totalRooms,totalPax,adults,taxableAdults:adults};
 }
+function formatDate(value?:string){if(!value)return'—';return new Date(`${value}T12:00:00`).toLocaleDateString('fr-FR')}
+function mealLabel(key:string){return key==='breakfast'?'Petit-déjeuner':key==='lunch'?'Déjeuner':key==='packedLunch'?'Panier midi':key==='dinner'?'Dîner':key==='packedDinner'?'Panier soir':'Logement'}
 
-export function ReceptionDailyPage() {
-  const groupsStore = useOperationalStore<Group[]>('group-360', []);
-  const today = todayIso();
+export function ReceptionDailyPage(){
+ const groupsStore=useOperationalStore<Group[]>('group-360',[]);
+ const meetingStore=useOperationalStore<Booking[]>('meeting-rooms',[]);
+ const [expanded,setExpanded]=useState<string[]>([]);
+ const [controlOpen,setControlOpen]=useState<string>('');
+ const [draft,setDraft]=useState<GroupControl>(emptyControl);
+ const user=sessionUser();const rights=roleRights(user.role);const today=todayIso();
+ const activeGroups=useMemo(()=>groupsStore.data.filter(g=>String(g.arrival)<=today&&String(g.departure)>=today).sort((a,b)=>(a.arrivalTime||'99:99').localeCompare(b.arrivalTime||'99:99')),[groupsStore.data,today]);
+ const readyGroups=activeGroups.filter(g=>g.arrival===today&&g.housekeepingArrivalStatus==='Chambres prêtes à donner');
+ const stayoverGroups=activeGroups.filter(g=>String(g.arrival)<today&&String(g.departure)>today&&['Recouche OK','Recouche partielle'].includes(g.stayoverStatus||''));
 
-  const readyGroups = groupsStore.data
-    .filter((group) => group.arrival === today && group.housekeepingArrivalStatus === 'Chambres prêtes à donner')
-    .sort((a, b) => (a.arrivalTime || '99:99').localeCompare(b.arrivalTime || '99:99'));
+ async function saveGroup(updated:Group,action:string){
+  const audit:Audit={id:crypto.randomUUID(),action,actor:user.name,role:user.role,at:stamp()};
+  await groupsStore.save(groupsStore.data.map(g=>g.id===updated.id?{...updated,audit:[...(updated.audit||[]),audit]}:g));
+ }
+ function openControl(group:Group){setDraft(calcControl({...emptyControl,...group.groupControl,locked:group.groupControl?.locked||false}));setControlOpen(group.id)}
+ function updateControl(key:keyof GroupControl,value:number){setDraft(current=>calcControl({...current,[key]:Math.max(0,Number(value)||0)}))}
+ async function validateControl(group:Group){
+  if(draft.totalPax<=0)return;
+  const control=calcControl({...draft,validatedBy:user.name,validatedAt:stamp(),locked:false});
+  await saveGroup({...group,groupControl:control},`Contrôle Groupe validé · ${control.totalPax} personnes · ${control.taxableAdults} adultes assujettis`);
+  setDraft(control);
+ }
+ async function printAndLock(group:Group){
+  const base=group.groupControl||draft;if(!base.validatedAt)return;
+  const control={...calcControl(base),locked:true,printedBy:user.name,printedAt:stamp()};
+  await saveGroup({...group,groupControl:control},'Contrôle Groupe imprimé et verrouillé · Bon pour paiement');
+  setDraft(control);setTimeout(()=>window.print(),150);
+ }
+ async function unlock(group:Group){if(!rights.unlock||!group.groupControl)return;const control={...group.groupControl,locked:false};await saveGroup({...group,groupControl:control},'Contrôle Groupe déverrouillé par un utilisateur habilité');setDraft(control)}
 
-  const stayoverGroups = groupsStore.data
-    .filter((group) =>
-      String(group.arrival) < today &&
-      String(group.departure) > today &&
-      ['Recouche OK', 'Recouche partielle'].includes(group.stayoverStatus || ''),
-    )
-    .sort((a, b) => (a.name || '').localeCompare(b.name || '', 'fr'));
+ if(!rights.access)return <div className="reception-daily-page"><header className="reception-daily-header"><a href="/"><ArrowLeft size={18}/>Dashboard</a><h1>Accès restreint</h1><span>Le contrôle groupe est réservé à la Réception, au Commercial et à la Direction.</span></header></div>;
+ return <div className="reception-daily-page">
+  <header className="reception-daily-header"><a href="/"><ArrowLeft size={18}/>Dashboard</a><p>HospiCore · Réception</p><h1>Pilotage quotidien des groupes</h1><span>Chaque carte donne accès à la Fiche Groupe 360° et au contrôle après arrivée.</span></header>
+  {groupsStore.state==='error'&&<div className="daily-closed">Synchronisation indisponible : {groupsStore.message}</div>}
 
-  return (
-    <div className="reception-daily-page">
-      <header className="reception-daily-header">
-        <a href="/"><ArrowLeft size={18} /> Dashboard</a>
-        <p>HospiCore · Réception</p>
-        <h1>Pilotage quotidien des groupes</h1>
-        <span>Arrivées, départs, horaires, réveils, salles et suivi Housekeeping.</span>
-      </header>
+  {readyGroups.length>0&&<section className="reception-hk-panel reception-hk-ready"><header><CheckCircle2 size={21}/><strong>Chambres prêtes à donner</strong><b>{readyGroups.length}</b></header><div className="reception-hk-grid">{readyGroups.map(g=><article className="reception-hk-card" key={g.id}><div><strong>{g.name||'Groupe sans nom'}</strong><span>{g.rooms||0} chambre(s) · arrivée {g.arrivalTime||'à confirmer'}</span></div><em className="reception-hk-badge ready">Prêtes</em></article>)}</div></section>}
+  {stayoverGroups.length>0&&<section className="reception-hk-panel"><header><CheckCircle2 size={21}/><strong>Suivi des recouches</strong><b>{stayoverGroups.length}</b></header><div className="reception-hk-grid">{stayoverGroups.map(g=>{const partial=g.stayoverStatus==='Recouche partielle';return <article className={`reception-hk-card${partial?' partial':''}`} key={g.id}><div className="reception-hk-card-head">{partial?<AlertTriangle size={19}/>:<CheckCircle2 size={19}/>}<div><strong>{g.name||'Groupe sans nom'}</strong><span>{g.rooms||0} chambre(s)</span></div><em className={`reception-hk-badge${partial?' partial':' ready'}`}>{partial?'Recouche partielle':'Recouche OK'}</em></div>{partial&&<div className="reception-hk-exceptions"><strong>Chambres non faites</strong>{(g.stayoverExceptions||[]).map(x=><div key={`${x.room}-${x.reason}`}><b>Chambre {x.room}</b><span>{x.reason}</span></div>)}</div>}</article>})}</div></section>}
 
-      {groupsStore.state === 'error' && (
-        <div className="daily-closed">Synchronisation indisponible : {groupsStore.message}</div>
-      )}
+  <section className="reception-groups360"><header><div><p>Informations opérationnelles</p><h2>Fiches Groupe 360° du jour</h2></div><b>{activeGroups.length} groupe(s)</b></header>
+   <div className="reception-group-list">{activeGroups.map(group=>{const isOpen=expanded.includes(group.id);const arrived=['Arrivé','En séjour'].includes(group.status||'');const bookings=meetingStore.data.filter(b=>b.groupId===group.id||b.title===group.name);const control=group.groupControl;return <article className={`reception-group360-card${isOpen?' open':''}`} key={group.id}>
+    <button className="reception-group360-summary" onClick={()=>setExpanded(v=>v.includes(group.id)?v.filter(id=>id!==group.id):[...v,group.id])}><div><strong>{group.name||'Groupe sans nom'}</strong><span>{group.agency||'Agence non renseignée'} · {group.pax||0} pax · {group.rooms||0} chambres</span></div><div className="reception-group360-status"><em>{group.status||'Préparation'}</em>{isOpen?<ChevronUp/>:<ChevronDown/>}</div></button>
+    {isOpen&&<div className="reception-group360-body">
+     <div className="reception-360-grid">
+      <section><h3>Informations générales</h3><p><b>Séjour :</b> {formatDate(group.arrival)} → {formatDate(group.departure)}</p><p><b>Horaires :</b> {group.arrivalTime||'—'} / {group.departureTime||'—'}</p><p><b>Nationalité / langue :</b> {group.language||'—'}</p><p><b>Type de séjour :</b> {group.stayType||'—'}</p><p><b>Bus :</b> {group.buses||0} · Parking {group.parking?'oui':'non'}</p></section>
+      <section><h3>Tour leader</h3><p><b>Nom :</b> {[group.leaderFirstName,group.leaderLastName].filter(Boolean).join(' ')||'—'}</p><p><b>Téléphone :</b> {group.leaderPhone||'—'}</p><p><b>E-mail :</b> {group.leaderEmail||'—'}</p></section>
+      <section><h3>Réception & comptabilité</h3><p><b>Paiement :</b> {group.paymentStatus||'—'}</p><p><b>Solde :</b> {Number(group.amountDue||0).toLocaleString('fr-FR',{style:'currency',currency:'EUR'})}</p><p><b>Débiteur :</b> {group.debtor||'—'}</p><p><b>Bagagerie arrivée :</b> {group.luggageArrival||'Non'}</p><p><b>Bagagerie départ :</b> {group.luggageDeparture||'Non'}</p></section>
+      <section><h3>Restauration & Housekeeping</h3><p><b>Petit-déjeuner :</b> {group.breakfastType||'—'}</p><p><b>Housekeeping :</b> {group.housekeepingType||'—'}</p><p><b>Allergies / régimes :</b> {group.dietary||'Aucun renseignement'}</p><p><b>Rooming list :</b> {group.rooming?'Reçue':'Non reçue'}</p></section>
+     </div>
+     {(group.mealDays||[]).length>0&&<section className="reception-360-meals"><h3>Repas du séjour</h3><div>{(group.mealDays||[]).flatMap(day=>Object.entries(day).filter(([key,value])=>key!=='date'&&typeof value==='object'&&Number((value as MealCell).pax||0)>0).map(([key,value])=><span key={`${day.date}-${key}`}><b>{formatDate(day.date)} · {mealLabel(key)}</b> {(value as MealCell).time||'—'} · {(value as MealCell).pax} pax{(value as MealCell).water?' · eau':''}{(value as MealCell).wine?' · vin':''}</span>))}</div></section>}
+     {bookings.length>0&&<section className="reception-360-meetings"><h3>Salles réservées</h3>{bookings.map(b=><p key={b.id}><b>{b.room}</b> · {formatDate(b.date)} · {b.start}–{b.end} · {b.attendees||0} pers.</p>)}</section>}
+     <div className="reception-360-actions">{arrived&&<button onClick={()=>openControl(group)}><ClipboardCheck size={18}/>{control?.validatedAt?'Ouvrir le contrôle Groupe':'Réaliser le contrôle Groupe'}</button>}{control?.locked&&<span><LockKeyhole size={16}/>Contrôle verrouillé · Bon pour paiement</span>}</div>
+    </div>}
+   </article>})}</div>
+  </section>
 
-      {readyGroups.length > 0 && (
-        <section className="reception-hk-panel reception-hk-ready">
-          <header>
-            <CheckCircle2 size={21} />
-            <strong>Chambres prêtes à donner</strong>
-            <b>{readyGroups.length}</b>
-          </header>
-          <div className="reception-hk-grid">
-            {readyGroups.map((group) => (
-              <article className="reception-hk-card" key={group.id}>
-                <div>
-                  <strong>{group.name || 'Groupe sans nom'}</strong>
-                  <span>{group.rooms || 0} chambre(s) · arrivée {group.arrivalTime || 'à confirmer'}</span>
-                </div>
-                <em className="reception-hk-badge ready">Prêtes</em>
-              </article>
-            ))}
-          </div>
-        </section>
-      )}
+  <DailyGroupBoard/>
 
-      {stayoverGroups.length > 0 && (
-        <section className="reception-hk-panel">
-          <header>
-            <CheckCircle2 size={21} />
-            <strong>Suivi des recouches</strong>
-            <b>{stayoverGroups.length}</b>
-          </header>
-          <div className="reception-hk-grid">
-            {stayoverGroups.map((group) => {
-              const partial = group.stayoverStatus === 'Recouche partielle';
-              return (
-                <article className={`reception-hk-card${partial ? ' partial' : ''}`} key={group.id}>
-                  <div className="reception-hk-card-head">
-                    {partial ? <AlertTriangle size={19} /> : <CheckCircle2 size={19} />}
-                    <div>
-                      <strong>{group.name || 'Groupe sans nom'}</strong>
-                      <span>{group.rooms || 0} chambre(s)</span>
-                    </div>
-                    <em className={`reception-hk-badge${partial ? ' partial' : ' ready'}`}>
-                      {partial ? 'Recouche partielle' : 'Recouche OK'}
-                    </em>
-                  </div>
-
-                  {partial && (
-                    <div className="reception-hk-exceptions">
-                      <strong>Chambres non faites</strong>
-                      {(group.stayoverExceptions || []).length > 0 ? (
-                        (group.stayoverExceptions || []).map((item) => (
-                          <div key={`${item.room}-${item.reason}`}>
-                            <b>Chambre {item.room}</b>
-                            <span>{item.reason}</span>
-                          </div>
-                        ))
-                      ) : (
-                        <span>Aucune chambre renseignée.</span>
-                      )}
-                    </div>
-                  )}
-                </article>
-              );
-            })}
-          </div>
-        </section>
-      )}
-
-      <DailyGroupBoard />
-    </div>
-  );
+  {controlOpen&&(()=>{const group=groupsStore.data.find(g=>g.id===controlOpen);if(!group)return null;const locked=Boolean(group.groupControl?.locked)&&!rights.unlock;return <div className="group-control-backdrop" onMouseDown={()=>setControlOpen('')}><section className="group-control-modal" onMouseDown={e=>e.stopPropagation()}>
+   <header><div><p>Réception · Contrôle des effectifs</p><h2>{group.name}</h2></div><button onClick={()=>setControlOpen('')}>×</button></header>
+   <div className="group-control-lock">{group.groupControl?.locked?<><LockKeyhole size={18}/><span>Imprimé et verrouillé le {group.groupControl.printedAt} par {group.groupControl.printedBy}</span>{rights.unlock&&<button onClick={()=>unlock(group)}>Déverrouiller</button>}</>:<><ClipboardCheck size={18}/><span>Le contrôle sera verrouillé après impression.</span></>}</div>
+   <section className="control-room-types"><h3>Nombre de chambres par typologie</h3><div>{([['single','Individuelle · 1 pers.'],['double','Double · 2 pers.'],['twin','Twin · 2 pers.'],['triple','Triple · 3 pers.'],['quadruple','Quadruple · 4 pers.']] as const).map(([key,label])=><label key={key}><span>{label}</span><input type="number" min="0" disabled={locked} value={draft[key]} onChange={e=>updateControl(key,Number(e.target.value))}/></label>)}</div></section>
+   <section className="control-age-groups"><h3>Enfants et mineurs</h3><div><label><span><Baby size={16}/>0–2 ans · offert</span><input type="number" min="0" disabled={locked} value={draft.babies} onChange={e=>updateControl('babies',Number(e.target.value))}/></label><label><span>3–6 ans · réduction 50 %</span><input type="number" min="0" disabled={locked} value={draft.children3to6} onChange={e=>updateControl('children3to6',Number(e.target.value))}/></label><label><span>7–10 ans · réduction 30 %</span><input type="number" min="0" disabled={locked} value={draft.children7to10} onChange={e=>updateControl('children7to10',Number(e.target.value))}/></label><label><span>11–17,99 ans · taxe de séjour offerte</span><input type="number" min="0" disabled={locked} value={draft.minors11to17} onChange={e=>updateControl('minors11to17',Number(e.target.value))}/></label></div></section>
+   <section className="control-results"><article><span>Chambres</span><strong>{draft.totalRooms}</strong></article><article><span>Personnes calculées</span><strong>{draft.totalPax}</strong></article><article><span>Adultes</span><strong>{draft.adults}</strong></article><article><span>Taxes de séjour à facturer</span><strong>{draft.taxableAdults}</strong></article></section>
+   <section className="control-discounts"><h3>Réductions à appliquer</h3><p><b>{draft.babies}</b> gratuité(s) 0–2 ans</p><p><b>{draft.children3to6}</b> réduction(s) de 50 %</p><p><b>{draft.children7to10}</b> réduction(s) de 30 %</p><p><b>{draft.minors11to17}</b> exonération(s) de taxe de séjour</p></section>
+   {draft.totalPax>0&&draft.babies+draft.children3to6+draft.children7to10+draft.minors11to17>draft.totalPax&&<div className="control-warning"><AlertTriangle size={18}/>Le nombre d’enfants et mineurs dépasse l’effectif calculé.</div>}
+   <footer>{!locked&&<button className="control-save" disabled={draft.totalPax<=0||draft.babies+draft.children3to6+draft.children7to10+draft.minors11to17>draft.totalPax} onClick={()=>validateControl(group)}><CheckCircle2 size={18}/>Valider le contrôle</button>}<button className="control-print" disabled={!draft.validatedAt} onClick={()=>printAndLock(group)}><Printer size={18}/>{group.groupControl?.locked?'Réimprimer':'Imprimer et verrouiller'}</button></footer>
+   <div className="control-payment-stamp">BON POUR PAIEMENT</div>
+  </section></div>})()}
+ </div>;
 }
