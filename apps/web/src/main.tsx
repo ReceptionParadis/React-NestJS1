@@ -23,6 +23,7 @@ import './hospicore-live.css';
 import './commercial-hub.css';
 import './function-sheet-notice.css';
 import './daily-group-board.css';
+import './housekeeping-dashboard.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode><AppRouter /></React.StrictMode>,
