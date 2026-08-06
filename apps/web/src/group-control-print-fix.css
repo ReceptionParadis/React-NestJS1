@@ -1,0 +1,49 @@
+@page{size:A4 portrait;margin:8mm}
+
+@media print{
+  html,body,#root{display:block!important;width:auto!important;min-height:0!important;margin:0!important;padding:0!important;background:#fff!important;overflow:visible!important}
+
+  body *{visibility:visible!important}
+
+  .reception-daily-page{display:block!important;width:100%!important;margin:0!important;padding:0!important;background:#fff!important}
+  .reception-daily-page> :not(.group-control-backdrop){display:none!important}
+
+  .group-control-backdrop{
+    display:block!important;
+    position:static!important;
+    inset:auto!important;
+    width:100%!important;
+    min-height:0!important;
+    margin:0!important;
+    padding:0!important;
+    background:#fff!important;
+    backdrop-filter:none!important;
+    overflow:visible!important;
+  }
+
+  .group-control-modal{
+    display:block!important;
+    position:static!important;
+    width:100%!important;
+    max-width:none!important;
+    max-height:none!important;
+    margin:0!important;
+    padding:0!important;
+    overflow:visible!important;
+    border:0!important;
+    border-radius:0!important;
+    background:#fff!important;
+    box-shadow:none!important;
+    color:#111!important;
+  }
+
+  .group-control-modal,.group-control-modal *{visibility:visible!important}
+  .group-control-modal>header>button,.group-control-lock,.group-control-modal>footer{display:none!important}
+  .control-print-summary,.control-room-types,.control-age-groups,.control-results,.control-meal-table,.control-discounts,.control-signature,.control-payment-stamp{display:grid!important}
+  .control-meal-table table{display:table!important;width:100%!important}
+  .control-meal-table thead{display:table-header-group!important}
+  .control-meal-table tbody{display:table-row-group!important}
+  .control-meal-table tr{display:table-row!important}
+  .control-meal-table th,.control-meal-table td{display:table-cell!important}
+  input{color:#111!important;-webkit-text-fill-color:#111!important;opacity:1!important}
+}
