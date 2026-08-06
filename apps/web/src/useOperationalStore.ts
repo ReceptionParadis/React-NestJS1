@@ -4,8 +4,6 @@ import { loadSharedData, saveSharedData } from './operational-sync';
 export type OperationalSyncState = 'loading' | 'synced' | 'saving' | 'error' | 'conflict';
 
 export function useOperationalStore<T>(namespace: string, initialValue: T, refreshMs = 30000) {
-  // Keep the fallback stable. Callers commonly pass [] or {} inline, which creates a
-  // new reference on every render and previously restarted the synchronization effect.
   const initialValueRef = useRef(initialValue);
   const [data, setData] = useState<T>(() => initialValueRef.current);
   const [version, setVersion] = useState(0);
@@ -13,8 +11,20 @@ export function useOperationalStore<T>(namespace: string, initialValue: T, refre
   const refreshInFlightRef = useRef(false);
   const mountedRef = useRef(true);
   const [updatedAt, setUpdatedAt] = useState('');
+  const [lastSuccessAt, setLastSuccessAt] = useState('');
   const [state, setState] = useState<OperationalSyncState>('loading');
   const [message, setMessage] = useState('Connexion à PostgreSQL…');
+
+  const markSuccess = useCallback((payload: T, nextVersion: number, nextUpdatedAt: string, successMessage: string) => {
+    if (!mountedRef.current) return;
+    setData(payload);
+    setVersion(nextVersion);
+    versionRef.current = nextVersion;
+    setUpdatedAt(nextUpdatedAt || '');
+    setLastSuccessAt(new Date().toISOString());
+    setState('synced');
+    setMessage(successMessage);
+  }, []);
 
   const refresh = useCallback(async (silent = false) => {
     if (refreshInFlightRef.current) return false;
@@ -35,30 +45,28 @@ export function useOperationalStore<T>(namespace: string, initialValue: T, refre
         return false;
       }
 
-      setData(result.payload);
-      setVersion(result.version);
-      versionRef.current = result.version;
-      setUpdatedAt(result.updatedAt);
-      setState('synced');
-      setMessage('Données partagées à jour');
+      markSuccess(result.payload, result.version, result.updatedAt, 'Données partagées à jour');
       return true;
+    } catch (error) {
+      if (!mountedRef.current) return false;
+      setState('error');
+      setMessage(error instanceof Error ? error.message : 'Synchronisation PostgreSQL indisponible.');
+      return false;
     } finally {
       refreshInFlightRef.current = false;
     }
-  }, [namespace]);
+  }, [markSuccess, namespace]);
 
   const save = useCallback(async (next: T) => {
-    setState('saving');
-    setMessage('Enregistrement partagé…');
+    if (mountedRef.current) {
+      setState('saving');
+      setMessage('Enregistrement partagé…');
+    }
+
     try {
       const result = await saveSharedData<T>(namespace, next, versionRef.current);
       if (!mountedRef.current) return false;
-      setData(result.payload);
-      setVersion(result.version);
-      versionRef.current = result.version;
-      setUpdatedAt(result.updatedAt);
-      setState('synced');
-      setMessage('Enregistré pour tous les services');
+      markSuccess(result.payload, result.version, result.updatedAt, 'Enregistré pour tous les services');
       return true;
     } catch (error) {
       if (!mountedRef.current) return false;
@@ -67,7 +75,7 @@ export function useOperationalStore<T>(namespace: string, initialValue: T, refre
       setMessage(text);
       return false;
     }
-  }, [namespace]);
+  }, [markSuccess, namespace]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -79,5 +87,5 @@ export function useOperationalStore<T>(namespace: string, initialValue: T, refre
     };
   }, [refresh, refreshMs]);
 
-  return { data, setData, version, updatedAt, state, message, refresh, save };
+  return { data, setData, version, updatedAt, lastSuccessAt, state, message, refresh, save };
 }
