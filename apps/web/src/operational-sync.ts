@@ -1,5 +1,5 @@
 type SessionUser = { id?: string; hotelId?: string; hotel?: { id?: string } };
-type Session = { token?: string; user?: SessionUser };
+type Session = { token?: string; accessToken?: string; user?: SessionUser };
 
 type StoreEnvelope<T> = {
   payload: T;
@@ -18,8 +18,13 @@ function hotelIdFromSession(current: Session) {
   return current.user?.hotelId || current.user?.hotel?.id || '';
 }
 
+function authToken() {
+  const current = session();
+  return current.token || current.accessToken || localStorage.getItem('hospicore.token') || localStorage.getItem('hospicore.accessToken') || '';
+}
+
 function headers() {
-  const token = session().token || localStorage.getItem('hospicore.token') || '';
+  const token = authToken();
   return { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) };
 }
 
@@ -43,7 +48,7 @@ export async function loadSharedData<T>(namespace: string, fallback: T): Promise
       const created = await saveSharedData(namespace, fallback, 0);
       return { ...created, connected: true };
     }
-    return { payload: data.payload as T, version: data.version, updatedAt: data.updatedAt, connected: true };
+    return { payload: data.payload as T, version: Number(data.version || 0), updatedAt: data.updatedAt || '', connected: true };
   } catch (error) {
     return { payload: fallback, version: 0, updatedAt: '', connected: false, error: error instanceof Error ? error.message : 'Synchronisation indisponible' };
   }
@@ -64,5 +69,5 @@ export async function saveSharedData<T>(namespace: string, payload: T, expectedV
   const data = await response.json().catch(() => ({}));
   if (response.status === 409) throw new Error('Une autre personne a modifié ces données. Rechargez la page avant de recommencer.');
   if (!response.ok) throw new Error(data.message || `Enregistrement impossible (${response.status}).`);
-  return { payload: data.payload as T, version: data.version, updatedAt: data.updatedAt, connected: true };
+  return { payload: data.payload as T, version: Number(data.version || 0), updatedAt: data.updatedAt || '', connected: true };
 }
