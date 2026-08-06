@@ -1,70 +1,38 @@
-import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, CheckCircle2, ChefHat, Clock3, Coffee, Eye, Filter, Salad, Search, Soup, UsersRound } from 'lucide-react';
-import { acknowledgeFunctionSheet, FunctionSheet, loadFunctionSheets, markMealRestaurantStatus, MealService, RestaurantStatus } from './interservice-data';
+import { useMemo, useState } from 'react';
+import { ArrowLeft, CheckCircle2, ChevronLeft, ChevronRight, Clock3, Coffee, Droplets, Grape, Salad, Soup, UsersRound } from 'lucide-react';
+import { useOperationalStore } from './useOperationalStore';
 
-const mealIcons = { 'Petit-déjeuner': Coffee, 'Déjeuner': Salad, 'Dîner': Soup };
+type MealKey='breakfast'|'lunch'|'packedLunch'|'dinner'|'packedDinner';
+type MealCell={pax?:number;time?:string;water?:boolean;wine?:boolean};
+type MealDay={date:string;breakfast?:MealCell;lunch?:MealCell;packedLunch?:MealCell;dinner?:MealCell;packedDinner?:MealCell};
+type MealStatus='Prévu'|'Pris en charge'|'En salle'|'Terminé';
+type Group={id:string;name?:string;pax?:number;status?:string;breakfastType?:string;dietary?:string;mealDays?:MealDay[];restaurantTracking?:Record<string,{status:MealStatus;updatedBy:string;updatedAt:string}>;audit?:Array<{id:string;action:string;actor:string;role:string;at:string}>};
+type SessionUser={name:string;role:string};
 
-export function RestaurantPlanningPage() {
-  const [meal, setMeal] = useState<'Tous' | MealService>('Tous');
-  const [query, setQuery] = useState('');
-  const [groups, setGroups] = useState<FunctionSheet[]>(loadFunctionSheets);
+const mealNames:Record<MealKey,string>={breakfast:'Petit-déjeuner',lunch:'Déjeuner',packedLunch:'Panier repas midi',dinner:'Dîner',packedDinner:'Panier repas soir'};
+const mealIcons:Record<MealKey,typeof Coffee>={breakfast:Coffee,lunch:Salad,packedLunch:Salad,dinner:Soup,packedDinner:Soup};
+const todayIso=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`};
+const addDays=(value:string,n:number)=>{const d=new Date(`${value}T12:00:00`);d.setDate(d.getDate()+n);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`};
+const dateLabel=(value:string)=>new Date(`${value}T12:00:00`).toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+function user():SessionUser{try{const s=JSON.parse(localStorage.getItem('hospicore.session')||'{}');const u=s.user||{};return{name:`${u.firstName||'Utilisateur'} ${u.lastName||'HospiCore'}`.trim(),role:String(u.role?.name||u.role||'Collaborateur')}}catch{return{name:'Utilisateur HospiCore',role:'Collaborateur'}}}
+function stamp(){return new Date().toLocaleString('fr-FR')}
 
-  useEffect(() => {
-    const refresh = () => setGroups(loadFunctionSheets());
-    window.addEventListener('hospicore:function-sheets', refresh);
-    window.addEventListener('storage', refresh);
-    return () => { window.removeEventListener('hospicore:function-sheets', refresh); window.removeEventListener('storage', refresh); };
-  }, []);
-
-  const rows = useMemo(() => groups.flatMap((group) => group.meals.map((mealPlan) => ({ group, mealPlan }))).filter(({ group, mealPlan }) => {
-    const matchesMeal = meal === 'Tous' || mealPlan.service === meal;
-    const matchesQuery = `${group.groupName} ${mealPlan.room}`.toLowerCase().includes(query.toLowerCase());
-    return matchesMeal && matchesQuery;
-  }), [groups, meal, query]);
-
-  const totals = useMemo(() => ({
-    breakfast: groups.flatMap((g) => g.meals).filter((m) => m.service === 'Petit-déjeuner').reduce((sum, m) => sum + m.pax, 0),
-    lunch: groups.flatMap((g) => g.meals).filter((m) => m.service === 'Déjeuner').reduce((sum, m) => sum + m.pax, 0),
-    dinner: groups.flatMap((g) => g.meals).filter((m) => m.service === 'Dîner').reduce((sum, m) => sum + m.pax, 0),
-    arrived: groups.filter((g) => g.arrivalStatus === 'Arrivé').length,
-  }), [groups]);
-
-  function updateService(groupId: string, service: MealService, status: RestaurantStatus) {
-    setGroups(markMealRestaurantStatus(groupId, service, status));
-  }
-
-  function acknowledge(groupId: string) {
-    setGroups(acknowledgeFunctionSheet(groupId, 'restaurant'));
-  }
-
-  return <div className="restaurant-page">
-    <header className="restaurant-header">
-      <div><button className="restaurant-back" onClick={() => { window.location.href = '/'; }}><ArrowLeft size={18}/> Tableau de bord</button><p className="restaurant-eyebrow">Communication Réception · Cuisine · Restaurant</p><h1>Planning Restaurant</h1><p>Suivez les groupes arrivés, les horaires de repas et l’état de préparation transmis par la cuisine.</p></div>
-      <div className="restaurant-date"><ChefHat size={22}/><div><strong>Mercredi 5 août</strong><span>Service du jour</span></div></div>
-    </header>
-
-    <section className="restaurant-kpis">
-      <article><Coffee size={20}/><span>Petit-déjeuner</span><strong>{totals.breakfast}</strong><small>couverts groupes</small></article>
-      <article><Salad size={20}/><span>Déjeuner</span><strong>{totals.lunch}</strong><small>couverts groupes</small></article>
-      <article><Soup size={20}/><span>Dîner</span><strong>{totals.dinner}</strong><small>couverts groupes</small></article>
-      <article><CheckCircle2 size={20}/><span>Groupes arrivés</span><strong>{totals.arrived}/{groups.length}</strong><small>confirmés par la réception</small></article>
-    </section>
-
-    <section className="restaurant-toolbar"><div className="meal-tabs">{(['Tous', 'Petit-déjeuner', 'Déjeuner', 'Dîner'] as const).map((item) => <button className={meal === item ? 'active' : ''} onClick={() => setMeal(item)} key={item}>{item}</button>)}</div><label><Search size={17}/><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Rechercher un groupe…"/></label><button className="filter-button"><Filter size={17}/> Filtres</button></section>
-
-    <section className="restaurant-list">{rows.map(({ group, mealPlan }) => {
-      const Icon = mealIcons[mealPlan.service];
-      const arrivalLabel = group.arrivalStatus === 'Arrivé' ? (mealPlan.time ? 'Prévu' : 'En attente de l’horaire') : group.arrivalStatus;
-      const acknowledgedAt = group.acknowledgements.restaurant;
-      return <article className="restaurant-group-card" key={`${group.id}-${mealPlan.service}`}>
-        <div className="meal-icon"><Icon size={22}/></div>
-        <div className="group-main">
-          <div className="group-heading"><div><span className="meal-label">{mealPlan.service}</span><h2>{group.groupName}</h2></div><span className={`arrival-badge ${group.arrivalStatus.toLowerCase().replace(' ', '-')}`}>{arrivalLabel}</span></div>
-          <div className={`acknowledgement-box compact${acknowledgedAt ? ' acknowledged' : ''}`}><div><Eye size={16}/><span>{acknowledgedAt ? `Fiche validée le ${acknowledgedAt}` : 'Fiche de fonction non encore validée par le restaurant.'}</span></div>{!acknowledgedAt && <button onClick={() => acknowledge(group.id)}><CheckCircle2 size={15}/> J’ai lu</button>}</div>
-          <div className="group-details"><span><Clock3 size={16}/><strong>{mealPlan.time || 'Horaire à confirmer'}</strong></span><span><UsersRound size={16}/><strong>{mealPlan.pax} pax</strong></span><span><ChefHat size={16}/>{mealPlan.room}</span></div>{(mealPlan.diets || mealPlan.notes) && <div className="group-notes">{mealPlan.diets && <span><strong>Régimes :</strong> {mealPlan.diets}</span>}{mealPlan.notes && <span><strong>Consigne :</strong> {mealPlan.notes}</span>}</div>}
-        </div>
-        <div className="reception-status"><span>Cuisine</span><strong>{mealPlan.kitchenStatus}</strong><small>{mealPlan.kitchenConfirmedAt ? `Validé à ${mealPlan.kitchenConfirmedAt}` : 'En cours de préparation'}</small><span>Restaurant</span><strong>{mealPlan.restaurantStatus}</strong>{group.arrivalStatus === 'Arrivé' && mealPlan.kitchenStatus === 'Prêt à servir' && mealPlan.restaurantStatus === 'Prévu' && <button onClick={() => updateService(group.id, mealPlan.service, 'En salle')}>Groupe en salle</button>}{mealPlan.restaurantStatus === 'En salle' && <button onClick={() => updateService(group.id, mealPlan.service, 'Terminé')}>Service terminé</button>}{mealPlan.restaurantStatus === 'Terminé' && <small>Terminé à {mealPlan.restaurantConfirmedAt}</small>}</div>
-      </article>;
-    })}</section>
-  </div>;
+export function RestaurantPlanningPage(){
+ const store=useOperationalStore<Group[]>('group-360',[]);
+ const [date,setDate]=useState(todayIso());
+ const [filter,setFilter]=useState<'Tous'|MealKey>('Tous');
+ const currentUser=user();
+ const rows=useMemo(()=>store.data.flatMap(group=>{
+  const day=group.mealDays?.find(item=>item.date===date);if(!day)return[];
+  return (Object.keys(mealNames) as MealKey[]).flatMap(key=>{const meal=day[key];if(!meal?.pax)return[];const tracking=group.restaurantTracking?.[`${date}:${key}`];return[{group,key,meal,status:tracking?.status||'Prévu' as MealStatus,updatedAt:tracking?.updatedAt||''}]});
+ }).filter(row=>filter==='Tous'||row.key===filter).sort((a,b)=>(a.meal.time||'99:99').localeCompare(b.meal.time||'99:99')),[store.data,date,filter]);
+ const totals=useMemo(()=>({breakfast:rows.filter(r=>r.key==='breakfast').reduce((s,r)=>s+(r.meal.pax||0),0),lunch:rows.filter(r=>r.key==='lunch'||r.key==='packedLunch').reduce((s,r)=>s+(r.meal.pax||0),0),dinner:rows.filter(r=>r.key==='dinner'||r.key==='packedDinner').reduce((s,r)=>s+(r.meal.pax||0),0),arrived:new Set(rows.filter(r=>['Arrivé','En séjour'].includes(r.group.status||'')).map(r=>r.group.id)).size}),[rows]);
+ async function setStatus(group:Group,key:MealKey,status:MealStatus){const slot=`${date}:${key}`,at=stamp();await store.save(store.data.map(g=>g.id===group.id?{...g,restaurantTracking:{...(g.restaurantTracking||{}),[slot]:{status,updatedBy:currentUser.name,updatedAt:at}},audit:[...(g.audit||[]),{id:crypto.randomUUID(),action:`Restaurant · ${mealNames[key]} : ${status}`,actor:currentUser.name,role:currentUser.role,at}]}:g))}
+ return <div className="restaurant-page">
+  <header className="restaurant-header"><div><button className="restaurant-back" onClick={()=>location.href='/'}><ArrowLeft size={18}/>Dashboard</button><p className="restaurant-eyebrow">HospiCore · Restaurant</p><h1>Service Restaurant</h1><p>Repas groupes, horaires, effectifs et prise en charge en temps réel.</p></div><div className="restaurant-date-nav"><button onClick={()=>setDate(addDays(date,-1))}><ChevronLeft/></button><strong>{dateLabel(date)}</strong><button onClick={()=>setDate(addDays(date,1))}><ChevronRight/></button><button onClick={()=>setDate(todayIso())}>Aujourd’hui</button></div></header>
+  <div className={`sync-banner ${store.state}`}><span>{store.message}</span></div>
+  <section className="restaurant-kpis"><article><Coffee/><span>Petit-déjeuner</span><strong>{totals.breakfast}</strong><small>couverts</small></article><article><Salad/><span>Midi</span><strong>{totals.lunch}</strong><small>repas + paniers</small></article><article><Soup/><span>Soir</span><strong>{totals.dinner}</strong><small>repas + paniers</small></article><article><CheckCircle2/><span>Groupes arrivés</span><strong>{totals.arrived}</strong><small>confirmés par la Réception</small></article></section>
+  <section className="restaurant-toolbar"><div className="meal-tabs">{(['Tous','breakfast','lunch','packedLunch','dinner','packedDinner'] as const).map(item=><button key={item} className={filter===item?'active':''} onClick={()=>setFilter(item)}>{item==='Tous'?'Tous':mealNames[item]}</button>)}</div></section>
+  <section className="restaurant-list">{rows.length?rows.map(({group,key,meal,status,updatedAt})=>{const Icon=mealIcons[key],arrived=['Arrivé','En séjour'].includes(group.status||'');return <article className="restaurant-group-card" key={`${group.id}-${date}-${key}`}><div className="meal-icon"><Icon/></div><div className="group-main"><div className="group-heading"><div><span className="meal-label">{mealNames[key]}</span><h2>{group.name||'Groupe sans nom'}</h2></div><span className={`arrival-badge ${arrived?'arrivé':'non-arrivé'}`}>{arrived?'Arrivé':'Non arrivé'}</span></div><div className="group-details"><span><Clock3/><strong>{meal.time||'À confirmer'}</strong></span><span><UsersRound/><strong>{meal.pax} pax</strong></span>{key==='breakfast'&&<span><Coffee/><strong>{group.breakfastType||'Standard'}</strong></span>}{meal.water&&<span><Droplets/><strong>Eau incluse</strong></span>}{meal.wine&&<span><Grape/><strong>Vin inclus</strong></span>}</div>{group.dietary&&<div className="group-notes"><strong>Régimes / allergies :</strong> {group.dietary}</div>}</div><div className="reception-status"><span>Suivi Restaurant</span><strong>{status}</strong>{updatedAt&&<small>{updatedAt}</small>}{status==='Prévu'&&<button onClick={()=>void setStatus(group,key,'Pris en charge')}>Prendre en charge</button>}{status==='Pris en charge'&&arrived&&<button onClick={()=>void setStatus(group,key,'En salle')}>Groupe en salle</button>}{status==='En salle'&&<button onClick={()=>void setStatus(group,key,'Terminé')}>Service terminé</button>}{status==='Terminé'&&<small>✓ Service clôturé</small>}</div></article>}):<div className="restaurant-empty"><strong>Aucun repas groupe prévu</strong><span>pour cette date et ce filtre.</span></div>}</section>
+ </div>
 }
