@@ -1,98 +1,51 @@
-import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, CalendarDays, ChefHat, ClipboardList, Coffee, Hotel, Printer, Sparkles, UsersRound } from 'lucide-react';
-import { FunctionSheet, loadFunctionSheets, MealService } from './interservice-data';
+import { ChangeEvent, useEffect, useMemo, useState } from 'react';
+import { ArrowLeft, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, LockKeyhole, Printer, RefreshCw, ShieldCheck } from 'lucide-react';
+import { useOperationalStore } from './useOperationalStore';
 
-type View = 'Tous' | 'Réception' | 'Restaurant' | 'Cuisine' | 'Housekeeping' | 'Commercial';
+type SheetStatus='Préparation'|'Prête à imprimer'|'Diffusée'|'Clôturée';
+type LineStatus='À relire'|'Validée';
+type FunctionLine={id:string;groupId:string;commercial:string;groupName:string;nationality:string;arrivalDate:string;arrivalTime:string;arrivalService:string;departureDate:string;departureTime:string;lastService:string;stayType:string;housekeepingType:string;dietary:string;roomingReceived:boolean;depositReceived:boolean;groupStatus:string;remarks:string;lineStatus:LineStatus;validatedBy:string;validatedAt:string;departureConfirmed:boolean};
+type WeeklySheet={id:string;weekStart:string;weekEnd:string;status:SheetStatus;lines:FunctionLine[];validatedForPrintBy:string;validatedForPrintAt:string;lockedBy:string;lockedAt:string};
+type Group={id:string;name?:string;agency?:string;commercial?:string;nationality?:string;language?:string;arrival?:string;arrivalTime?:string;departure?:string;departureTime?:string;stayType?:string;housekeepingType?:string;dietary?:string;allergies?:string;rooming?:boolean;depositReceived?:boolean;paymentStatus?:string;status?:string;commercialNotes?:string;commercialValidated?:boolean;mealDays?:Array<{date:string;breakfast?:{pax:number};lunch?:{pax:number};packedLunch?:{pax:number};dinner?:{pax:number};packedDinner?:{pax:number}}>};
 
-const views: { label: View; icon: typeof Hotel }[] = [
-  { label: 'Tous', icon: CalendarDays },
-  { label: 'Réception', icon: Hotel },
-  { label: 'Restaurant', icon: Coffee },
-  { label: 'Cuisine', icon: ChefHat },
-  { label: 'Housekeeping', icon: Sparkles },
-  { label: 'Commercial', icon: ClipboardList },
-];
+type SessionUser={name:string;role:string};
+const emptySheets:WeeklySheet[]=[];
+const emptyGroups:Group[]=[];
+function user():SessionUser{try{const s=JSON.parse(localStorage.getItem('hospicore.session')||'{}');const u=s.user||{};return{name:`${u.firstName||'Utilisateur'} ${u.lastName||'HospiCore'}`.trim(),role:String(u.role?.name||u.role||'Collaborateur')}}catch{return{name:'Utilisateur HospiCore',role:'Collaborateur'}}}
+function iso(d:Date){return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}
+function monday(value=new Date()){const d=new Date(value);const day=d.getDay()||7;d.setDate(d.getDate()-day+1);d.setHours(0,0,0,0);return d}
+function addDays(value:Date,n:number){const d=new Date(value);d.setDate(d.getDate()+n);return d}
+function stamp(){return new Date().toLocaleString('fr-FR')}
+function roleFlags(role:string){const r=role.toLowerCase();return{commercial:r.includes('commercial')||r.includes('admin')||r.includes('direction'),reception:r.includes('réception')||r.includes('reception')||r.includes('admin')||r.includes('direction'),direction:r.includes('direction')||r.includes('admin')}}
+function dateLabel(value:string){return value?new Date(`${value}T12:00:00`).toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric'}):'—'}
+function lastService(group:Group){const days=group.mealDays||[];const last=days.at(-1);if(last?.breakfast?.pax)return'Petit-déjeuner';if(last?.packedLunch?.pax)return'Panier repas midi';if(last?.lunch?.pax)return'Déjeuner';if(last?.packedDinner?.pax)return'Panier repas soir';if(last?.dinner?.pax)return'Dîner';return'Logement'}
+function arrivalService(group:Group){const first=(group.mealDays||[])[0];if(first?.dinner?.pax)return'Dîner';if(first?.packedDinner?.pax)return'Panier repas soir';if(first?.lunch?.pax)return'Déjeuner';return'Logement'}
+function groupToLine(group:Group):FunctionLine{return{id:crypto.randomUUID(),groupId:group.id,commercial:group.commercial||group.agency||'',groupName:group.name||'',nationality:group.nationality||group.language||'',arrivalDate:group.arrival||'',arrivalTime:group.arrivalTime||'',arrivalService:arrivalService(group),departureDate:group.departure||'',departureTime:group.departureTime||'',lastService:lastService(group),stayType:group.stayType||'',housekeepingType:group.housekeepingType||'Standard',dietary:group.dietary||group.allergies||'',roomingReceived:Boolean(group.rooming),depositReceived:Boolean(group.depositReceived||group.paymentStatus==='Payé'),groupStatus:group.status||'Préparation',remarks:group.commercialNotes||'',lineStatus:'À relire',validatedBy:'',validatedAt:'',departureConfirmed:false}}
 
-const dayLabels = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'];
-
-function startOfWeek(date = new Date()) {
-  const current = new Date(date);
-  const day = current.getDay() || 7;
-  current.setDate(current.getDate() - day + 1);
-  current.setHours(0, 0, 0, 0);
-  return current;
-}
-
-function iso(date: Date) { return date.toISOString().slice(0, 10); }
-function shortDate(date: Date) { return date.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' }); }
-
-function serviceSummary(sheet: FunctionSheet, view: View) {
-  if (view === 'Réception') return sheet.receptionNotes || `Arrivée prévue à ${sheet.arrivalTime || 'confirmer'}`;
-  if (view === 'Housekeeping') return `${sheet.housekeepingStatus} · ${sheet.housekeepingNotes || 'Aucune consigne'}`;
-  if (view === 'Cuisine') return sheet.kitchenNotes || 'Aucune consigne cuisine';
-  if (view === 'Commercial') return sheet.commercialNotes || `${sheet.agency} · ${sheet.leader}`;
-  if (view === 'Restaurant') return sheet.meals.map((meal) => `${meal.service} ${meal.time || 'horaire à confirmer'} · ${meal.pax} pax`).join(' | ');
-  return `${sheet.arrivalStatus} · ${sheet.meals.length} service(s) repas · ${sheet.housekeepingStatus}`;
-}
-
-export function WeeklyPlanningPage() {
-  const [items, setItems] = useState<FunctionSheet[]>(loadFunctionSheets);
-  const [view, setView] = useState<View>('Tous');
-  const [weekStart, setWeekStart] = useState(startOfWeek);
-
-  useEffect(() => {
-    const refresh = () => setItems(loadFunctionSheets());
-    window.addEventListener('hospicore:function-sheets', refresh);
-    window.addEventListener('storage', refresh);
-    return () => { window.removeEventListener('hospicore:function-sheets', refresh); window.removeEventListener('storage', refresh); };
-  }, []);
-
-  const days = useMemo(() => Array.from({ length: 7 }, (_, index) => {
-    const date = new Date(weekStart);
-    date.setDate(date.getDate() + index);
-    return date;
-  }), [weekStart]);
-
-  const weekItems = useMemo(() => items.filter((item) => item.arrivalDate <= iso(days[6]) && item.departureDate >= iso(days[0])), [items, days]);
-
-  function shiftWeek(offset: number) {
-    setWeekStart((current) => { const next = new Date(current); next.setDate(next.getDate() + offset * 7); return next; });
-  }
-
-  return <div className="weekly-page">
-    <header className="weekly-header">
-      <div>
-        <button onClick={() => { window.location.href = '/'; }}><ArrowLeft size={18} /> Tableau de bord</button>
-        <p>HospiCore · Fiches de fonction</p>
-        <h1><CalendarDays size={30} /> Planning hebdomadaire interservice</h1>
-        <span>Une vue commune, filtrable par service, alimentée par les fiches commerciales.</span>
-      </div>
-      <button className="weekly-print" onClick={() => window.print()}><Printer size={18} /> Imprimer la semaine</button>
-    </header>
-
-    <section className="weekly-controls">
-      <div className="weekly-nav"><button onClick={() => shiftWeek(-1)}>Semaine précédente</button><strong>{shortDate(days[0])} — {shortDate(days[6])}</strong><button onClick={() => shiftWeek(1)}>Semaine suivante</button></div>
-      <div className="weekly-tabs">{views.map(({ label, icon: Icon }) => <button key={label} className={view === label ? 'active' : ''} onClick={() => setView(label)}><Icon size={16} /> {label}</button>)}</div>
-    </section>
-
-    <section className="weekly-grid">
-      {days.map((day, index) => {
-        const date = iso(day);
-        const active = weekItems.filter((item) => item.arrivalDate <= date && item.departureDate >= date);
-        return <article className="weekly-day" key={date}>
-          <header><span>{dayLabels[index]}</span><strong>{shortDate(day)}</strong><small>{active.length} groupe(s)</small></header>
-          <div className="weekly-day-content">
-            {active.length === 0 ? <p className="weekly-empty">Aucun groupe prévu</p> : active.map((sheet) => {
-              const mealsToday = sheet.meals as { service: MealService; time: string; pax: number }[];
-              return <div className="weekly-card" key={`${date}-${sheet.id}`}>
-                <div><span className={`workflow-status ${sheet.arrivalStatus.toLowerCase().replace(' ', '-')}`}>{sheet.arrivalStatus}</span><h2>{sheet.groupName}</h2><small><UsersRound size={13} /> {sheet.pax} pax</small></div>
-                <p>{serviceSummary(sheet, view)}</p>
-                {(view === 'Tous' || view === 'Restaurant' || view === 'Cuisine') && mealsToday.length > 0 && <div className="weekly-meals">{mealsToday.map((meal) => <span key={meal.service}>{meal.service} · {meal.time || 'à confirmer'}</span>)}</div>}
-              </div>;
-            })}
-          </div>
-        </article>;
-      })}
-    </section>
-  </div>;
+export function WeeklyPlanningPage(){
+ const sheetsStore=useOperationalStore<WeeklySheet[]>('function-sheets',emptySheets);
+ const groupsStore=useOperationalStore<Group[]>('group-360',emptyGroups);
+ const [weekStart,setWeekStart]=useState(monday);const currentUser=user();const permissions=roleFlags(currentUser.role);
+ const weekStartIso=iso(weekStart),weekEndIso=iso(addDays(weekStart,6));
+ const sheet=useMemo(()=>sheetsStore.data.find(s=>s.weekStart===weekStartIso),[sheetsStore.data,weekStartIso]);
+ const eligibleGroups=useMemo(()=>groupsStore.data.filter(g=>g.commercialValidated&&String(g.arrival||'')<=weekEndIso&&String(g.departure||'')>=weekStartIso),[groupsStore.data,weekStartIso,weekEndIso]);
+ const locked=sheet?.status==='Clôturée';const canEdit=permissions.commercial&&!locked;const canConfirmDeparture=permissions.reception&&!locked;
+ async function saveSheet(next:WeeklySheet){const all=sheetsStore.data.filter(s=>s.id!==next.id);await sheetsStore.save([...all,next])}
+ async function importGroups(){if(!permissions.commercial)return;const existing=sheet?.lines||[];const byGroup=new Map(existing.map(l=>[l.groupId,l]));const lines=eligibleGroups.map(g=>byGroup.get(g.id)||groupToLine(g));const next:WeeklySheet=sheet?{...sheet,lines}:{id:crypto.randomUUID(),weekStart:weekStartIso,weekEnd:weekEndIso,status:'Préparation',lines,validatedForPrintBy:'',validatedForPrintAt:'',lockedBy:'',lockedAt:''};await saveSheet(next)}
+ async function updateLine(id:string,key:keyof FunctionLine,value:string|boolean){if(!sheet||!canEdit)return;await saveSheet({...sheet,lines:sheet.lines.map(l=>l.id===id?{...l,[key]:value,lineStatus:key==='lineStatus'?value as LineStatus:'À relire',validatedBy:key==='lineStatus'&&value==='Validée'?currentUser.name:'',validatedAt:key==='lineStatus'&&value==='Validée'?stamp():''}:l)})}
+ async function validateForPrint(){if(!sheet||!permissions.commercial||sheet.lines.some(l=>l.lineStatus!=='Validée'))return;await saveSheet({...sheet,status:'Prête à imprimer',validatedForPrintBy:currentUser.name,validatedForPrintAt:stamp()})}
+ async function markDistributed(){if(!sheet||!permissions.commercial||sheet.status!=='Prête à imprimer')return;await saveSheet({...sheet,status:'Diffusée'})}
+ async function confirmDeparture(id:string,checked:boolean){if(!sheet||!canConfirmDeparture)return;const lines=sheet.lines.map(l=>l.id===id?{...l,departureConfirmed:checked,groupStatus:checked?'Parti':l.groupStatus}:l);const allDeparted=lines.length>0&&lines.every(l=>l.departureConfirmed);await saveSheet({...sheet,lines,status:allDeparted?'Clôturée':sheet.status,lockedBy:allDeparted?currentUser.name:sheet.lockedBy,lockedAt:allDeparted?stamp():sheet.lockedAt})}
+ function shift(offset:number){setWeekStart(current=>addDays(current,offset*7))}
+ useEffect(()=>{if(!sheet&&permissions.commercial&&eligibleGroups.length)void importGroups()},[weekStartIso]);
+ if(locked&&!permissions.direction)return <div className="weekly-page"><header className="weekly-header"><div><button onClick={()=>location.href='/'}><ArrowLeft size={18}/>Tableau de bord</button><h1><LockKeyhole/>Fiche de fonction clôturée</h1><span>Le dernier départ a été confirmé. Cette fiche est désormais accessible uniquement à la Direction.</span></div></header></div>;
+ return <div className="weekly-page">
+  <header className="weekly-header"><div><button onClick={()=>location.href='/'}><ArrowLeft size={18}/>Tableau de bord</button><p>HospiCore · Commercial & opérations</p><h1><CalendarDays size={30}/>Fiche de fonction hebdomadaire</h1><span>Importée depuis les Fiches Groupe 360° validées.</span></div><div className="weekly-actions"><button onClick={()=>void sheetsStore.refresh()}><RefreshCw size={17}/>Actualiser</button>{permissions.commercial&&<button onClick={()=>void importGroups()}>Importer les groupes validés</button>}{sheet?.status==='Prête à imprimer'&&<button className="weekly-print" onClick={()=>window.print()}><Printer size={18}/>Imprimer</button>}</div></header>
+  <div className={`sync-banner ${sheetsStore.state}`}><span>{sheetsStore.message}</span></div>
+  <section className="weekly-controls"><div className="weekly-nav"><button onClick={()=>shift(-1)}><ChevronLeft/>Semaine précédente</button><strong>{dateLabel(weekStartIso)} — {dateLabel(weekEndIso)}</strong><button onClick={()=>shift(1)}>Semaine suivante<ChevronRight/></button></div>{sheet&&<div className={`function-sheet-status ${sheet.status.toLowerCase().replaceAll(' ','-')}`}><ShieldCheck size={18}/><strong>{sheet.status}</strong><span>{sheet.lines.filter(l=>l.lineStatus==='Validée').length}/{sheet.lines.length} lignes validées</span></div>}</section>
+  {!sheet?<section className="panel weekly-empty-state"><h2>Aucune fiche créée pour cette semaine</h2><p>{eligibleGroups.length} groupe(s) validé(s) peuvent être importés.</p>{permissions.commercial&&<button onClick={()=>void importGroups()}>Créer la fiche de fonction</button>}</section>:<>
+   <section className="function-sheet-table-wrap"><table className="function-sheet-table"><thead><tr><th>Commercial</th><th>Groupe</th><th>Nationalité</th><th>Arrivée</th><th>Heure</th><th>Service arrivée</th><th>Départ</th><th>Heure</th><th>Dernier service</th><th>Séjour</th><th>Housekeeping</th><th>Allergies / régimes</th><th>Rooming reçue</th><th>Acompte reçu</th><th>Statut groupe</th><th>Remarques</th><th>Contrôle commercial</th><th>Départ confirmé</th></tr></thead><tbody>{sheet.lines.map(line=><tr key={line.id} className={line.lineStatus==='Validée'?'line-validated':''}><td><input disabled={!canEdit} value={line.commercial} onChange={e=>void updateLine(line.id,'commercial',e.target.value)}/></td><td><strong>{line.groupName}</strong></td><td><input disabled={!canEdit} value={line.nationality} onChange={e=>void updateLine(line.id,'nationality',e.target.value)}/></td><td>{dateLabel(line.arrivalDate)}</td><td><input disabled={!canEdit} type="time" value={line.arrivalTime} onChange={e=>void updateLine(line.id,'arrivalTime',e.target.value)}/></td><td><input disabled={!canEdit} value={line.arrivalService} onChange={e=>void updateLine(line.id,'arrivalService',e.target.value)}/></td><td>{dateLabel(line.departureDate)}</td><td><input disabled={!canEdit} type="time" value={line.departureTime} onChange={e=>void updateLine(line.id,'departureTime',e.target.value)}/></td><td><input disabled={!canEdit} value={line.lastService} onChange={e=>void updateLine(line.id,'lastService',e.target.value)}/></td><td>{line.stayType}</td><td>{line.housekeepingType}</td><td><textarea disabled={!canEdit} value={line.dietary} onChange={e=>void updateLine(line.id,'dietary',e.target.value)}/></td><td><input disabled={!canEdit} type="checkbox" checked={line.roomingReceived} onChange={e=>void updateLine(line.id,'roomingReceived',e.target.checked)}/></td><td><input disabled={!canEdit} type="checkbox" checked={line.depositReceived} onChange={e=>void updateLine(line.id,'depositReceived',e.target.checked)}/></td><td>{line.groupStatus}</td><td><textarea disabled={!canEdit} value={line.remarks} onChange={e=>void updateLine(line.id,'remarks',e.target.value)}/></td><td>{canEdit?<button className={line.lineStatus==='Validée'?'validated':''} onClick={()=>void updateLine(line.id,'lineStatus',line.lineStatus==='Validée'?'À relire':'Validée')}>{line.lineStatus==='Validée'?<CheckCircle2/>:null}{line.lineStatus}</button>:<span>{line.lineStatus}</span>}{line.validatedBy&&<small>{line.validatedBy}<br/>{line.validatedAt}</small>}</td><td><label><input disabled={!canConfirmDeparture} type="checkbox" checked={line.departureConfirmed} onChange={e=>void confirmDeparture(line.id,e.target.checked)}/> {line.departureConfirmed?'Confirmé':'À confirmer'}</label></td></tr>)}</tbody></table></section>
+   <section className="function-sheet-footer"><div><strong>Workflow</strong><span>Relecture commerciale → validation de chaque ligne → validation impression → lecture seule services → clôture après dernier départ.</span></div>{permissions.commercial&&sheet.status==='Préparation'&&<button disabled={sheet.lines.some(l=>l.lineStatus!=='Validée')} onClick={()=>void validateForPrint()}>Valider pour impression</button>}{permissions.commercial&&sheet.status==='Prête à imprimer'&&<button onClick={()=>void markDistributed()}>Confirmer la diffusion aux services</button>}{locked&&<div><LockKeyhole/>Clôturée par {sheet.lockedBy} · {sheet.lockedAt}</div>}</section>
+  </>}
+ </div>
 }
