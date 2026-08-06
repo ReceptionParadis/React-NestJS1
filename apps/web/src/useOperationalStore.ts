@@ -10,6 +10,7 @@ export function useOperationalStore<T>(namespace: string, initialValue: T, refre
   const versionRef = useRef(0);
   const refreshInFlightRef = useRef(false);
   const mountedRef = useRef(true);
+  const lastSuccessRef = useRef('');
   const [updatedAt, setUpdatedAt] = useState('');
   const [lastSuccessAt, setLastSuccessAt] = useState('');
   const [state, setState] = useState<OperationalSyncState>('loading');
@@ -18,6 +19,7 @@ export function useOperationalStore<T>(namespace: string, initialValue: T, refre
   const markSuccess = useCallback((payload: T, nextVersion: number, successMessage: string) => {
     if (!mountedRef.current) return;
     const successAt = new Date().toISOString();
+    lastSuccessRef.current = successAt;
     setData(payload);
     setVersion(nextVersion);
     versionRef.current = nextVersion;
@@ -25,6 +27,13 @@ export function useOperationalStore<T>(namespace: string, initialValue: T, refre
     setLastSuccessAt(successAt);
     setState('synced');
     setMessage(successMessage);
+  }, []);
+
+  const preservePreviousSuccess = useCallback((fallbackMessage: string) => {
+    if (!mountedRef.current || !lastSuccessRef.current) return false;
+    setState('synced');
+    setMessage(`Dernière synchronisation réussie · ${new Date(lastSuccessRef.current).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`);
+    return true;
   }, []);
 
   const refresh = useCallback(async (silent = false) => {
@@ -41,6 +50,7 @@ export function useOperationalStore<T>(namespace: string, initialValue: T, refre
       if (!mountedRef.current) return false;
 
       if (!result.connected) {
+        if (preservePreviousSuccess(result.error || 'Synchronisation PostgreSQL indisponible.')) return false;
         setState('error');
         setMessage(result.error || 'Synchronisation PostgreSQL indisponible.');
         return false;
@@ -50,13 +60,15 @@ export function useOperationalStore<T>(namespace: string, initialValue: T, refre
       return true;
     } catch (error) {
       if (!mountedRef.current) return false;
+      const text = error instanceof Error ? error.message : 'Synchronisation PostgreSQL indisponible.';
+      if (preservePreviousSuccess(text)) return false;
       setState('error');
-      setMessage(error instanceof Error ? error.message : 'Synchronisation PostgreSQL indisponible.');
+      setMessage(text);
       return false;
     } finally {
       refreshInFlightRef.current = false;
     }
-  }, [markSuccess, namespace]);
+  }, [markSuccess, namespace, preservePreviousSuccess]);
 
   const save = useCallback(async (next: T) => {
     if (mountedRef.current) {
