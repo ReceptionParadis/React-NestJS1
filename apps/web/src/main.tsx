@@ -26,6 +26,7 @@ import './reception-group-control.css';
 import './group-control-workflow.css';
 import './reception-control-uniform.css';
 import './group-control-print-fix.css';
+import './command-center.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode><AppRouter /></React.StrictMode>,
