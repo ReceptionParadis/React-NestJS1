@@ -1,243 +1,81 @@
-import { useMemo, useState } from 'react';
-import { ArrowLeft, Clock3, Filter, MapPin, Plus, Search, Send, UserRound, X } from 'lucide-react';
+import { FormEvent, useMemo, useState } from 'react';
+import { AlertTriangle, ArrowLeft, Camera, CheckCircle2, Clock3, Filter, LockKeyhole, MapPin, Plus, Search, Send, UserRound, Wrench, X } from 'lucide-react';
+import { useOperationalStore } from './useOperationalStore';
 
-type TicketStatus = 'Nouveau' | 'Assigné' | 'En cours' | 'En attente' | 'Résolu';
-type TicketPriority = 'Basse' | 'Normale' | 'Haute' | 'Critique';
-
-type TicketComment = { id: number; author: string; text: string; time: string };
-type Ticket = {
-  id: number;
-  reference: string;
-  title: string;
-  description: string;
-  status: TicketStatus;
-  priority: TicketPriority;
-  service: string;
-  location: string;
-  room?: string;
-  assignee: string;
-  requester: string;
-  createdAt: string;
-  due: string;
-  comments: TicketComment[];
+type MaintenanceStatus='À traiter'|'En cours'|'En attente de pièce'|'Terminée';
+type MaintenancePriority='Basse'|'Normale'|'Haute'|'Urgente';
+type RoomState='Libre'|'Occupée'|'Bloquée';
+type HistoryEntry={id:string;action:string;actor:string;role:string;at:string;note?:string};
+type Intervention={
+ id:string;reference:string;title:string;description:string;status:MaintenanceStatus;priority:MaintenancePriority;
+ building:'A'|'B'|'Zone commune';floor:string;room:string;area:string;roomState:RoomState;blocked:boolean;
+ assignee:string;requester:string;requesterRole:string;createdAt:string;updatedAt:string;dueAt:string;
+ beforePhoto:string;afterPhoto:string;resolution:string;returnedToServiceAt:string;returnedToServiceBy:string;
+ history:HistoryEntry[];
 };
+type SessionUser={name:string;role:string};
 
-const statuses: TicketStatus[] = ['Nouveau', 'Assigné', 'En cours', 'En attente', 'Résolu'];
+const statuses:MaintenanceStatus[]=['À traiter','En cours','En attente de pièce','Terminée'];
+const priorities:MaintenancePriority[]=['Basse','Normale','Haute','Urgente'];
+const initial:Intervention[]=[];
 
-const initialTickets: Ticket[] = [
-  {
-    id: 1,
-    reference: 'HC-2026-000154',
-    title: 'Climatisation en panne',
-    description: 'La climatisation ne produit plus d’air froid. Chambre occupée par le groupe Tangney.',
-    status: 'En cours',
-    priority: 'Critique',
-    service: 'Maintenance',
-    location: 'Bâtiment A · 4e étage',
-    room: '412',
-    assignee: 'José',
-    requester: 'Thomas',
-    createdAt: '09h12',
-    due: 'Échéance 10h00',
-    comments: [{ id: 1, author: 'José', text: 'Diagnostic en cours, filtre vérifié.', time: '09h38' }],
-  },
-  {
-    id: 2,
-    reference: 'HC-2026-000155',
-    title: 'Porte difficile à fermer',
-    description: 'La porte frotte au sol et nécessite plusieurs tentatives pour se verrouiller.',
-    status: 'Assigné',
-    priority: 'Haute',
-    service: 'Maintenance',
-    location: 'Bâtiment A · 2e étage',
-    room: '215',
-    assignee: 'Maintenance',
-    requester: 'Paola',
-    createdAt: '09h25',
-    due: 'Avant 14h00',
-    comments: [],
-  },
-  {
-    id: 3,
-    reference: 'HC-2026-000156',
-    title: 'Télévision sans signal',
-    description: 'Écran allumé mais aucune chaîne disponible après redémarrage.',
-    status: 'Nouveau',
-    priority: 'Normale',
-    service: 'IT',
-    location: 'Bâtiment B · 6e étage',
-    room: '608',
-    assignee: 'Non assigné',
-    requester: 'Gabriel',
-    createdAt: '10h04',
-    due: 'Aujourd’hui',
-    comments: [],
-  },
-  {
-    id: 4,
-    reference: 'HC-2026-000151',
-    title: 'Lit bébé installé',
-    description: 'Lit bébé installé et contrôlé avant arrivée client.',
-    status: 'Résolu',
-    priority: 'Basse',
-    service: 'Housekeeping',
-    location: 'Bâtiment A · 2e étage',
-    room: '214',
-    assignee: 'Valérie',
-    requester: 'Réception',
-    createdAt: '08h12',
-    due: 'Terminé 09h02',
-    comments: [{ id: 2, author: 'Valérie', text: 'Installation terminée.', time: '09h02' }],
-  },
-  {
-    id: 5,
-    reference: 'HC-2026-000153',
-    title: 'Badge parking bus manquant',
-    description: 'Préparer un badge supplémentaire pour le groupe ORP.',
-    status: 'En attente',
-    priority: 'Haute',
-    service: 'Réception',
-    location: 'Parking bus',
-    assignee: 'Gabriel',
-    requester: 'Thomas',
-    createdAt: '08h55',
-    due: 'Avant 17h30',
-    comments: [],
-  },
-];
+function user():SessionUser{try{const s=JSON.parse(localStorage.getItem('hospicore.session')||'{}');const u=s.user||{};return{name:`${u.firstName||'Utilisateur'} ${u.lastName||'HospiCore'}`.trim(),role:String(u.role?.name||u.role||'Collaborateur')}}catch{return{name:'Utilisateur HospiCore',role:'Collaborateur'}}}
+function now(){return new Date().toLocaleString('fr-FR')}
+function ref(){const d=new Date();return`MT-${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}-${String(d.getTime()).slice(-5)}`}
+function priorityClass(value:MaintenancePriority){return value==='Urgente'?'critical':value==='Haute'?'high':value==='Normale'?'normal':'low'}
+function locationLabel(item:Intervention){if(item.room)return`Bâtiment ${item.building} · étage ${item.floor||'—'} · chambre ${item.room}`;return item.area||`Bâtiment ${item.building}`}
 
-const priorityClass: Record<TicketPriority, string> = {
-  Basse: 'low',
-  Normale: 'normal',
-  Haute: 'high',
-  Critique: 'critical',
-};
+export function TicketsPage(){
+ const store=useOperationalStore<Intervention[]>('maintenance-interventions',initial);
+ const current=user();
+ const [selectedId,setSelectedId]=useState('');
+ const [search,setSearch]=useState('');
+ const [priority,setPriority]=useState<'Toutes'|MaintenancePriority>('Toutes');
+ const [createOpen,setCreateOpen]=useState(false);
+ const [comment,setComment]=useState('');
+ const interventions=store.data;
+ const filtered=useMemo(()=>interventions.filter(item=>(priority==='Toutes'||item.priority===priority)&&`${item.reference} ${item.title} ${item.description} ${item.room} ${item.area} ${item.assignee}`.toLowerCase().includes(search.toLowerCase())),[interventions,priority,search]);
+ const selected=interventions.find(item=>item.id===selectedId)||filtered[0];
 
-export function TicketsPage() {
-  const [tickets, setTickets] = useState(initialTickets);
-  const [selectedId, setSelectedId] = useState(1);
-  const [search, setSearch] = useState('');
-  const [service, setService] = useState('Tous');
-  const [isCreateOpen, setCreateOpen] = useState(false);
-  const [comment, setComment] = useState('');
-  const [draft, setDraft] = useState({ title: '', description: '', room: '', service: 'Maintenance', priority: 'Normale' as TicketPriority });
+ async function save(updated:Intervention,action:string,note=''){
+  const entry:HistoryEntry={id:crypto.randomUUID(),action,actor:current.name,role:current.role,at:now(),note};
+  const final={...updated,updatedAt:now(),history:[...(updated.history||[]),entry]};
+  await store.save(interventions.map(item=>item.id===final.id?final:item));
+  setSelectedId(final.id);
+ }
+ async function patch(update:Partial<Intervention>,action:string){if(selected)await save({...selected,...update},action)}
+ async function create(event:FormEvent<HTMLFormElement>){
+  event.preventDefault();const form=new FormData(event.currentTarget);const blocked=form.get('blocked')==='on';const created=now();
+  const item:Intervention={id:crypto.randomUUID(),reference:ref(),title:String(form.get('title')||''),description:String(form.get('description')||''),status:'À traiter',priority:String(form.get('priority')||'Normale') as MaintenancePriority,building:String(form.get('building')||'A') as Intervention['building'],floor:String(form.get('floor')||''),room:String(form.get('room')||''),area:String(form.get('area')||''),roomState:blocked?'Bloquée':String(form.get('roomState')||'Libre') as RoomState,blocked,assignee:String(form.get('assignee')||'Maintenance'),requester:current.name,requesterRole:current.role,createdAt:created,updatedAt:created,dueAt:String(form.get('dueAt')||''),beforePhoto:String(form.get('beforePhoto')||''),afterPhoto:'',resolution:'',returnedToServiceAt:'',returnedToServiceBy:'',history:[{id:crypto.randomUUID(),action:'Intervention créée',actor:current.name,role:current.role,at:created}]};
+  if(!item.title.trim()||!item.description.trim())return;
+  if(await store.save([item,...interventions])){setSelectedId(item.id);setCreateOpen(false)}
+ }
+ async function addComment(){const text=comment.trim();if(!selected||!text)return;await save(selected,'Commentaire ajouté',text);setComment('')}
+ async function changeStatus(status:MaintenanceStatus){
+  if(!selected)return;
+  const update:Partial<Intervention>={status};
+  if(status==='Terminée'&&selected.blocked){update.resolution=selected.resolution||''}
+  await patch(update,`Statut passé à « ${status} »`);
+ }
+ async function returnToService(){if(!selected||selected.status!=='Terminée'||!selected.resolution.trim())return;await save({...selected,blocked:false,roomState:'Libre',returnedToServiceAt:now(),returnedToServiceBy:current.name},'Chambre / zone remise en service')}
 
-  const filtered = useMemo(() => {
-    const query = search.trim().toLowerCase();
-    return tickets.filter((ticket) => {
-      const matchesSearch = !query || `${ticket.reference} ${ticket.title} ${ticket.description} ${ticket.room ?? ''} ${ticket.assignee}`.toLowerCase().includes(query);
-      const matchesService = service === 'Tous' || ticket.service === service;
-      return matchesSearch && matchesService;
-    });
-  }, [search, service, tickets]);
-
-  const selected = tickets.find((ticket) => ticket.id === selectedId) ?? filtered[0];
-
-  function updateTicket(id: number, update: Partial<Ticket>) {
-    setTickets((current) => current.map((ticket) => (ticket.id === id ? { ...ticket, ...update } : ticket)));
-  }
-
-  function addComment() {
-    const text = comment.trim();
-    if (!selected || !text) return;
-    updateTicket(selected.id, {
-      comments: [...selected.comments, { id: Date.now(), author: 'Thomas', text, time: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) }],
-    });
-    setComment('');
-  }
-
-  function createTicket() {
-    if (!draft.title.trim() || !draft.description.trim()) return;
-    const id = Date.now();
-    const ticket: Ticket = {
-      id,
-      reference: `HC-2026-${String(tickets.length + 157).padStart(6, '0')}`,
-      title: draft.title.trim(),
-      description: draft.description.trim(),
-      status: 'Nouveau',
-      priority: draft.priority,
-      service: draft.service,
-      location: draft.room ? `Chambre ${draft.room}` : 'Zone non précisée',
-      room: draft.room || undefined,
-      assignee: 'Non assigné',
-      requester: 'Thomas',
-      createdAt: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
-      due: 'À planifier',
-      comments: [],
-    };
-    setTickets((current) => [ticket, ...current]);
-    setSelectedId(id);
-    setDraft({ title: '', description: '', room: '', service: 'Maintenance', priority: 'Normale' });
-    setCreateOpen(false);
-  }
-
-  return (
-    <div className="tickets-page">
-      <header className="tickets-header">
-        <div>
-          <a className="back-link" href="/"><ArrowLeft size={18} /> Tableau de bord</a>
-          <p className="eyebrow">Suivi opérationnel</p>
-          <h1>Tickets</h1>
-          <p className="tickets-subtitle">Aucune demande ne doit être oubliée.</p>
-        </div>
-        <button className="primary-button" type="button" onClick={() => setCreateOpen(true)}><Plus size={17} /> Nouveau ticket</button>
-      </header>
-
-      <section className="tickets-toolbar">
-        <label className="tickets-search"><Search size={18} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Rechercher un ticket, une chambre…" /></label>
-        <label className="tickets-service"><Filter size={17} /><select value={service} onChange={(event) => setService(event.target.value)}><option>Tous</option><option>Maintenance</option><option>Réception</option><option>Housekeeping</option><option>IT</option></select></label>
-        <div className="ticket-kpis"><span><strong>{tickets.filter((ticket) => ticket.priority === 'Critique' && ticket.status !== 'Résolu').length}</strong> critiques</span><span><strong>{tickets.filter((ticket) => ticket.status === 'Résolu').length}</strong> résolus</span><span><strong>{tickets.filter((ticket) => ticket.status !== 'Résolu').length}</strong> ouverts</span></div>
-      </section>
-
-      <section className="ticket-workspace">
-        <div className="ticket-board">
-          {statuses.map((status) => {
-            const columnTickets = filtered.filter((ticket) => ticket.status === status);
-            return (
-              <section className="ticket-column" key={status}>
-                <div className="ticket-column-header"><h2>{status}</h2><span>{columnTickets.length}</span></div>
-                <div className="ticket-stack">
-                  {columnTickets.map((ticket) => (
-                    <button className={`ticket-card${selected?.id === ticket.id ? ' selected' : ''}`} type="button" key={ticket.id} onClick={() => setSelectedId(ticket.id)}>
-                      <div className="ticket-card-top"><span className={`ticket-priority ${priorityClass[ticket.priority]}`}>{ticket.priority}</span><small>{ticket.reference}</small></div>
-                      <strong>{ticket.title}</strong>
-                      <p>{ticket.description}</p>
-                      <div className="ticket-card-meta">{ticket.room && <span><MapPin size={14} /> Ch. {ticket.room}</span>}<span><UserRound size={14} /> {ticket.assignee}</span></div>
-                      <div className="ticket-due"><Clock3 size={14} /> {ticket.due}</div>
-                    </button>
-                  ))}
-                  {columnTickets.length === 0 && <p className="ticket-empty">Aucun ticket</p>}
-                </div>
-              </section>
-            );
-          })}
-        </div>
-
-        {selected && (
-          <aside className="ticket-detail">
-            <div className="ticket-detail-head"><div><span className={`ticket-priority ${priorityClass[selected.priority]}`}>{selected.priority}</span><small>{selected.reference}</small><h2>{selected.title}</h2></div><button className="detail-close" type="button" onClick={() => setSelectedId(0)}><X size={18} /></button></div>
-            <p className="ticket-description">{selected.description}</p>
-            <div className="ticket-properties"><div><span>Localisation</span><strong>{selected.location}{selected.room ? ` · Chambre ${selected.room}` : ''}</strong></div><div><span>Service</span><strong>{selected.service}</strong></div><div><span>Demandeur</span><strong>{selected.requester}</strong></div><div><span>Responsable</span><strong>{selected.assignee}</strong></div></div>
-            <label className="field-label">Statut<select value={selected.status} onChange={(event) => updateTicket(selected.id, { status: event.target.value as TicketStatus })}>{statuses.map((status) => <option key={status}>{status}</option>)}</select></label>
-            <label className="field-label">Responsable<select value={selected.assignee} onChange={(event) => updateTicket(selected.id, { assignee: event.target.value })}><option>Non assigné</option><option>Maintenance</option><option>José</option><option>Gabriel</option><option>Valérie</option><option>Thomas</option></select></label>
-            <div className="ticket-comments-title"><h3>Historique et commentaires</h3><span>{selected.comments.length}</span></div>
-            <div className="ticket-comments">{selected.comments.map((item) => <div className="ticket-comment" key={item.id}><div className="comment-avatar">{item.author.slice(0, 2).toUpperCase()}</div><div><strong>{item.author}</strong><time>{item.time}</time><p>{item.text}</p></div></div>)}{selected.comments.length === 0 && <p className="ticket-empty">Aucun commentaire.</p>}</div>
-            <div className="ticket-comment-compose"><input value={comment} onChange={(event) => setComment(event.target.value)} onKeyDown={(event) => event.key === 'Enter' && addComment()} placeholder="Ajouter un commentaire…" /><button type="button" onClick={addComment}><Send size={17} /></button></div>
-          </aside>
-        )}
-      </section>
-
-      {isCreateOpen && (
-        <div className="modal-backdrop" onMouseDown={() => setCreateOpen(false)}>
-          <section className="modal ticket-modal" role="dialog" aria-modal="true" onMouseDown={(event) => event.stopPropagation()}>
-            <div className="modal-header"><div><p className="eyebrow">Intervention</p><h2>Nouveau ticket</h2></div><button className="icon-button" type="button" onClick={() => setCreateOpen(false)}><X size={19} /></button></div>
-            <label className="field-label">Titre<input value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} placeholder="Ex. Climatisation en panne" /></label>
-            <label className="field-label">Description<textarea value={draft.description} onChange={(event) => setDraft({ ...draft, description: event.target.value })} placeholder="Décrivez précisément le problème…" /></label>
-            <div className="ticket-form-grid"><label className="field-label">Chambre ou zone<input value={draft.room} onChange={(event) => setDraft({ ...draft, room: event.target.value })} placeholder="412" /></label><label className="field-label">Service<select value={draft.service} onChange={(event) => setDraft({ ...draft, service: event.target.value })}><option>Maintenance</option><option>Réception</option><option>Housekeeping</option><option>IT</option></select></label><label className="field-label">Priorité<select value={draft.priority} onChange={(event) => setDraft({ ...draft, priority: event.target.value as TicketPriority })}><option>Basse</option><option>Normale</option><option>Haute</option><option>Critique</option></select></label></div>
-            <div className="modal-actions"><button className="secondary-button" type="button" onClick={() => setCreateOpen(false)}>Annuler</button><button className="primary-button" type="button" onClick={createTicket}>Créer le ticket</button></div>
-          </section>
-        </div>
-      )}
-    </div>
-  );
+ return <div className="tickets-page maintenance-page">
+  <header className="tickets-header"><div><a className="back-link" href="/"><ArrowLeft size={18}/>Centre de Commandement</a><p className="eyebrow">GMAO opérationnelle</p><h1>Maintenance</h1><p className="tickets-subtitle">Suivi des pannes, chambres bloquées et remises en service.</p></div><button className="primary-button" onClick={()=>setCreateOpen(true)}><Plus size={17}/>Nouvelle intervention</button></header>
+  {store.state==='error'&&<div className="daily-closed">Synchronisation indisponible : {store.message}</div>}
+  <section className="maintenance-kpis"><article><AlertTriangle/><div><span>Urgentes</span><strong>{interventions.filter(i=>i.priority==='Urgente'&&i.status!=='Terminée').length}</strong></div></article><article><Wrench/><div><span>Ouvertes</span><strong>{interventions.filter(i=>i.status!=='Terminée').length}</strong></div></article><article><LockKeyhole/><div><span>Chambres bloquées</span><strong>{interventions.filter(i=>i.blocked).length}</strong></div></article><article><CheckCircle2/><div><span>Terminées</span><strong>{interventions.filter(i=>i.status==='Terminée').length}</strong></div></article></section>
+  <section className="tickets-toolbar"><label className="tickets-search"><Search size={18}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Référence, chambre, panne, technicien…"/></label><label className="tickets-service"><Filter size={17}/><select value={priority} onChange={e=>setPriority(e.target.value as typeof priority)}><option>Toutes</option>{priorities.map(p=><option key={p}>{p}</option>)}</select></label></section>
+  <section className="ticket-workspace"><div className="ticket-board maintenance-board">{statuses.map(status=>{const list=filtered.filter(i=>i.status===status);return <section className="ticket-column" key={status}><div className="ticket-column-header"><h2>{status}</h2><span>{list.length}</span></div><div className="ticket-stack">{list.map(item=><button className={`ticket-card${selected?.id===item.id?' selected':''}${item.blocked?' blocked':''}`} key={item.id} onClick={()=>setSelectedId(item.id)}><div className="ticket-card-top"><span className={`ticket-priority ${priorityClass(item.priority)}`}>{item.priority}</span><small>{item.reference}</small></div><strong>{item.title}</strong><p>{item.description}</p><div className="ticket-card-meta"><span><MapPin size={14}/>{locationLabel(item)}</span><span><UserRound size={14}/>{item.assignee||'Non assigné'}</span></div>{item.blocked&&<div className="maintenance-blocked"><LockKeyhole size={14}/>Chambre / zone bloquée</div>}<div className="ticket-due"><Clock3 size={14}/>{item.dueAt||'Sans échéance'}</div></button>)}{!list.length&&<p className="ticket-empty">Aucune intervention</p>}</div></section>})}</div>
+   {selected&&<aside className="ticket-detail"><div className="ticket-detail-head"><div><span className={`ticket-priority ${priorityClass(selected.priority)}`}>{selected.priority}</span><small>{selected.reference}</small><h2>{selected.title}</h2></div><button className="detail-close" onClick={()=>setSelectedId('')}><X size={18}/></button></div><p className="ticket-description">{selected.description}</p><div className="ticket-properties"><div><span>Localisation</span><strong>{locationLabel(selected)}</strong></div><div><span>État chambre</span><strong>{selected.roomState}</strong></div><div><span>Demandeur</span><strong>{selected.requester}</strong></div><div><span>Responsable</span><strong>{selected.assignee||'Non assigné'}</strong></div><div><span>Créée</span><strong>{selected.createdAt}</strong></div><div><span>Échéance</span><strong>{selected.dueAt||'—'}</strong></div></div>
+    <label className="field-label">Statut<select value={selected.status} onChange={e=>void changeStatus(e.target.value as MaintenanceStatus)}>{statuses.map(s=><option key={s}>{s}</option>)}</select></label>
+    <label className="field-label">Technicien / responsable<input value={selected.assignee} onChange={e=>void patch({assignee:e.target.value},'Responsable modifié')}/></label>
+    <label className="field-label">Priorité<select value={selected.priority} onChange={e=>void patch({priority:e.target.value as MaintenancePriority},'Priorité modifiée')}>{priorities.map(p=><option key={p}>{p}</option>)}</select></label>
+    <label className="field-label">Compte rendu de résolution<textarea value={selected.resolution} onChange={e=>void patch({resolution:e.target.value},'Compte rendu mis à jour')} placeholder="Travaux réalisés, pièce remplacée, contrôle effectué…"/></label>
+    <div className="maintenance-photos"><div><span><Camera size={15}/>Photo avant</span>{selected.beforePhoto?<a href={selected.beforePhoto} target="_blank" rel="noreferrer">Ouvrir</a>:<em>Non renseignée</em>}</div><div><span><Camera size={15}/>Photo après</span><input value={selected.afterPhoto} onChange={e=>void patch({afterPhoto:e.target.value},'Photo après ajoutée')} placeholder="URL de la photo"/></div></div>
+    {selected.blocked&&<button className="maintenance-return" disabled={selected.status!=='Terminée'||!selected.resolution.trim()} onClick={()=>void returnToService()}><CheckCircle2 size={17}/>Valider la remise en service</button>}
+    {selected.returnedToServiceAt&&<div className="maintenance-returned"><CheckCircle2 size={17}/>Remise en service le {selected.returnedToServiceAt} par {selected.returnedToServiceBy}</div>}
+    <div className="ticket-comments-title"><h3>Historique horodaté</h3><span>{selected.history.length}</span></div><div className="ticket-comments">{[...selected.history].reverse().map(entry=><div className="ticket-comment" key={entry.id}><div className="comment-avatar">{entry.actor.slice(0,2).toUpperCase()}</div><div><strong>{entry.actor}</strong><time>{entry.at}</time><p>{entry.action}{entry.note?` · ${entry.note}`:''}</p></div></div>)}</div><div className="ticket-comment-compose"><input value={comment} onChange={e=>setComment(e.target.value)} onKeyDown={e=>e.key==='Enter'&&void addComment()} placeholder="Ajouter une note…"/><button onClick={()=>void addComment()}><Send size={17}/></button></div>
+   </aside>}
+  </section>
+  {createOpen&&<div className="modal-backdrop" onMouseDown={()=>setCreateOpen(false)}><form className="modal ticket-modal" onSubmit={create} onMouseDown={e=>e.stopPropagation()}><div className="modal-header"><div><p className="eyebrow">Nouvelle demande</p><h2>Créer une intervention</h2></div><button type="button" className="icon-button" onClick={()=>setCreateOpen(false)}><X/></button></div><label className="field-label">Titre<input name="title" required placeholder="Ex. Climatisation en panne"/></label><label className="field-label">Description<textarea name="description" required placeholder="Décrivez précisément le problème…"/></label><div className="ticket-form-grid"><label className="field-label">Bâtiment<select name="building"><option>A</option><option>B</option><option>Zone commune</option></select></label><label className="field-label">Étage<input name="floor" placeholder="4"/></label><label className="field-label">Chambre<input name="room" placeholder="412"/></label><label className="field-label">Zone<input name="area" placeholder="Hall, bar, salle…"/></label><label className="field-label">État chambre<select name="roomState"><option>Libre</option><option>Occupée</option><option>Bloquée</option></select></label><label className="field-label">Priorité<select name="priority">{priorities.map(p=><option key={p}>{p}</option>)}</select></label><label className="field-label">Responsable<input name="assignee" defaultValue="Maintenance"/></label><label className="field-label">Échéance<input name="dueAt" type="datetime-local"/></label><label className="field-label">Photo avant<input name="beforePhoto" placeholder="URL de la photo"/></label></div><label className="maintenance-checkbox"><input type="checkbox" name="blocked"/>Bloquer immédiatement la chambre ou la zone</label><div className="modal-actions"><button type="button" className="secondary-button" onClick={()=>setCreateOpen(false)}>Annuler</button><button className="primary-button" type="submit">Créer l’intervention</button></div></form></div>}
+ </div>
 }
