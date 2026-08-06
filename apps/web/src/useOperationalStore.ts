@@ -15,13 +15,14 @@ export function useOperationalStore<T>(namespace: string, initialValue: T, refre
   const [state, setState] = useState<OperationalSyncState>('loading');
   const [message, setMessage] = useState('Connexion à PostgreSQL…');
 
-  const markSuccess = useCallback((payload: T, nextVersion: number, nextUpdatedAt: string, successMessage: string) => {
+  const markSuccess = useCallback((payload: T, nextVersion: number, successMessage: string) => {
     if (!mountedRef.current) return;
+    const successAt = new Date().toISOString();
     setData(payload);
     setVersion(nextVersion);
     versionRef.current = nextVersion;
-    setUpdatedAt(nextUpdatedAt || '');
-    setLastSuccessAt(new Date().toISOString());
+    setUpdatedAt(successAt);
+    setLastSuccessAt(successAt);
     setState('synced');
     setMessage(successMessage);
   }, []);
@@ -45,7 +46,7 @@ export function useOperationalStore<T>(namespace: string, initialValue: T, refre
         return false;
       }
 
-      markSuccess(result.payload, result.version, result.updatedAt, 'Données partagées à jour');
+      markSuccess(result.payload, result.version, 'Données partagées à jour');
       return true;
     } catch (error) {
       if (!mountedRef.current) return false;
@@ -66,7 +67,7 @@ export function useOperationalStore<T>(namespace: string, initialValue: T, refre
     try {
       const result = await saveSharedData<T>(namespace, next, versionRef.current);
       if (!mountedRef.current) return false;
-      markSuccess(result.payload, result.version, result.updatedAt, 'Enregistré pour tous les services');
+      markSuccess(result.payload, result.version, 'Enregistré pour tous les services');
       return true;
     } catch (error) {
       if (!mountedRef.current) return false;
