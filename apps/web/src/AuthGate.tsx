@@ -1,4 +1,5 @@
 import { FormEvent, ReactNode, useEffect, useState } from 'react';
+import { FunctionSheetNotice } from './FunctionSheetNotice';
 
 type Session = { token: string; user: { firstName: string; lastName: string; email: string; role: string } };
 
@@ -68,7 +69,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
     }
   }
 
-  if (session) return <>{children}</>;
+  if (session) return <><FunctionSheetNotice/>{children}</>;
   if (loading) return <div className="auth-loading">Ouverture de HospiCore…</div>;
 
   return <main className="auth-page">
