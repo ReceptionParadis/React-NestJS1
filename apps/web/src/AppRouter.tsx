@@ -6,6 +6,7 @@ import { CommercialHubPage } from './CommercialHubPage';
 import { DiagnosticPage } from './DiagnosticPage';
 import { GeneralInstructionsPage } from './GeneralInstructionsPage';
 import { GroupsPage } from './GroupsPage';
+import { HousekeepingDashboardPage } from './HousekeepingDashboardPage';
 import { InterserviceControlPage } from './InterserviceControlPage';
 import { InterservicePage } from './InterservicePage';
 import { MainCourante } from './MainCourante';
@@ -33,7 +34,7 @@ function CurrentPage(){
  if(path.startsWith('/planning-hebdomadaire'))return <WeeklyPlanningPage/>;
  if(path.startsWith('/reception'))return <ReceptionDailyPage/>;
  if(path.startsWith('/restaurant'))return <RestaurantPlanningPage/>;
- if(path.startsWith('/housekeeping'))return <InterservicePage department="housekeeping"/>;
+ if(path.startsWith('/housekeeping'))return <HousekeepingDashboardPage/>;
  if(path.startsWith('/cuisine'))return <InterservicePage department="cuisine"/>;
  if(path.startsWith('/main-courante'))return <MainCourante/>;
  if(path.startsWith('/salles-reunion'))return <MeetingRoomsPage/>;
