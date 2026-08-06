@@ -70,6 +70,7 @@ export function App(){
    <div className="brand"><div className="brand-mark">H</div><div><strong>HospiCore</strong><span>Hôtel Paradis · Lourdes</span></div><button className="sidebar-close" onClick={()=>setSidebarOpen(false)}><X size={20}/></button></div>
    <nav className="nav-list" aria-label="Navigation principale">
     <button data-nav="/" className="nav-item active" onClick={()=>window.location.assign('/')}><LayoutDashboard size={19}/><span>HospiCore Live</span></button>
+    <span aria-hidden="true" style={{display:'none'}} data-nav-spacer="true" />
     <button data-nav="/reception" className="nav-item reception-nav-item" onClick={()=>window.location.assign('/reception')}><ConciergeBell size={19}/><span>Réception</span></button>
     {nav.map(({label,icon:Icon,href})=><button key={href} data-nav={href} className="nav-item" onClick={()=>window.location.assign(href)}><Icon size={19}/><span>{label}</span></button>)}
    </nav>
