@@ -27,6 +27,7 @@ import './housekeeping-dashboard.css';
 import './operational-planning.css';
 import './reception-group-control.css';
 import './group-control-workflow.css';
+import './reception-control-uniform.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode><AppRouter /></React.StrictMode>,
