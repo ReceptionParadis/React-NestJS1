@@ -19,6 +19,7 @@ import './tasks.css';
 import './administration.css';
 import './diagnostic.css';
 import './hospicore-live.css';
+import './command-center.css';
 import './commercial-hub.css';
 import './function-sheet-notice.css';
 import './daily-group-board.css';
