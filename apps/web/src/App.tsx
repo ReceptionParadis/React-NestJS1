@@ -17,8 +17,6 @@ type MealEvent={id:string;time:string;label:string;group:string;pax:number};
 type NavItem={label:string;icon:typeof LayoutDashboard;href:string};
 
 const nav:NavItem[]=[
- {label:'HospiCore Live',icon:LayoutDashboard,href:'/'},
- {label:'Réception',icon:ConciergeBell,href:'/reception'},
  {label:'Restaurant',icon:UtensilsCrossed,href:'/restaurant'},
  {label:'Housekeeping',icon:BedDouble,href:'/housekeeping'},
  {label:'Cuisine',icon:ChefHat,href:'/cuisine'},
@@ -71,7 +69,9 @@ export function App(){
   <aside className={`sidebar${sidebarOpen?' open':''}`}>
    <div className="brand"><div className="brand-mark">H</div><div><strong>HospiCore</strong><span>Hôtel Paradis · Lourdes</span></div><button className="sidebar-close" onClick={()=>setSidebarOpen(false)}><X size={20}/></button></div>
    <nav className="nav-list" aria-label="Navigation principale">
-    {nav.map(({label,icon:Icon,href})=><button key={href} data-nav={href} className={`nav-item${href==='/'?' active':''}`} onClick={()=>{window.location.assign(href)}}><Icon size={19}/><span>{label}</span></button>)}
+    <button data-nav="/" className="nav-item active" onClick={()=>window.location.assign('/')}><LayoutDashboard size={19}/><span>HospiCore Live</span></button>
+    <button data-nav="/reception" className="nav-item reception-nav-item" onClick={()=>window.location.assign('/reception')}><ConciergeBell size={19}/><span>Réception</span></button>
+    {nav.map(({label,icon:Icon,href})=><button key={href} data-nav={href} className="nav-item" onClick={()=>window.location.assign(href)}><Icon size={19}/><span>{label}</span></button>)}
    </nav>
    <div className="demo-version"><Sparkles size={16}/><div><strong>HospiCore V2</strong><span>Exploitation interservices</span></div></div>
   </aside>
