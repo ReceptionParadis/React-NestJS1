@@ -1,16 +1,29 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { Dispatch, SetStateAction, useCallback, useEffect, useRef, useState } from 'react';
 import { loadSharedData, saveSharedData } from './operational-sync';
 
 export type OperationalSyncState = 'loading' | 'synced' | 'saving' | 'error' | 'conflict';
 
-export function useOperationalStore<T>(namespace: string, initialValue: T, refreshMs = 30000) {
+export type OperationalStore<T> = {
+  data: T;
+  setData: Dispatch<SetStateAction<T>>;
+  version: number;
+  updatedAt: string;
+  lastSuccessAt: string;
+  state: OperationalSyncState;
+  rawState: OperationalSyncState;
+  rawMessage: string;
+  message: string;
+  refresh: (silent?: boolean) => Promise<boolean>;
+  save: (next: T) => Promise<boolean>;
+};
+
+export function useOperationalStore<T>(namespace: string, initialValue: T, refreshMs = 30000): OperationalStore<T> {
   const initialValueRef = useRef(initialValue);
   const [data, setData] = useState<T>(() => initialValueRef.current);
   const [version, setVersion] = useState(0);
   const versionRef = useRef(0);
   const refreshInFlightRef = useRef(false);
   const mountedRef = useRef(true);
-  const lastSuccessRef = useRef('');
   const [updatedAt, setUpdatedAt] = useState('');
   const [lastSuccessAt, setLastSuccessAt] = useState('');
   const [state, setState] = useState<OperationalSyncState>('loading');
@@ -19,7 +32,6 @@ export function useOperationalStore<T>(namespace: string, initialValue: T, refre
   const markSuccess = useCallback((payload: T, nextVersion: number, successMessage: string) => {
     if (!mountedRef.current) return;
     const successAt = new Date().toISOString();
-    lastSuccessRef.current = successAt;
     setData(payload);
     setVersion(nextVersion);
     versionRef.current = nextVersion;
@@ -29,7 +41,7 @@ export function useOperationalStore<T>(namespace: string, initialValue: T, refre
     setMessage(successMessage);
   }, []);
 
-  const refresh = useCallback(async (silent = false) => {
+  const refresh = useCallback(async (silent = false): Promise<boolean> => {
     if (refreshInFlightRef.current) return false;
     refreshInFlightRef.current = true;
 
@@ -60,7 +72,7 @@ export function useOperationalStore<T>(namespace: string, initialValue: T, refre
     }
   }, [markSuccess, namespace]);
 
-  const save = useCallback(async (next: T) => {
+  const save = useCallback(async (next: T): Promise<boolean> => {
     if (mountedRef.current) {
       setState('saving');
       setMessage('Enregistrement partagé…');
@@ -90,9 +102,6 @@ export function useOperationalStore<T>(namespace: string, initialValue: T, refre
     };
   }, [refresh, refreshMs]);
 
-  // The command center needs an operational status, not every transient read error.
-  // Keep the raw state for the Diagnostic screen, but only expose blocking states:
-  // initial loading, active saving, or a genuine write conflict.
   const publicState: OperationalSyncState = state === 'loading' && !lastSuccessAt
     ? 'loading'
     : state === 'saving'
