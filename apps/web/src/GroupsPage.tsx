@@ -1,85 +1,38 @@
-import { useMemo, useState } from 'react';
-import { ArrowLeft, Bus, CalendarDays, CheckCircle2, Clock3, CreditCard, FileSpreadsheet, Plus, Search, UsersRound, X } from 'lucide-react';
+import { FormEvent, useMemo, useState } from 'react';
+import { ArrowLeft, Bus, CalendarDays, CheckCircle2, Clock3, CreditCard, FileSpreadsheet, Plus, RefreshCw, Search, UsersRound, X } from 'lucide-react';
+import { useOperationalStore } from './useOperationalStore';
 
-type GroupStatus = 'Préparation' | 'Confirmé' | 'Action requise' | 'Présent';
-type PaymentStatus = 'Soldé' | 'Arrhes reçues' | 'En attente';
-type Group = {
-  id: number; name: string; agency: string; arrival: string; departure: string; pax: number; rooms: number;
-  status: GroupStatus; payment: PaymentStatus; rooming: boolean; arrivalTime: string; dinnerTime: string;
-  leader: string; phone: string; language: string; buses: number; parking: boolean; notes: string[];
-};
+type GroupStatus='Préparation'|'Confirmé'|'Arrivé'|'En séjour'|'Parti';
+type PaymentStatus='Soldé'|'Arrhes reçues'|'En attente';
+type ServiceState='À préparer'|'En cours'|'Validé';
+type Meal={enabled:boolean;time:string;pax:number;room:string;status:'Prévu'|'Installé'|'Servi'|'Terminé';notes:string};
+type Audit={id:string;action:string;actor:string;role:string;at:string};
+type Group={id:string;name:string;agency:string;arrival:string;departure:string;pax:number;rooms:number;status:GroupStatus;payment:PaymentStatus;rooming:boolean;arrivalTime:string;departureTime:string;leader:string;phone:string;language:string;buses:number;parking:boolean;mealPlan:string;breakfast:Meal;lunch:Meal;dinner:Meal;receptionState:ServiceState;restaurantState:ServiceState;housekeepingState:ServiceState;kitchenState:ServiceState;commercialState:ServiceState;receptionNotes:string;restaurantNotes:string;housekeepingNotes:string;kitchenNotes:string;commercialNotes:string;audit:Audit[]};
 
-const initialGroups: Group[] = [
-  { id: 1, name: 'Joe Walsh Tours', agency: 'JWT', arrival: '12/10/2026', departure: '16/10/2026', pax: 72, rooms: 38, status: 'Action requise', payment: 'En attente', rooming: true, arrivalTime: '16h30', dinnerTime: '19h15', leader: 'Nilo Melo', phone: '+353 87 000 0000', language: 'Anglais', buses: 2, parking: true, notes: ['Solde à relancer', 'Préparer 72 cartes'] },
-  { id: 2, name: 'Tangney', agency: 'Tangney Tours', arrival: '13/10/2026', departure: '15/10/2026', pax: 54, rooms: 28, status: 'Confirmé', payment: 'Soldé', rooming: true, arrivalTime: '16h00', dinnerTime: '19h00', leader: 'Anne Murphy', phone: '+44 7700 000000', language: 'Anglais', buses: 1, parking: true, notes: ['Chambres 5e et 6e étages'] },
-  { id: 3, name: 'ORP', agency: 'ORP Voyages', arrival: '15/10/2026', departure: '18/10/2026', pax: 96, rooms: 50, status: 'Préparation', payment: 'Arrhes reçues', rooming: false, arrivalTime: '18h30', dinnerTime: '19h30', leader: 'Maria Rossi', phone: '+39 333 000 0000', language: 'Italien', buses: 2, parking: true, notes: ['Rooming list manquante'] },
-  { id: 4, name: 'Unitalsi', agency: 'Unitalsi', arrival: '18/10/2026', departure: '22/10/2026', pax: 118, rooms: 61, status: 'Présent', payment: 'Soldé', rooming: true, arrivalTime: '14h45', dinnerTime: '18h45', leader: 'Paolo Bianchi', phone: '+39 334 000 0000', language: 'Italien', buses: 3, parking: true, notes: ['12 chambres PMR'] },
-];
+const emptyMeal:Meal={enabled:false,time:'',pax:0,room:'Restaurant',status:'Prévu',notes:''};
+const initial:Group[]=[];
+function sessionUser(){try{const s=JSON.parse(localStorage.getItem('hospicore.session')||'{}');const u=s.user||{};return{name:`${u.firstName||'Utilisateur'} ${u.lastName||'HospiCore'}`.trim(),role:u.role||'Collaborateur'}}catch{return{name:'Utilisateur HospiCore',role:'Collaborateur'}}}
+function stamp(){return new Date().toLocaleString('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit'})}
 
-export function GroupsPage() {
-  const [groups, setGroups] = useState(initialGroups);
-  const [selectedId, setSelectedId] = useState(1);
-  const [search, setSearch] = useState('');
-  const [status, setStatus] = useState<'Tous' | GroupStatus>('Tous');
-  const [isCreateOpen, setCreateOpen] = useState(false);
-  const selected = groups.find((group) => group.id === selectedId) ?? groups[0];
-
-  const filtered = useMemo(() => groups.filter((group) => {
-    const query = search.trim().toLowerCase();
-    return (status === 'Tous' || group.status === status) && (!query || `${group.name} ${group.agency} ${group.leader}`.toLowerCase().includes(query));
-  }), [groups, search, status]);
-
-  function updateSelected(update: Partial<Group>) {
-    setGroups((current) => current.map((group) => group.id === selected.id ? { ...group, ...update } : group));
-  }
-
-  return <div className="groups-page">
-    <header className="module-header">
-      <a className="back-link" href="/"><ArrowLeft size={18}/> Tableau de bord</a>
-      <div><p className="eyebrow">Commercial & opérations</p><h1>Groupes</h1><p>Suivi des séjours, rooming lists, paiements et arrivées.</p></div>
-      <button className="primary-button" type="button" onClick={() => setCreateOpen(true)}><Plus size={17}/> Nouveau groupe</button>
-    </header>
-
-    <section className="groups-kpis">
-      <article><UsersRound/><div><strong>{groups.length}</strong><span>Groupes suivis</span></div></article>
-      <article><CalendarDays/><div><strong>{groups.reduce((sum, group) => sum + group.pax, 0)}</strong><span>Personnes</span></div></article>
-      <article><FileSpreadsheet/><div><strong>{groups.filter((group) => !group.rooming).length}</strong><span>Rooming list manquante</span></div></article>
-      <article><CreditCard/><div><strong>{groups.filter((group) => group.payment === 'En attente').length}</strong><span>Paiement en attente</span></div></article>
-    </section>
-
-    <section className="groups-toolbar">
-      <label className="search-box"><Search size={18}/><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Rechercher un groupe…"/></label>
-      <div className="filter-chips">{(['Tous','Préparation','Confirmé','Action requise','Présent'] as const).map((item) => <button key={item} className={`filter-chip${status === item ? ' active' : ''}`} onClick={() => setStatus(item)}>{item}</button>)}</div>
-    </section>
-
-    <section className="groups-layout">
-      <div className="groups-table panel">
-        <div className="groups-row groups-head"><span>Groupe</span><span>Séjour</span><span>Pax</span><span>Paiement</span><span>Rooming</span><span>Statut</span></div>
-        {filtered.map((group) => <button type="button" key={group.id} className={`groups-row${selected.id === group.id ? ' selected' : ''}`} onClick={() => setSelectedId(group.id)}>
-          <span><strong>{group.name}</strong><small>{group.agency}</small></span>
-          <span>{group.arrival}<small>→ {group.departure}</small></span>
-          <span><strong>{group.pax}</strong><small>{group.rooms} ch.</small></span>
-          <span className={`group-pill ${group.payment === 'Soldé' ? 'success' : group.payment === 'En attente' ? 'danger' : 'warning'}`}>{group.payment}</span>
-          <span>{group.rooming ? '✅ Reçue' : '❌ Manquante'}</span>
-          <span className={`group-pill ${group.status === 'Confirmé' || group.status === 'Présent' ? 'success' : group.status === 'Action requise' ? 'danger' : 'warning'}`}>{group.status}</span>
-        </button>)}
-      </div>
-
-      <aside className="group-detail panel">
-        <div className="detail-heading"><div><p className="eyebrow">Fiche groupe</p><h2>{selected.name}</h2><span>{selected.agency}</span></div><span className="group-code">GRP-{String(selected.id).padStart(4,'0')}</span></div>
-        <div className="group-summary"><div><UsersRound/><strong>{selected.pax} pax</strong><span>{selected.rooms} chambres</span></div><div><Bus/><strong>{selected.buses} bus</strong><span>{selected.parking ? 'Parking réservé' : 'À réserver'}</span></div></div>
-        <div className="group-fields">
-          <label>Statut<select value={selected.status} onChange={(event) => updateSelected({ status: event.target.value as GroupStatus })}><option>Préparation</option><option>Confirmé</option><option>Action requise</option><option>Présent</option></select></label>
-          <label>Paiement<select value={selected.payment} onChange={(event) => updateSelected({ payment: event.target.value as PaymentStatus })}><option>Soldé</option><option>Arrhes reçues</option><option>En attente</option></select></label>
-          <label>Heure d’arrivée<input value={selected.arrivalTime} onChange={(event) => updateSelected({ arrivalTime: event.target.value })}/></label>
-          <label>Dîner<input value={selected.dinnerTime} onChange={(event) => updateSelected({ dinnerTime: event.target.value })}/></label>
-        </div>
-        <div className="group-contact"><h3>Tour leader</h3><strong>{selected.leader}</strong><span>{selected.phone}</span><span>{selected.language}</span></div>
-        <div className="group-checklist"><h3>Préparation</h3><button onClick={() => updateSelected({ rooming: !selected.rooming })}>{selected.rooming ? <CheckCircle2/> : <Clock3/>}<span>Rooming list</span><strong>{selected.rooming ? 'Reçue' : 'Manquante'}</strong></button><button><CheckCircle2/><span>Parking bus</span><strong>{selected.parking ? 'Réservé' : 'À faire'}</strong></button><button><Clock3/><span>Cartes de chambres</span><strong>À préparer</strong></button></div>
-        <div className="group-notes"><h3>Points d’attention</h3>{selected.notes.map((note) => <p key={note}>• {note}</p>)}</div>
-      </aside>
-    </section>
-
-    {isCreateOpen && <div className="modal-backdrop" onMouseDown={() => setCreateOpen(false)}><section className="modal" onMouseDown={(event) => event.stopPropagation()}><div className="modal-header"><div><p className="eyebrow">Groupes</p><h2>Nouveau groupe</h2></div><button className="icon-button" onClick={() => setCreateOpen(false)}><X size={19}/></button></div><p className="empty-state">Le formulaire complet sera relié à l’API lors du branchement des données réelles.</p><div className="modal-actions"><button className="secondary-button" onClick={() => setCreateOpen(false)}>Fermer</button></div></section></div>}
-  </div>;
+export function GroupsPage(){
+ const store=useOperationalStore<Group[]>('group-360',initial);
+ const groups=store.data;const [selectedId,setSelectedId]=useState('');const [search,setSearch]=useState('');const [status,setStatus]=useState<'Tous'|GroupStatus>('Tous');const [createOpen,setCreateOpen]=useState(false);
+ const selected=groups.find(g=>g.id===selectedId)||groups[0];
+ const filtered=useMemo(()=>groups.filter(g=>(status==='Tous'||g.status===status)&&`${g.name} ${g.agency} ${g.leader}`.toLowerCase().includes(search.toLowerCase())),[groups,search,status]);
+ async function patch(update:Partial<Group>,action:string){if(!selected)return;const u=sessionUser();const next=groups.map(g=>g.id===selected.id?{...g,...update,audit:[...g.audit,{id:crypto.randomUUID(),action,actor:u.name,role:u.role,at:stamp()}]}:g);await store.save(next)}
+ async function create(e:FormEvent<HTMLFormElement>){e.preventDefault();const f=new FormData(e.currentTarget),u=sessionUser(),pax=Number(f.get('pax')||0);const g:Group={id:crypto.randomUUID(),name:String(f.get('name')||''),agency:String(f.get('agency')||''),arrival:String(f.get('arrival')||''),departure:String(f.get('departure')||''),pax,rooms:Number(f.get('rooms')||0),status:'Préparation',payment:'En attente',rooming:false,arrivalTime:String(f.get('arrivalTime')||''),departureTime:String(f.get('departureTime')||''),leader:String(f.get('leader')||''),phone:String(f.get('phone')||''),language:String(f.get('language')||''),buses:Number(f.get('buses')||0),parking:false,mealPlan:String(f.get('mealPlan')||'BB'),breakfast:{...emptyMeal,enabled:true,pax,time:'07:30'},lunch:{...emptyMeal,pax},dinner:{...emptyMeal,enabled:String(f.get('mealPlan'))!=='BB',pax,time:'19:00'},receptionState:'À préparer',restaurantState:'À préparer',housekeepingState:'À préparer',kitchenState:'À préparer',commercialState:'En cours',receptionNotes:'',restaurantNotes:'',housekeepingNotes:'',kitchenNotes:'',commercialNotes:'',audit:[{id:crypto.randomUUID(),action:'Fiche Groupe 360° créée',actor:u.name,role:u.role,at:stamp()}]};const ok=await store.save([g,...groups]);if(ok){setSelectedId(g.id);setCreateOpen(false)}}
+ if(store.state==='loading'&&!groups.length)return <div className="groups-page"><p>Chargement des groupes partagés…</p></div>;
+ return <div className="groups-page">
+  <header className="module-header"><a className="back-link" href="/"><ArrowLeft size={18}/>Tableau de bord</a><div><p className="eyebrow">Commercial & opérations</p><h1>Fiches Groupe 360°</h1><p>Une source unique partagée entre tous les services.</p></div><button className="primary-button" onClick={()=>setCreateOpen(true)}><Plus size={17}/>Nouveau groupe</button></header>
+  <div className={`sync-banner ${store.state}`}><span>{store.message}{store.updatedAt&&` · ${new Date(store.updatedAt).toLocaleString('fr-FR')}`}</span><button onClick={()=>void store.refresh()}><RefreshCw size={15}/>Actualiser</button></div>
+  <section className="groups-kpis"><article><UsersRound/><div><strong>{groups.length}</strong><span>Groupes suivis</span></div></article><article><CalendarDays/><div><strong>{groups.reduce((s,g)=>s+g.pax,0)}</strong><span>Personnes</span></div></article><article><FileSpreadsheet/><div><strong>{groups.filter(g=>!g.rooming).length}</strong><span>Rooming lists manquantes</span></div></article><article><CreditCard/><div><strong>{groups.filter(g=>g.payment==='En attente').length}</strong><span>Paiements en attente</span></div></article></section>
+  <section className="groups-toolbar"><label className="search-box"><Search size={18}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Rechercher un groupe…"/></label><div className="filter-chips">{(['Tous','Préparation','Confirmé','Arrivé','En séjour','Parti'] as const).map(v=><button key={v} className={`filter-chip${status===v?' active':''}`} onClick={()=>setStatus(v)}>{v}</button>)}</div></section>
+  <section className="groups-layout"><div className="groups-table panel"><div className="groups-row groups-head"><span>Groupe</span><span>Séjour</span><span>Pax</span><span>Paiement</span><span>Rooming</span><span>Statut</span></div>{filtered.map(g=><button key={g.id} className={`groups-row${selected?.id===g.id?' selected':''}`} onClick={()=>setSelectedId(g.id)}><span><strong>{g.name}</strong><small>{g.agency}</small></span><span>{g.arrival}<small>→ {g.departure}</small></span><span><strong>{g.pax}</strong><small>{g.rooms} ch.</small></span><span className={`group-pill ${g.payment==='Soldé'?'success':g.payment==='En attente'?'danger':'warning'}`}>{g.payment}</span><span>{g.rooming?'✅ Reçue':'❌ Manquante'}</span><span className="group-pill success">{g.status}</span></button>)}</div>
+  {selected?<aside className="group-detail panel"><div className="detail-heading"><div><p className="eyebrow">Fiche Groupe 360°</p><h2>{selected.name}</h2><span>{selected.agency}</span></div><span className="group-code">{selected.id.slice(0,8).toUpperCase()}</span></div><div className="group-summary"><div><UsersRound/><strong>{selected.pax} pax</strong><span>{selected.rooms} chambres</span></div><div><Bus/><strong>{selected.buses} bus</strong><span>{selected.parking?'Parking réservé':'À réserver'}</span></div></div>
+  <div className="group-fields"><label>Statut<select value={selected.status} onChange={e=>void patch({status:e.target.value as GroupStatus},`Statut groupe : ${e.target.value}`)}><option>Préparation</option><option>Confirmé</option><option>Arrivé</option><option>En séjour</option><option>Parti</option></select></label><label>Paiement<select value={selected.payment} onChange={e=>void patch({payment:e.target.value as PaymentStatus},`Paiement : ${e.target.value}`)}><option>Soldé</option><option>Arrhes reçues</option><option>En attente</option></select></label><label>Arrivée<input value={selected.arrivalTime} onChange={e=>void patch({arrivalTime:e.target.value},'Heure d’arrivée modifiée')}/></label><label>Départ<input value={selected.departureTime} onChange={e=>void patch({departureTime:e.target.value},'Heure de départ modifiée')}/></label></div>
+  <div className="group-contact"><h3>Tour leader</h3><strong>{selected.leader||'Non renseigné'}</strong><span>{selected.phone}</span><span>{selected.language}</span></div>
+  <div className="group-checklist"><h3>État des services</h3>{(['reception','restaurant','housekeeping','kitchen','commercial'] as const).map(k=>{const labels={reception:'Réception',restaurant:'Restaurant',housekeeping:'Housekeeping',kitchen:'Cuisine',commercial:'Commercial'};const key=`${k}State` as keyof Group;return <button key={k} onClick={()=>void patch({[key]:(selected[key]==='Validé'?'À préparer':'Validé')} as Partial<Group>,`${labels[k]} : ${selected[key]==='Validé'?'À préparer':'Validé'}`)}>{selected[key]==='Validé'?<CheckCircle2/>:<Clock3/>}<span>{labels[k]}</span><strong>{String(selected[key])}</strong></button>})}<button onClick={()=>void patch({rooming:!selected.rooming},`Rooming list ${selected.rooming?'retirée':'reçue'}`)}>{selected.rooming?<CheckCircle2/>:<Clock3/>}<span>Rooming list</span><strong>{selected.rooming?'Reçue':'Manquante'}</strong></button></div>
+  <div className="group-notes"><h3>Repas prévus</h3>{[selected.breakfast,selected.lunch,selected.dinner].map((m,i)=><p key={i}>• {['Petit-déjeuner','Déjeuner','Dîner'][i]} : {m.enabled?`${m.time||'horaire à définir'} · ${m.pax} pax · ${m.status}`:'Non prévu'}</p>)}</div><details><summary>Historique signé</summary>{selected.audit.slice().reverse().map(a=><p key={a.id}><strong>{a.action}</strong><br/><small>{a.actor} · {a.role} · {a.at}</small></p>)}</details></aside>:<aside className="group-detail panel"><p>Aucun groupe enregistré.</p></aside>}</section>
+  {createOpen&&<div className="modal-backdrop" onMouseDown={()=>setCreateOpen(false)}><form className="modal" onSubmit={e=>void create(e)} onMouseDown={e=>e.stopPropagation()}><div className="modal-header"><div><p className="eyebrow">Groupe 360°</p><h2>Nouveau groupe</h2></div><button type="button" className="icon-button" onClick={()=>setCreateOpen(false)}><X size={19}/></button></div><label>Nom du groupe<input name="name" required/></label><label>Agence<input name="agency"/></label><label>Arrivée<input name="arrival" type="date" required/></label><label>Départ<input name="departure" type="date" required/></label><label>Pax<input name="pax" type="number" min="1" required/></label><label>Chambres<input name="rooms" type="number" min="1" required/></label><label>Heure d’arrivée<input name="arrivalTime" type="time"/></label><label>Heure de départ<input name="departureTime" type="time"/></label><label>Tour leader<input name="leader"/></label><label>Téléphone<input name="phone"/></label><label>Langue<input name="language"/></label><label>Bus<input name="buses" type="number" min="0" defaultValue="1"/></label><label>Formule<select name="mealPlan"><option>BB</option><option>HB</option><option>FB</option></select></label><div className="modal-actions"><button type="button" className="secondary-button" onClick={()=>setCreateOpen(false)}>Annuler</button><button className="primary-button" type="submit">Créer et partager</button></div></form></div>}
+ </div>;
 }
