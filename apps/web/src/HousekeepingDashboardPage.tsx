@@ -1,51 +1,92 @@
 import { useMemo, useState } from 'react';
-import { ArrowLeft, BedDouble, Building2, CheckCircle2, ChevronLeft, ChevronRight, Clock3, Plus, Save, ShieldCheck, Sparkles, Trash2, UsersRound } from 'lucide-react';
+import { ArrowLeft, BedDouble, CheckCircle2, ChevronLeft, ChevronRight, Plus, Save, Trash2, UsersRound, X } from 'lucide-react';
 import { useOperationalStore } from './useOperationalStore';
 
-type HKStatus='En attente'|'En préparation'|'Chambres prêtes'|'Contrôle'|'Groupe prêt';
-type StayoverStatus='Non commencée'|'En cours'|'Recouche complète'|'Recouche partielle'|'Contrôle terminé';
 type ExceptionReason='Refus service'|'Ne pas déranger';
 type ExceptionRoom={room:string;reason:ExceptionReason};
 type Audit={id:string;action:string;actor:string;role:string;at:string};
-type Group={id:string;name?:string;pax?:number;rooms?:number;arrival?:string;departure?:string;arrivalTime?:string;departureTime?:string;status?:string;housekeepingType?:string;housekeepingArrivalStatus?:HKStatus;housekeepingDepartureStatus?:HKStatus;stayoverStatus?:StayoverStatus;stayoverExceptions?:ExceptionRoom[];audit?:Audit[]};
-type Sector={id:string;building:'A'|'B';floor:number;total:number;done:number;manager:string;status:'En attente'|'En cours'|'Terminé';updatedBy?:string;updatedAt?:string};
+type Group={
+ id:string;name?:string;pax?:number;rooms?:number;arrival?:string;departure?:string;
+ arrivalTime?:string;departureTime?:string;status?:string;housekeepingType?:string;
+ housekeepingArrivalStatus?:string;stayoverStatus?:string;stayoverExceptions?:ExceptionRoom[];audit?:Audit[]
+};
 type SessionUser={name:string;role:string};
 
 const iso=(d:Date)=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-const addDays=(v:string,n:number)=>{const d=new Date(`${v}T12:00:00`);d.setDate(d.getDate()+n);return iso(d)};
-const label=(v:string)=>new Date(`${v}T12:00:00`).toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+const addDays=(value:string,days:number)=>{const d=new Date(`${value}T12:00:00`);d.setDate(d.getDate()+days);return iso(d)};
+const label=(value:string)=>new Date(`${value}T12:00:00`).toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
 const stamp=()=>new Date().toLocaleString('fr-FR');
 function currentUser():SessionUser{try{const s=JSON.parse(localStorage.getItem('hospicore.session')||'{}'),u=s.user||{};return{name:`${u.firstName||'Utilisateur'} ${u.lastName||'HospiCore'}`.trim(),role:String(u.role?.name||u.role||u.department?.name||u.department||'Housekeeping')}}catch{return{name:'Utilisateur HospiCore',role:'Housekeeping'}}}
-const defaultSectors:Sector[]=[...Array.from({length:7},(_,i)=>({id:`A-${i+2}`,building:'A' as const,floor:i+2,total:0,done:0,manager:'',status:'En attente' as const})),...Array.from({length:9},(_,i)=>({id:`B-${i+1}`,building:'B' as const,floor:i+1,total:0,done:0,manager:'',status:'En attente' as const}))];
-const arrivalSteps:HKStatus[]=['En attente','En préparation','Chambres prêtes','Contrôle','Groupe prêt'];
-const staySteps:StayoverStatus[]=['Non commencée','En cours','Recouche complète','Recouche partielle','Contrôle terminé'];
 
 export function HousekeepingDashboardPage(){
- const groupsStore=useOperationalStore<Group[]>('group-360',[]),sectorStore=useOperationalStore<Sector[]>('housekeeping-sectors',defaultSectors);
- const [date,setDate]=useState(iso(new Date()));const [editing,setEditing]=useState<Group|null>(null);const [draftExceptions,setDraftExceptions]=useState<ExceptionRoom[]>([]);const user=currentUser();
+ const groupsStore=useOperationalStore<Group[]>('group-360',[]);
+ const [date,setDate]=useState(iso(new Date()));
+ const [editing,setEditing]=useState<Group|null>(null);
+ const [draftExceptions,setDraftExceptions]=useState<ExceptionRoom[]>([]);
+ const user=currentUser();
  const groups=groupsStore.data;
- const arrivals=useMemo(()=>groups.filter(g=>g.arrival===date).sort((a,b)=>(a.arrivalTime||'99:99').localeCompare(b.arrivalTime||'99:99')),[groups,date]);
- const departures=useMemo(()=>groups.filter(g=>g.departure===date).sort((a,b)=>(a.departureTime||'99:99').localeCompare(b.departureTime||'99:99')),[groups,date]);
- const stayovers=useMemo(()=>groups.filter(g=>String(g.arrival)<date&&String(g.departure)>date),[groups,date]);
- const sectors=sectorStore.data.length?sectorStore.data:defaultSectors;
- const total=sectors.reduce((s,x)=>s+x.total,0),done=sectors.reduce((s,x)=>s+Math.min(x.done,x.total),0),progress=total?Math.round(done/total*100):0;
- const early=arrivals.filter(g=>(g.arrivalTime||'99:99')<'16:00'),late=departures.filter(g=>(g.departureTime||'00:00')>'09:00');
- async function saveGroup(next:Group,action:string){const audit=[...(next.audit||[]),{id:crypto.randomUUID(),action,actor:user.name,role:user.role,at:stamp()}];const saved={...next,audit};await groupsStore.save(groups.map(g=>g.id===saved.id?saved:g));setEditing(saved)}
- async function setArrivalStatus(g:Group,status:HKStatus){await saveGroup({...g,housekeepingArrivalStatus:status},`Housekeeping arrivée : ${status}`)}
- async function setDepartureStatus(g:Group,status:HKStatus){await saveGroup({...g,housekeepingDepartureStatus:status},`Housekeeping départ : ${status}`)}
- async function setStayStatus(g:Group,status:StayoverStatus){const patch=status==='Recouche partielle'?{stayoverStatus:status,stayoverExceptions:draftExceptions}:{stayoverStatus:status,stayoverExceptions:status==='Recouche complète'?[]:g.stayoverExceptions};await saveGroup({...g,...patch},`Housekeeping recouche : ${status}`)}
- async function updateSector(id:string,patch:Partial<Sector>){const next=sectors.map(s=>s.id===id?{...s,...patch,done:Math.min(Number(patch.done??s.done),Number(patch.total??s.total)),updatedBy:user.name,updatedAt:new Date().toISOString()}:s);await sectorStore.save(next)}
- function openGroup(g:Group){setEditing(g);setDraftExceptions(g.stayoverExceptions||[])}
- const workflow=(g:Group,type:'arrival'|'departure')=>{const current=type==='arrival'?(g.housekeepingArrivalStatus||'En attente'):(g.housekeepingDepartureStatus||'En attente');return <div className="hk-workflow">{arrivalSteps.map(step=><button key={step} className={current===step?'active':''} onClick={()=>void(type==='arrival'?setArrivalStatus(g,step):setDepartureStatus(g,step))}>{step==='Groupe prêt'&&<CheckCircle2 size={14}/>} {step}</button>)}</div>};
- return <div className="hk-page">
-  <header className="hk-header"><div><a href="/"><ArrowLeft size={18}/>Dashboard</a><p>HospiCore · Housekeeping V2</p><h1><BedDouble/>Pilotage Housekeeping</h1><span>Arrivées, départs, recouches et progression par étage.</span></div><div className="hk-date-nav"><button onClick={()=>setDate(addDays(date,-1))}><ChevronLeft/></button><strong>{label(date)}</strong><button onClick={()=>setDate(addDays(date,1))}><ChevronRight/></button><button onClick={()=>setDate(iso(new Date()))}>Aujourd’hui</button></div></header>
-  <section className="hk-kpis"><article><Sparkles/><span>Progression globale</span><strong>{progress}%</strong><small>{done}/{total||0} chambres terminées</small></article><article><Clock3/><span>Early check-in</span><strong>{early.length}</strong><small>arrivée(s) avant 16h</small></article><article><Clock3/><span>Late check-out</span><strong>{late.length}</strong><small>départ(s) après 9h</small></article><article><UsersRound/><span>Groupes en séjour</span><strong>{stayovers.length}</strong><small>recouches à suivre</small></article></section>
-  <section className="hk-sectors"><SectorBlock title="Bâtiment A · Étages 2 à 8" building="A" sectors={sectors} updateSector={updateSector}/><SectorBlock title="Bâtiment B · Étages 1 à 9" building="B" sectors={sectors} updateSector={updateSector}/></section>
-  <section className="hk-columns"><div><h2>Arrivées <b>{arrivals.length}</b></h2>{arrivals.map(g=><article className="hk-group-card" key={g.id}><header><div><strong>{g.name}</strong><span>{g.rooms||0} chambres · {g.pax||0} pax</span></div><time>{g.arrivalTime||'À confirmer'}</time></header><p className={(g.arrivalTime||'99:99')<'16:00'?'hk-alert':''}>{(g.arrivalTime||'99:99')<'16:00'?`Early check-in · ${g.arrivalTime}`:'Arrivée standard'} · {g.housekeepingType||'Standard'}</p>{workflow(g,'arrival')}<button className="hk-open" onClick={()=>openGroup(g)}>Voir le suivi</button></article>)}</div>
-  <div><h2>Départs <b>{departures.length}</b></h2>{departures.map(g=><article className="hk-group-card" key={g.id}><header><div><strong>{g.name}</strong><span>{g.rooms||0} chambres · {g.pax||0} pax</span></div><time>{g.departureTime||'À confirmer'}</time></header><p className={(g.departureTime||'00:00')>'09:00'?'hk-alert':''}>{(g.departureTime||'00:00')>'09:00'?`Late check-out · ${g.departureTime}`:'Départ standard'}</p>{workflow(g,'departure')}<button className="hk-open" onClick={()=>openGroup(g)}>Voir le suivi</button></article>)}</div>
-  <div><h2>Recouches <b>{stayovers.length}</b></h2>{stayovers.map(g=><article className="hk-group-card" key={g.id}><header><div><strong>{g.name}</strong><span>{g.rooms||0} chambres · {g.pax||0} pax</span></div><span className="hk-pill">{g.stayoverStatus||'Non commencée'}</span></header><div className="hk-workflow stay">{staySteps.map(step=><button key={step} className={(g.stayoverStatus||'Non commencée')===step?'active':''} onClick={()=>{openGroup(g);if(step!=='Recouche partielle')void setStayStatus(g,step)}}>{step}</button>)}</div>{g.stayoverExceptions?.length?<ul>{g.stayoverExceptions.map(x=><li key={`${x.room}-${x.reason}`}>Ch. {x.room} · {x.reason}</li>)}</ul>:null}<button className="hk-open" onClick={()=>openGroup(g)}>Gérer la recouche</button></article>)}</div></section>
-  {editing&&<div className="hk-modal-backdrop" onMouseDown={()=>setEditing(null)}><div className="hk-modal" onMouseDown={e=>e.stopPropagation()}><header><div><p>Suivi Housekeeping</p><h2>{editing.name}</h2></div><button onClick={()=>setEditing(null)}>×</button></header><div className="hk-summary"><span><b>Arrivée</b>{editing.arrivalTime||'—'}</span><span><b>Départ</b>{editing.departureTime||'—'}</span><span><b>Prestation</b>{editing.housekeepingType||'Standard'}</span><span><b>Chambres</b>{editing.rooms||0}</span></div>{String(editing.arrival)<date&&String(editing.departure)>date&&<section><h3>Recouche partielle</h3><p>Ajoutez les chambres non faites et leur motif.</p><div className="hk-exceptions">{draftExceptions.map((x,i)=><div key={i}><input placeholder="Chambre" value={x.room} onChange={e=>setDraftExceptions(draftExceptions.map((v,j)=>j===i?{...v,room:e.target.value}:v))}/><select value={x.reason} onChange={e=>setDraftExceptions(draftExceptions.map((v,j)=>j===i?{...v,reason:e.target.value as ExceptionReason}:v))}><option>Refus service</option><option>Ne pas déranger</option></select><button onClick={()=>setDraftExceptions(draftExceptions.filter((_,j)=>j!==i))}><Trash2 size={15}/></button></div>)}</div><button className="hk-add" onClick={()=>setDraftExceptions([...draftExceptions,{room:'',reason:'Ne pas déranger'}])}><Plus size={16}/>Ajouter une chambre</button><button className="hk-save" disabled={!draftExceptions.length||draftExceptions.some(x=>!x.room.trim())} onClick={()=>void setStayStatus(editing,'Recouche partielle')}><Save size={16}/>Enregistrer la recouche partielle</button><button className="hk-complete" onClick={()=>void setStayStatus(editing,'Recouche complète')}><ShieldCheck size={16}/>Recouche complète</button></section>}</div></div>}
+
+ const arrivals=useMemo(()=>groups.filter(g=>g.arrival===date&&g.status!=='Parti').sort((a,b)=>(a.arrivalTime||'99:99').localeCompare(b.arrivalTime||'99:99')),[groups,date]);
+ const stayovers=useMemo(()=>groups.filter(g=>String(g.arrival)<date&&String(g.departure)>date&&['Arrivé','En séjour','IN_HOUSE'].includes(g.status||'')),[groups,date]);
+
+ async function saveGroup(next:Group,action:string){
+  const audit=[...(next.audit||[]),{id:crypto.randomUUID(),action,actor:user.name,role:user.role,at:stamp()}];
+  const saved={...next,audit};
+  const ok=await groupsStore.save(groups.map(g=>g.id===saved.id?saved:g));
+  if(ok)setEditing(saved);
+ }
+ async function markReady(group:Group){await saveGroup({...group,housekeepingArrivalStatus:'Chambres prêtes à donner'},'Housekeeping : chambres prêtes à donner')}
+ async function markStayoverComplete(group:Group){await saveGroup({...group,stayoverStatus:'Recouche OK',stayoverExceptions:[]},'Housekeeping : recouche OK')}
+ async function savePartial(){
+  if(!editing||!draftExceptions.length||draftExceptions.some(item=>!item.room.trim()))return;
+  await saveGroup({...editing,stayoverStatus:'Recouche partielle',stayoverExceptions:draftExceptions.map(item=>({...item,room:item.room.trim()}))},'Housekeeping : recouche partielle');
+  setEditing(null);
+ }
+ function openPartial(group:Group){setEditing(group);setDraftExceptions(group.stayoverExceptions||[{room:'',reason:'Ne pas déranger'}])}
+
+ return <div className="hk-page hk-simple-page">
+  <header className="hk-header">
+   <div><a href="/"><ArrowLeft size={18}/>Dashboard</a><p>HospiCore · Housekeeping</p><h1><BedDouble/>Suivi des groupes</h1><span>Indiquez uniquement si les chambres sont prêtes ou si la recouche est complète ou partielle.</span></div>
+   <div className="hk-date-nav"><button onClick={()=>setDate(addDays(date,-1))}><ChevronLeft/></button><strong>{label(date)}</strong><button onClick={()=>setDate(addDays(date,1))}><ChevronRight/></button><button onClick={()=>setDate(iso(new Date()))}>Aujourd’hui</button></div>
+  </header>
+
+  <section className="hk-simple-summary">
+   <article><span>Arrivées</span><strong>{arrivals.length}</strong></article>
+   <article><span>Recouches</span><strong>{stayovers.length}</strong></article>
+   <article><span>Groupes traités</span><strong>{[...arrivals,...stayovers].filter(g=>g.housekeepingArrivalStatus==='Chambres prêtes à donner'||['Recouche OK','Recouche partielle'].includes(g.stayoverStatus||'')).length}</strong></article>
+  </section>
+
+  <section className="hk-simple-columns">
+   <div><h2>Groupes en arrivée <b>{arrivals.length}</b></h2>
+    {arrivals.length?arrivals.map(group=>{
+     const ready=group.housekeepingArrivalStatus==='Chambres prêtes à donner';
+     return <article className={`hk-simple-card${ready?' done':''}`} key={group.id}>
+      <header><div><strong>{group.name||'Groupe sans nom'}</strong><span><UsersRound size={14}/>{group.pax||0} pax · {group.rooms||0} chambres</span></div><time>{group.arrivalTime||'À confirmer'}</time></header>
+      <p>{group.housekeepingType||'Prestation standard'}</p>
+      {ready?<div className="hk-success"><CheckCircle2 size={18}/>Chambres prêtes à donner</div>:<button className="hk-primary-action" onClick={()=>void markReady(group)}><CheckCircle2 size={18}/>Marquer chambres prêtes à donner</button>}
+     </article>
+    }):<p className="hk-empty">Aucun groupe en arrivée.</p>}
+   </div>
+
+   <div><h2>Groupes en recouche <b>{stayovers.length}</b></h2>
+    {stayovers.length?stayovers.map(group=>{
+     const complete=group.stayoverStatus==='Recouche OK';
+     const partial=group.stayoverStatus==='Recouche partielle';
+     return <article className={`hk-simple-card${complete?' done':partial?' partial':''}`} key={group.id}>
+      <header><div><strong>{group.name||'Groupe sans nom'}</strong><span><UsersRound size={14}/>{group.pax||0} pax · {group.rooms||0} chambres</span></div><span className="hk-pill">{group.stayoverStatus||'À traiter'}</span></header>
+      {partial&&group.stayoverExceptions?.length?<ul>{group.stayoverExceptions.map(item=><li key={`${item.room}-${item.reason}`}>Chambre {item.room} · {item.reason}</li>)}</ul>:null}
+      <div className="hk-card-actions"><button className="hk-complete-action" onClick={()=>void markStayoverComplete(group)}><CheckCircle2 size={17}/>Recouche OK</button><button className="hk-partial-action" onClick={()=>openPartial(group)}>Recouche partielle</button></div>
+     </article>
+    }):<p className="hk-empty">Aucun groupe en recouche.</p>}
+   </div>
+  </section>
+
+  {editing&&<div className="hk-modal-backdrop" onMouseDown={()=>setEditing(null)}><div className="hk-modal hk-partial-modal" onMouseDown={event=>event.stopPropagation()}>
+   <header><div><p>Recouche partielle</p><h2>{editing.name}</h2></div><button onClick={()=>setEditing(null)}><X/></button></header>
+   <p>Renseignez uniquement les chambres qui n’ont pas été faites.</p>
+   <div className="hk-exceptions">{draftExceptions.map((item,index)=><div key={index}><input inputMode="numeric" placeholder="N° de chambre" value={item.room} onChange={event=>setDraftExceptions(draftExceptions.map((value,i)=>i===index?{...value,room:event.target.value}:value))}/><select value={item.reason} onChange={event=>setDraftExceptions(draftExceptions.map((value,i)=>i===index?{...value,reason:event.target.value as ExceptionReason}:value))}><option>Refus service</option><option>Ne pas déranger</option></select><button aria-label="Supprimer" onClick={()=>setDraftExceptions(draftExceptions.filter((_,i)=>i!==index))}><Trash2 size={16}/></button></div>)}</div>
+   <button className="hk-add" onClick={()=>setDraftExceptions([...draftExceptions,{room:'',reason:'Ne pas déranger'}])}><Plus size={16}/>Ajouter une chambre</button>
+   <button className="hk-save" disabled={!draftExceptions.length||draftExceptions.some(item=>!item.room.trim())} onClick={()=>void savePartial()}><Save size={16}/>Enregistrer la recouche partielle</button>
+  </div></div>}
  </div>
 }
-
-function SectorBlock({title,building,sectors,updateSector}:{title:string;building:'A'|'B';sectors:Sector[];updateSector:(id:string,patch:Partial<Sector>)=>Promise<void>}){return <article className="hk-sector-block"><h2><Building2/>{title}</h2><div>{sectors.filter(s=>s.building===building).map(s=>{const pct=s.total?Math.round(Math.min(s.done,s.total)/s.total*100):0;return <section key={s.id}><header><strong>{s.floor}{s.floor===1?'er':'e'} étage</strong><span>{pct}%</span></header><div className="hk-progress"><i style={{width:`${pct}%`}}/></div><div className="hk-sector-fields"><label>Terminées<input type="number" min="0" value={s.done} onChange={e=>void updateSector(s.id,{done:Number(e.target.value),status:Number(e.target.value)>=s.total&&s.total>0?'Terminé':Number(e.target.value)>0?'En cours':'En attente'})}/></label><label>Total<input type="number" min="0" value={s.total} onChange={e=>void updateSector(s.id,{total:Number(e.target.value)})}/></label><label>Responsable<input value={s.manager} placeholder="Nom" onChange={e=>void updateSector(s.id,{manager:e.target.value})}/></label></div></section>})}</div></article>}
