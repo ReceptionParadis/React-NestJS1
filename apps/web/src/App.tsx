@@ -14,8 +14,9 @@ type Group={id:string;name?:string;pax?:number;arrival?:string;departure?:string
 type Booking={id:string;groupId?:string;title:string;room:string;date:string;start:string;end:string;attendees:number;status?:string};
 type Sheet={status?:string;lines?:Array<{groupId:string}>};
 type MealEvent={id:string;time:string;label:string;group:string;pax:number};
+type NavItem={label:string;icon:typeof LayoutDashboard;href:string};
 
-const nav=[
+const nav:NavItem[]=[
  {label:'HospiCore Live',icon:LayoutDashboard,href:'/'},
  {label:'Réception',icon:ConciergeBell,href:'/reception'},
  {label:'Restaurant',icon:UtensilsCrossed,href:'/restaurant'},
@@ -69,7 +70,9 @@ export function App(){
  return <div className="app-shell executive-shell">
   <aside className={`sidebar${sidebarOpen?' open':''}`}>
    <div className="brand"><div className="brand-mark">H</div><div><strong>HospiCore</strong><span>Hôtel Paradis · Lourdes</span></div><button className="sidebar-close" onClick={()=>setSidebarOpen(false)}><X size={20}/></button></div>
-   <nav className="nav-list">{nav.map(({label,icon:Icon,href})=><button key={label} className={`nav-item${href==='/'?' active':''}`} onClick={()=>location.href=href}><Icon size={19}/>{label}</button>)}</nav>
+   <nav className="nav-list" aria-label="Navigation principale">
+    {nav.map(({label,icon:Icon,href})=><button key={href} data-nav={href} className={`nav-item${href==='/'?' active':''}`} onClick={()=>{window.location.assign(href)}}><Icon size={19}/><span>{label}</span></button>)}
+   </nav>
    <div className="demo-version"><Sparkles size={16}/><div><strong>HospiCore V2</strong><span>Exploitation interservices</span></div></div>
   </aside>
   <main className="live-v2-main">
