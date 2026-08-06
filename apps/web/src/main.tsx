@@ -5,6 +5,7 @@ import './styles.css';
 import './executive-dashboard.css';
 import './shift-log.css';
 import './tickets.css';
+import './maintenance-v2.css';
 import './groups.css';
 import './rooming-import.css';
 import './auth.css';
@@ -26,7 +27,6 @@ import './reception-group-control.css';
 import './group-control-workflow.css';
 import './reception-control-uniform.css';
 import './group-control-print-fix.css';
-import './command-center.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode><AppRouter /></React.StrictMode>,
