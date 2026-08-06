@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle, BedDouble, Bell, BookOpenCheck, BriefcaseBusiness, CalendarDays, ChefHat, ChevronRight,
   ClipboardList, ConciergeBell, History, LayoutDashboard, ListTodo, Menu, Package, RefreshCw, Settings,
-  Sparkles, UtensilsCrossed, Wrench, X,
+  Sparkles, UsersRound, UtensilsCrossed, Wrench, X,
 } from 'lucide-react';
 import { loadSharedData } from './operational-sync';
 
@@ -14,6 +14,7 @@ type Group = { id?: string; name?: string; pax?: number; arrivalDate?: string; d
 
 const nav = [
   { label: 'HospiCore Live', icon: LayoutDashboard, href: '/', active: true },
+  { label: 'Groupes 360°', icon: UsersRound, href: '/groupes' },
   { label: 'Tâches', icon: ListTodo, href: '/taches' },
   { label: 'Journal d’exploitation', icon: History, href: '/journal-exploitation' },
   { label: 'Centre des opérations', icon: BookOpenCheck, href: '/centre-operations' },
@@ -138,7 +139,7 @@ export function App() {
         {error && <div className="live-v2-error"><AlertTriangle size={17}/> {error}</div>}
 
         <section className="live-v2-kpis">
-          <button className="live-v2-kpi" onClick={() => navigate('/groupes')}><span className="icon"><ConciergeBell/></span><span>Arrivées aujourd’hui</span><strong>{todayArrivals.length}</strong><small>{todayArrivals.reduce((sum, group) => sum + (group.pax || 0), 0)} personnes attendues</small></button>
+          <button className="live-v2-kpi" onClick={() => navigate('/groupes')}><span className="icon"><UsersRound/></span><span>Groupes 360°</span><strong>{groups.length}</strong><small>{todayArrivals.length} arrivée(s) aujourd’hui</small></button>
           <button className="live-v2-kpi" onClick={() => navigate('/taches')}><span className="icon"><ListTodo/></span><span>Tâches ouvertes</span><strong>{openTasks.length}</strong><small>{criticalTasks.length} prioritaire(s)</small></button>
           <button className="live-v2-kpi" onClick={() => navigate('/consignes-generales')}><span className="icon"><ClipboardList/></span><span>Consignes ouvertes</span><strong>{openInstructions.length}</strong><small>Partagées entre les services</small></button>
           <button className="live-v2-kpi" onClick={() => navigate('/centre-operations')}><span className="icon"><Package/></span><span>Prêts en cours</span><strong>{activeLoans.length}</strong><small>{overdueLoans.length} retour(s) dépassé(s)</small></button>
