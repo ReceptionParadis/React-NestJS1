@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import {
   BedDouble, BookOpenCheck, BriefcaseBusiness, CalendarDays, ChefHat, ClipboardList,
   ConciergeBell, History, LayoutDashboard, ListTodo, Menu, RefreshCw, Settings,
-  Sparkles, UsersRound, UtensilsCrossed, Wrench, X,
+  Sparkles, Stethoscope, UtensilsCrossed, Wrench, X,
 } from 'lucide-react';
 import { DailyGroupBoard } from './DailyGroupBoard';
 import { useOperationalStore } from './useOperationalStore';
@@ -13,7 +13,6 @@ type MealDay={date:string;breakfast?:MealCell;lunch?:MealCell;packedLunch?:MealC
 type Group={id:string;name?:string;pax?:number;arrival?:string;departure?:string;status?:string;mealDays?:MealDay[]};
 type Booking={id:string;groupId?:string;title:string;room:string;date:string;start:string;end:string;attendees:number;status?:string};
 type Sheet={status?:string;lines?:Array<{groupId:string}>};
-
 type MealEvent={id:string;time:string;label:string;group:string;pax:number};
 
 const nav=[
@@ -29,6 +28,7 @@ const nav=[
  {label:'Journal',icon:History,href:'/journal-exploitation'},
  {label:'Centre des opérations',icon:BookOpenCheck,href:'/centre-operations'},
  {label:'Tickets',icon:Wrench,href:'/tickets'},
+ {label:'Diagnostic',icon:Stethoscope,href:'/diagnostic'},
  {label:'Administration',icon:Settings,href:'/administration'},
 ];
 
@@ -61,7 +61,10 @@ export function App(){
   });
   return events.sort((a,b)=>(a.time==='À confirmer'?'99:99':a.time).localeCompare(b.time==='À confirmer'?'99:99':b.time));
  },[groups,date]);
- const loading=[groupsStore.state,roomsStore.state,sheetsStore.state].some(state=>state==='loading'||state==='saving');
+ const stores=[groupsStore,roomsStore,sheetsStore];
+ const loading=stores.some(store=>store.state==='loading'||store.state==='saving');
+ const syncError=stores.find(store=>store.state==='error'||store.state==='conflict');
+ const syncLabel=loading?'Synchronisation…':syncError?(syncError.state==='conflict'?'Conflit de données':'Synchronisation en erreur'):'PostgreSQL à jour';
  const refresh=()=>{void groupsStore.refresh();void roomsStore.refresh();void sheetsStore.refresh()};
  return <div className="app-shell executive-shell">
   <aside className={`sidebar${sidebarOpen?' open':''}`}>
@@ -70,8 +73,9 @@ export function App(){
    <div className="demo-version"><Sparkles size={16}/><div><strong>HospiCore V2</strong><span>Exploitation interservices</span></div></div>
   </aside>
   <main className="live-v2-main">
-   <header className="live-v2-topbar"><div className="live-v2-title"><button className="live-v2-menu" onClick={()=>setSidebarOpen(true)}><Menu size={22}/></button><div><h1>HospiCore Live</h1><p>{session.user?.hotel?.name||'Hôtel Paradis'} · vue commune des services</p></div></div><div className="live-v2-user"><button className={`live-v2-sync${loading?' loading':''}`} onClick={refresh}><RefreshCw size={15}/>{loading?'Synchronisation…':'Données à jour'}</button><div className="live-v2-avatar" title={userName}>{initials}</div></div></header>
+   <header className="live-v2-topbar"><div className="live-v2-title"><button className="live-v2-menu" onClick={()=>setSidebarOpen(true)}><Menu size={22}/></button><div><h1>HospiCore Live</h1><p>{session.user?.hotel?.name||'Hôtel Paradis'} · vue commune des services</p></div></div><div className="live-v2-user"><button className={`live-v2-sync${loading?' loading':''}${syncError?' error':''}`} title={syncError?.message||'Actualiser les données'} onClick={refresh}><RefreshCw size={15}/>{syncLabel}</button><div className="live-v2-avatar" title={userName}>{initials}</div></div></header>
    <div className="live-v2-content operational-home">
+    {syncError&&<button className="live-v2-error" onClick={()=>location.href='/diagnostic'}>La synchronisation PostgreSQL rencontre un problème : {syncError.message} · Ouvrir le diagnostic</button>}
     <section className="operational-home-heading"><div><p>Vue du jour</p><h2>{dateLabel(date)}</h2><span>Arrivées, départs, salles et restauration en un seul écran.</span></div><div><strong>{new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}</strong><small>{userName}</small></div></section>
     <DailyGroupBoard compact/>
     <section className="operational-home-grid">
