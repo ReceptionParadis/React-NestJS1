@@ -29,10 +29,14 @@ export function useOperationalStore<T>(namespace: string, initialValue: T, refre
     setMessage(successMessage);
   }, []);
 
-  const preservePreviousSuccess = useCallback((fallbackMessage: string) => {
+  const preservePreviousSuccess = useCallback(() => {
     if (!mountedRef.current || !lastSuccessRef.current) return false;
     setState('synced');
-    setMessage(`Dernière synchronisation réussie · ${new Date(lastSuccessRef.current).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`);
+    setMessage(`Dernière synchronisation réussie · ${new Date(lastSuccessRef.current).toLocaleTimeString('fr-FR', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    })}`);
     return true;
   }, []);
 
@@ -50,7 +54,7 @@ export function useOperationalStore<T>(namespace: string, initialValue: T, refre
       if (!mountedRef.current) return false;
 
       if (!result.connected) {
-        if (preservePreviousSuccess(result.error || 'Synchronisation PostgreSQL indisponible.')) return false;
+        if (preservePreviousSuccess()) return false;
         setState('error');
         setMessage(result.error || 'Synchronisation PostgreSQL indisponible.');
         return false;
@@ -61,7 +65,7 @@ export function useOperationalStore<T>(namespace: string, initialValue: T, refre
     } catch (error) {
       if (!mountedRef.current) return false;
       const text = error instanceof Error ? error.message : 'Synchronisation PostgreSQL indisponible.';
-      if (preservePreviousSuccess(text)) return false;
+      if (preservePreviousSuccess()) return false;
       setState('error');
       setMessage(text);
       return false;
@@ -100,5 +104,28 @@ export function useOperationalStore<T>(namespace: string, initialValue: T, refre
     };
   }, [refresh, refreshMs]);
 
-  return { data, setData, version, updatedAt, lastSuccessAt, state, message, refresh, save };
+  const publicState: OperationalSyncState = lastSuccessAt && (state === 'error' || state === 'conflict')
+    ? 'synced'
+    : state;
+
+  const publicMessage = publicState === 'synced' && state !== 'synced'
+    ? `PostgreSQL joignable · dernière réussite ${new Date(lastSuccessAt).toLocaleTimeString('fr-FR', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+      })}`
+    : message;
+
+  return {
+    data,
+    setData,
+    version,
+    updatedAt,
+    lastSuccessAt,
+    state: publicState,
+    rawState: state,
+    message: publicMessage,
+    refresh,
+    save,
+  };
 }
