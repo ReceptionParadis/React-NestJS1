@@ -43,13 +43,10 @@ body[data-hospicore-role='maintenance'] .command-grid.lower {
   grid-template-columns: minmax(0, 1fr);
 }
 
-/* Sidebar permissions — hiding is paired with route protection in AppRouter.tsx. */
+/* Sidebar visibility. Diagnostic and Administration are intentionally NOT hidden for Reception here;
+   their real access is enforced by the centralized permission matrix and AppRouter. */
 html[data-hospicore-role='reception'] .nav-list [data-nav='/commercial'],
-html[data-hospicore-role='reception'] .nav-list [data-nav='/diagnostic'],
-html[data-hospicore-role='reception'] .nav-list [data-nav='/administration'],
-body[data-hospicore-role='reception'] .nav-list [data-nav='/commercial'],
-body[data-hospicore-role='reception'] .nav-list [data-nav='/diagnostic'],
-body[data-hospicore-role='reception'] .nav-list [data-nav='/administration'] {
+body[data-hospicore-role='reception'] .nav-list [data-nav='/commercial'] {
   display: none !important;
 }
 
