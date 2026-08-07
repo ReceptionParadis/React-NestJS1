@@ -1,6 +1,7 @@
 import { AlertTriangle, ArrowLeft, BellRing, CalendarDays, CheckCircle2, ChevronRight, ClipboardCheck, FileCheck2, ReceiptText, Send, UsersRound } from 'lucide-react';
 import { can, currentRole } from './permissions';
 import { useOperationalStore } from './useOperationalStore';
+import './commercial-hub.css';
 
 type Audit={id:string;action:string;actor:string;role:string;at:string};
 type GroupControl={locked?:boolean;printedBy?:string;printedAt?:string;totalPax?:number;taxableAdults?:number;commercialValidation?:'À valider'|'Validé';commercialValidatedBy?:string;commercialValidatedAt?:string};
