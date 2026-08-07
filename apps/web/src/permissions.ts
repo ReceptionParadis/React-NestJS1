@@ -32,7 +32,13 @@ function normalize(value: string) {
 export function roleFromValue(value: unknown): AppRole {
   const raw = normalize(String(typeof value === 'object' && value && 'name' in value ? (value as { name?: string }).name || '' : value || ''));
   if (raw.includes('direction') || raw.includes('directeur') || raw.includes('admin')) return 'direction';
-  if (raw.includes('chef de reception') || raw.includes('responsable reception') || raw.includes('front office manager')) return 'reception_manager';
+  if (
+    raw.includes('chef de reception') ||
+    raw.includes('chef reception') ||
+    raw.includes('responsable de reception') ||
+    raw.includes('responsable reception') ||
+    raw.includes('front office manager')
+  ) return 'reception_manager';
   if (raw.includes('maintenance') || raw.includes('technique') || raw.includes('technicien')) return 'maintenance';
   if (raw.includes('commercial') || raw.includes('vente')) return 'commercial';
   if (raw.includes('reception') || raw.includes('front')) return 'reception';
@@ -67,6 +73,7 @@ const matrix: Record<AppRole, ReadonlySet<Capability>> = {
     'dashboard.view','reception.view','reception.operate','group-control.create',
     'maintenance.view','maintenance.create','planning.view','meeting-rooms.view','meeting-rooms.edit',
     'tasks.view','tasks.edit','instructions.view','operations-center.view','operations-center.edit','journal.view',
+    'diagnostic.view','administration.view',
   ]),
   commercial: new Set<Capability>([
     'dashboard.view','commercial.view','commercial.edit','commercial.validate-control','group-control.unlock',
