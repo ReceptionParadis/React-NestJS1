@@ -1,6 +1,5 @@
 /* Role-aware simplification of the HospiCore command center.
-   Shared operational awareness stays visible to every profile:
-   arrivals/departures, meeting rooms, KPIs and forecast. */
+   Navigation visibility is handled exclusively by permissions.ts + AppRouter. */
 
 /* Commercial: group controls + meeting rooms. Maintenance detail is not part of the commercial workflow. */
 html[data-hospicore-role='commercial'] .command-grid.secondary .command-maintenance,
@@ -41,41 +40,6 @@ body[data-hospicore-role='reception'] .command-grid.lower,
 body[data-hospicore-role='commercial'] .command-grid.lower,
 body[data-hospicore-role='maintenance'] .command-grid.lower {
   grid-template-columns: minmax(0, 1fr);
-}
-
-/* Sidebar visibility. Diagnostic and Administration are intentionally NOT hidden for Reception here;
-   their real access is enforced by the centralized permission matrix and AppRouter. */
-html[data-hospicore-role='reception'] .nav-list [data-nav='/commercial'],
-body[data-hospicore-role='reception'] .nav-list [data-nav='/commercial'] {
-  display: none !important;
-}
-
-html[data-hospicore-role='commercial'] .nav-list [data-nav='/reception'],
-html[data-hospicore-role='commercial'] .nav-list [data-nav='/journal-exploitation'],
-html[data-hospicore-role='commercial'] .nav-list [data-nav='/centre-operations'],
-html[data-hospicore-role='commercial'] .nav-list [data-nav='/diagnostic'],
-html[data-hospicore-role='commercial'] .nav-list [data-nav='/administration'],
-body[data-hospicore-role='commercial'] .nav-list [data-nav='/reception'],
-body[data-hospicore-role='commercial'] .nav-list [data-nav='/journal-exploitation'],
-body[data-hospicore-role='commercial'] .nav-list [data-nav='/centre-operations'],
-body[data-hospicore-role='commercial'] .nav-list [data-nav='/diagnostic'],
-body[data-hospicore-role='commercial'] .nav-list [data-nav='/administration'] {
-  display: none !important;
-}
-
-html[data-hospicore-role='maintenance'] .nav-list [data-nav='/reception'],
-html[data-hospicore-role='maintenance'] .nav-list [data-nav='/commercial'],
-html[data-hospicore-role='maintenance'] .nav-list [data-nav='/journal-exploitation'],
-html[data-hospicore-role='maintenance'] .nav-list [data-nav='/centre-operations'],
-html[data-hospicore-role='maintenance'] .nav-list [data-nav='/diagnostic'],
-html[data-hospicore-role='maintenance'] .nav-list [data-nav='/administration'],
-body[data-hospicore-role='maintenance'] .nav-list [data-nav='/reception'],
-body[data-hospicore-role='maintenance'] .nav-list [data-nav='/commercial'],
-body[data-hospicore-role='maintenance'] .nav-list [data-nav='/journal-exploitation'],
-body[data-hospicore-role='maintenance'] .nav-list [data-nav='/centre-operations'],
-body[data-hospicore-role='maintenance'] .nav-list [data-nav='/diagnostic'],
-body[data-hospicore-role='maintenance'] .nav-list [data-nav='/administration'] {
-  display: none !important;
 }
 
 @media (max-width: 760px) {
