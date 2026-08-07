@@ -17,7 +17,8 @@ type MaintenanceStatus='À traiter'|'En cours'|'En attente de pièce'|'Terminée
 type MaintenancePriority='Basse'|'Normale'|'Haute'|'Urgente';
 type MaintenanceIntervention={id:string;reference?:string;title:string;status:MaintenanceStatus;priority:MaintenancePriority;building?:string;floor?:string;room?:string;zone?:string;assignee?:string;blocked?:boolean;returnedToServiceAt?:string;createdAt?:string;dueAt?:string};
 type NavItem={label:string;icon:typeof LayoutDashboard;href:string};
-type ActionItem={id:string;label:string;detail:string;href:string;level:'urgent'|'warning'|'info'|'done'};
+type ActionCategory='reception'|'commercial'|'maintenance'|'shared';
+type ActionItem={id:string;label:string;detail:string;href:string;level:'urgent'|'warning'|'info'|'done';category:ActionCategory};
 
 const nav:NavItem[]=[
  {label:'Commercial',icon:BriefcaseBusiness,href:'/commercial'},
@@ -43,11 +44,19 @@ function checklist(group:Group){
  return{payment,keys,control,complete:payment&&keys&&control};
 }
 function roleName(session:Session){return String(typeof session.user?.role==='object'?session.user?.role?.name:session.user?.role||'Utilisateur')}
+function normalizedRole(session:Session){return roleName(session).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase()}
 function maintenanceLocation(item:MaintenanceIntervention){return item.room?`Chambre ${item.room}`:[item.building,item.floor,item.zone].filter(Boolean).join(' · ')||'Zone à préciser'}
 function isStaleSync(updatedAt:string,maxAgeMs=120000){
  if(!updatedAt)return true;
  const timestamp=Date.parse(updatedAt);
  return !Number.isFinite(timestamp)||Date.now()-timestamp>maxAgeMs;
+}
+function allowedActionCategories(role:string):Set<ActionCategory>{
+ if(role.includes('direction')||role.includes('directeur')||role.includes('admin'))return new Set(['reception','commercial','maintenance','shared']);
+ if(role.includes('maintenance')||role.includes('technique'))return new Set(['maintenance','shared']);
+ if(role.includes('commercial')||role.includes('vente'))return new Set(['commercial','shared']);
+ if(role.includes('reception')||role.includes('chef de reception')||role.includes('front'))return new Set(['reception','shared']);
+ return new Set(['shared']);
 }
 
 export function App(){
@@ -57,6 +66,8 @@ export function App(){
  const sheetsStore=useOperationalStore<Sheet[]>('function-sheets',[]);
  const maintenanceStore=useOperationalStore<MaintenanceIntervention[]>('maintenance-interventions',[]);
  const session=readSession(),today=isoDate(new Date());
+ const currentRole=normalizedRole(session);
+ const actionCategories=allowedActionCategories(currentRole);
  const userName=`${session.user?.firstName||'Utilisateur'} ${session.user?.lastName||''}`.trim();
  const initials=`${session.user?.firstName?.[0]||'H'}${session.user?.lastName?.[0]||'C'}`.toUpperCase();
  const publishedIds=useMemo(()=>new Set(sheetsStore.data.filter(s=>['Prête à imprimer','Diffusée','Clôturée'].includes(s.status||'')).flatMap(s=>s.lines?.map(l=>l.groupId)||[])),[sheetsStore.data]);
@@ -76,13 +87,13 @@ export function App(){
  const maintenancePreview=[...maintenanceUrgent,...maintenanceBlocked.filter(i=>!maintenanceUrgent.some(u=>u.id===i.id)),...maintenanceActive.filter(i=>!maintenanceUrgent.some(u=>u.id===i.id)&&!maintenanceBlocked.some(b=>b.id===i.id))].slice(0,5);
  const audit=useMemo(()=>groups.flatMap(g=>(g.audit||[]).map(a=>({...a,group:g.name||'Groupe'}))).sort((a,b)=>b.at.localeCompare(a.at,'fr')).slice(0,20),[groups]);
  const actions=useMemo<ActionItem[]>(()=>[
-  ...blockedDepartures.map(g=>({id:`dep-${g.id}`,label:`Départ bloqué · ${g.name||'Groupe'}`,detail:'Solde, clés ou contrôle à compléter',href:'/reception',level:'urgent' as const})),
-  ...maintenanceUrgent.map(i=>({id:`maint-${i.id}`,label:`Maintenance urgente · ${i.title}`,detail:`${maintenanceLocation(i)}${i.assignee?` · ${i.assignee}`:''}`,href:'/tickets',level:'urgent' as const})),
-  ...maintenanceBlocked.map(i=>({id:`block-${i.id}`,label:`Chambre ou zone bloquée · ${maintenanceLocation(i)}`,detail:i.title,href:'/tickets',level:'warning' as const})),
-  ...controlsToDo.map(g=>({id:`ctl-${g.id}`,label:`Contrôle Groupe · ${g.name||'Groupe'}`,detail:'À réaliser par la Réception',href:'/reception',level:'warning' as const})),
-  ...controlsCommercial.map(g=>({id:`com-${g.id}`,label:`Validation commerciale · ${g.name||'Groupe'}`,detail:'Contrôle prêt à valider',href:'/commercial',level:'warning' as const})),
-  ...todayRooms.map(r=>({id:`room-${r.id}`,label:`${r.room} · ${r.title}`,detail:`${r.start}–${r.end} · ${r.attendees} pers.`,href:'/salles-reunion',level:'info' as const})),
- ].slice(0,12),[blockedDepartures,maintenanceUrgent,maintenanceBlocked,controlsToDo,controlsCommercial,todayRooms]);
+  ...blockedDepartures.map(g=>({id:`dep-${g.id}`,label:`Départ bloqué · ${g.name||'Groupe'}`,detail:'Solde, clés ou contrôle à compléter',href:'/reception',level:'urgent' as const,category:'reception' as const})),
+  ...maintenanceUrgent.map(i=>({id:`maint-${i.id}`,label:`Maintenance urgente · ${i.title}`,detail:`${maintenanceLocation(i)}${i.assignee?` · ${i.assignee}`:''}`,href:'/tickets',level:'urgent' as const,category:'maintenance' as const})),
+  ...maintenanceBlocked.map(i=>({id:`block-${i.id}`,label:`Chambre ou zone bloquée · ${maintenanceLocation(i)}`,detail:i.title,href:'/tickets',level:'warning' as const,category:'maintenance' as const})),
+  ...controlsToDo.map(g=>({id:`ctl-${g.id}`,label:`Contrôle Groupe · ${g.name||'Groupe'}`,detail:'À réaliser par la Réception',href:'/reception',level:'warning' as const,category:'reception' as const})),
+  ...controlsCommercial.map(g=>({id:`com-${g.id}`,label:`Validation commerciale · ${g.name||'Groupe'}`,detail:'Contrôle prêt à valider',href:'/commercial',level:'warning' as const,category:'commercial' as const})),
+  ...todayRooms.map(r=>({id:`room-${r.id}`,label:`${r.room} · ${r.title}`,detail:`${r.start}–${r.end} · ${r.attendees} pers.`,href:'/salles-reunion',level:'info' as const,category:'shared' as const})),
+ ].filter(item=>actionCategories.has(item.category)).slice(0,12),[blockedDepartures,maintenanceUrgent,maintenanceBlocked,controlsToDo,controlsCommercial,todayRooms,currentRole]);
  const forecast=[0,1,2].map(offset=>{const date=addDays(today,offset);const a=groups.filter(g=>g.arrival===date).length;const d=groups.filter(g=>g.departure===date).length;const p=groups.filter(g=>String(g.arrival)<=date&&String(g.departure)>=date&&g.status!=='Parti').length;const c=groups.filter(g=>g.arrival===date).length;const m=roomsStore.data.filter(r=>r.date===date).length;const score=a*3+d*2+m*2;return{date,a,d,p,c,m,level:score>=18?'Critique':score>=10?'Élevée':score>=5?'Modérée':'Faible'}});
  const stores=[groupsStore,roomsStore,sheetsStore,maintenanceStore];
  const loading=stores.some(s=>s.state==='loading'||s.state==='saving');
@@ -121,7 +132,7 @@ export function App(){
     </section>
 
     <section className="command-grid primary">
-     <article className="command-panel command-actions"><header><div><p>Boîte de réception opérationnelle</p><h2><Bell size={20}/>Actions prioritaires</h2></div><b>{actions.length}</b></header><div>{actions.length?actions.map(item=><button key={item.id} className={item.level} onClick={()=>location.href=item.href}><span className="command-action-dot"/><div><strong>{item.label}</strong><small>{item.detail}</small></div><ChevronRight size={18}/></button>):<p className="command-empty"><CheckCircle2 size={20}/>Aucune action prioritaire.</p>}</div></article>
+     <article className="command-panel command-actions"><header><div><p>Boîte de réception · {roleName(session)}</p><h2><Bell size={20}/>Actions prioritaires</h2></div><b>{actions.length}</b></header><div>{actions.length?actions.map(item=><button key={item.id} className={item.level} onClick={()=>location.href=item.href}><span className="command-action-dot"/><div><strong>{item.label}</strong><small>{item.detail}</small></div><ChevronRight size={18}/></button>):<p className="command-empty"><CheckCircle2 size={20}/>Aucune action prioritaire pour votre profil.</p>}</div></article>
      <article className="command-panel command-flow"><header><div><p>Réception</p><h2>Arrivées & départs</h2></div><button onClick={()=>location.href='/reception'}>Ouvrir</button></header><div className="command-flow-columns"><section><h3>Arrivées <b>{arrivals.length}</b></h3>{arrivals.map(g=><button key={g.id} onClick={()=>location.href='/reception'}><time>{g.arrivalTime||'—'}</time><div><strong>{g.name}</strong><span>{g.pax||0} pax · {g.status||'Préparation'}</span></div></button>)}{!arrivals.length&&<p>Aucune arrivée.</p>}</section><section><h3>Départs <b>{departures.length}</b></h3>{departures.map(g=>{const c=checklist(g);return <button key={g.id} className={c.complete?'ready':'blocked'} onClick={()=>location.href='/reception'}><time>{g.departureTime||'—'}</time><div><strong>{g.name}</strong><span>{c.complete?'Prêt au départ':'Étapes manquantes'}</span></div></button>})}{!departures.length&&<p>Aucun départ.</p>}</section></div></article>
     </section>
 
