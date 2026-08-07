@@ -17,7 +17,8 @@ type Audit = { id: string; action: string; actor: string; role: string; at: stri
 type Group = {
   id: string; name: string; agency: string; directAgency: string; dmc: string;
   arrival: string; departure: string; pax: number; rooms: number;
-  status: GroupStatus; paymentStatus: PaymentStatus; amountDue: number; debtor: string; rooming: boolean;
+  status: GroupStatus; paymentStatus: PaymentStatus; amountDue: number; debtor: string;
+  rooming: boolean; roomingReceivedAt: string; roomingReceivedBy: string;
   arrivalTime: string; departureTime: string; leaderFirstName: string; leaderLastName: string;
   leaderPhone: string; leaderEmail: string; language: string; buses: number; parking: boolean;
   stayType: StayType; breakfastType: BreakfastType; housekeepingType: RoomServiceType; dietary: string;
@@ -79,7 +80,8 @@ function normalize(value: Partial<Group> & { id: string }): Group {
   return {
     id: value.id, name: value.name || '', agency: directAgency, directAgency, dmc: value.dmc || '',
     arrival: value.arrival || '', departure: value.departure || '', pax: Number(value.pax || 0), rooms: Number(value.rooms || 0),
-    status: value.status || 'Préparation', paymentStatus: value.paymentStatus || 'Reste à payer', amountDue: Number(value.amountDue || 0), debtor: value.debtor || '', rooming: Boolean(value.rooming),
+    status: value.status || 'Préparation', paymentStatus: value.paymentStatus || 'Reste à payer', amountDue: Number(value.amountDue || 0), debtor: value.debtor || '',
+    rooming: Boolean(value.rooming), roomingReceivedAt: value.roomingReceivedAt || '', roomingReceivedBy: value.roomingReceivedBy || '',
     arrivalTime: value.arrivalTime || '', departureTime: value.departureTime || '', leaderFirstName: value.leaderFirstName || legacyName.shift() || '', leaderLastName: value.leaderLastName || legacyName.join(' '), leaderPhone: value.leaderPhone || legacy.phone || '', leaderEmail: value.leaderEmail || '', language: value.language || '', buses: Number(value.buses || 0), parking: Boolean(value.parking),
     stayType, breakfastType: value.breakfastType || 'Standard', housekeepingType: value.housekeepingType || 'Standard', dietary: value.dietary || '', luggageArrival: value.luggageArrival || '', luggageDeparture: value.luggageDeparture || '',
     mealDays: Array.isArray(value.mealDays) && value.mealDays.length ? value.mealDays : buildMealDays(value.arrival || '', value.departure || '', Number(value.pax || 0), stayType),
@@ -116,6 +118,16 @@ export function GroupsPage() {
   }
   async function patch(update: Partial<Group>, action: string, invalidate = canEditAll) {
     if (selected) await saveGroup({ ...selected, ...update }, action, invalidate);
+  }
+  async function updateRooming(received: boolean) {
+    if (!selected || !canEditAll) return;
+    const receivedAt = received ? stamp() : '';
+    const receivedBy = received ? user.name : '';
+    await saveGroup(
+      { ...selected, rooming: received, roomingReceivedAt: receivedAt, roomingReceivedBy: receivedBy },
+      received ? `Rooming List reçue · ${receivedAt}` : 'Rooming List repassée en statut Manquante',
+      false,
+    );
   }
   async function regenerate(update: Partial<Pick<Group, 'arrival' | 'departure' | 'pax' | 'stayType'>> = {}) {
     if (!selected || !canEditAll) return;
@@ -157,7 +169,7 @@ export function GroupsPage() {
     <div className={`sync-banner ${store.state}`}><span>{store.message}</span><button onClick={() => void store.refresh()}><RefreshCw size={15}/>Actualiser</button></div>
     <section className="groups-kpis"><article><UsersRound/><div><strong>{groups.length}</strong><span>Groupes suivis</span></div></article><article><CalendarDays/><div><strong>{groups.reduce((sum, group) => sum + group.pax, 0)}</strong><span>Personnes</span></div></article><article><FileSpreadsheet/><div><strong>{groups.filter(group => !group.rooming).length}</strong><span>Rooming lists manquantes</span></div></article><article><CreditCard/><div><strong>{groups.filter(group => group.paymentStatus === 'Reste à payer').length}</strong><span>Restes à payer</span></div></article></section>
     <section className="groups-toolbar"><label className="search-box"><Search size={18}/><input value={search} onChange={event => setSearch(event.target.value)} placeholder="Rechercher groupe, agence ou DMC…"/></label><div className="filter-chips">{(['Tous','Préparation','Confirmé','Arrivé','En séjour','Parti'] as const).map(value => <button key={value} className={`filter-chip${status === value ? ' active' : ''}`} onClick={() => setStatus(value)}>{value}</button>)}</div></section>
-    <section className="groups-layout"><div className="groups-table panel"><div className="groups-row groups-head"><span>Groupe</span><span>Séjour</span><span>Pax</span><span>Paiement</span><span>Rooming</span><span>Statut</span></div>{filtered.map(group => <button key={group.id} className={`groups-row${selected?.id === group.id ? ' selected' : ''}`} onClick={() => setSelectedId(group.id)}><span><strong>{group.name}</strong><small>{group.directAgency || 'Agence non renseignée'}{group.dmc ? ` · DMC ${group.dmc}` : ''}</small></span><span>{group.arrival}<small>→ {group.departure}</small></span><span><strong>{group.pax}</strong><small>{group.rooms} ch.</small></span><span className={`group-pill ${group.paymentStatus === 'Payé' ? 'success' : 'danger'}`}>{group.paymentStatus}</span><span>{group.rooming ? '✅ Reçue' : '❌ Manquante'}</span><span className="group-pill success">{group.status}</span></button>)}</div>
+    <section className="groups-layout"><div className="groups-table panel"><div className="groups-row groups-head"><span>Groupe</span><span>Séjour</span><span>Pax</span><span>Paiement</span><span>Rooming</span><span>Statut</span></div>{filtered.map(group => <button key={group.id} className={`groups-row${selected?.id === group.id ? ' selected' : ''}`} onClick={() => setSelectedId(group.id)}><span><strong>{group.name}</strong><small>{group.directAgency || 'Agence non renseignée'}{group.dmc ? ` · DMC ${group.dmc}` : ''}</small></span><span>{group.arrival}<small>→ {group.departure}</small></span><span><strong>{group.pax}</strong><small>{group.rooms} ch.</small></span><span className={`group-pill ${group.paymentStatus === 'Payé' ? 'success' : 'danger'}`}>{group.paymentStatus}</span><span>{group.rooming ? <><strong>✅ Reçue</strong><small>{group.roomingReceivedAt || 'Horodatage non disponible'}</small></> : '❌ Manquante'}</span><span className="group-pill success">{group.status}</span></button>)}</div>
     {selected ? <aside className="group-detail panel group-detail-wide">
       <div className="detail-heading"><div><p className="eyebrow">Fiche Groupe 360°</p><h2>{selected.name}</h2><span>{selected.directAgency || 'Agence non renseignée'}{selected.dmc ? ` · DMC ${selected.dmc}` : ''}</span></div><span className="group-code">{selected.id.slice(0,8).toUpperCase()}</span></div>
       <div className={`commercial-lock ${selected.commercialValidated ? 'validated' : 'draft'}`}><LockKeyhole size={18}/><div><strong>{selected.commercialValidated ? 'Fiche validée et verrouillée' : 'Brouillon Commercial — non importable'}</strong><small>{selected.commercialValidated ? `Validée par ${selected.validatedBy} · ${selected.validatedAt}` : 'Toute modification commerciale impose une nouvelle validation avant import dans la fiche de fonction.'}</small></div>{canEditAll && !selected.commercialValidated && <button onClick={() => void validateCommercial()}>Valider et verrouiller</button>}</div>
@@ -165,6 +177,7 @@ export function GroupsPage() {
       <div className="group-fields">
         <label>Agence directe<input disabled={!canEditAll} value={selected.directAgency} onChange={event => void patch({ directAgency: event.target.value, agency: event.target.value }, 'Agence directe modifiée')}/></label>
         <label>DMC<input disabled={!canEditAll} value={selected.dmc} onChange={event => void patch({ dmc: event.target.value }, 'DMC modifié')}/></label>
+        <label>Rooming List<select disabled={!canEditAll} value={selected.rooming ? 'Reçue' : 'Manquante'} onChange={event => void updateRooming(event.target.value === 'Reçue')}><option>Manquante</option><option>Reçue</option></select>{selected.rooming && <small>Reçue le {selected.roomingReceivedAt || '—'}{selected.roomingReceivedBy ? ` · ${selected.roomingReceivedBy}` : ''}</small>}</label>
         <label>Statut<select disabled={!canEditAll} value={selected.status} onChange={event => void patch({ status: event.target.value as GroupStatus }, `Statut : ${event.target.value}`)}><option>Préparation</option><option>Confirmé</option><option>Arrivé</option><option>En séjour</option><option>Parti</option></select></label>
         <label>Type de séjour<select disabled={!canEditAll} value={selected.stayType} onChange={event => void regenerate({ stayType: event.target.value as StayType })}><option>Logement</option><option>B&B</option><option>1/2 midi</option><option>1/2 Soir</option><option>Pension complète</option></select></label>
         <label>Type de PDJ<select disabled={!canEditAll} value={selected.breakfastType} onChange={event => void patch({ breakfastType: event.target.value as BreakfastType }, 'Type PDJ modifié')}><option>Standard</option><option>PDJ Chaud</option><option>Indiv</option></select></label>
