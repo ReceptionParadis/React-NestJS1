@@ -1,6 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { AppRouter } from './AppRouter';
+import { OperationalToastHost } from './OperationalToastHost';
 import './styles.css';
 import './executive-dashboard.css';
 import './shift-log.css';
@@ -31,5 +32,8 @@ import './reception-control-uniform.css';
 import './group-control-print-fix.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode><AppRouter /></React.StrictMode>,
+  <React.StrictMode>
+    <AppRouter />
+    <OperationalToastHost />
+  </React.StrictMode>,
 );
