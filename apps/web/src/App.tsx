@@ -4,6 +4,7 @@ import {
   ChevronRight, ClipboardCheck, ClipboardList, ConciergeBell, History, LayoutDashboard,
   ListTodo, Menu, RefreshCw, Settings, Sparkles, Stethoscope, Wrench, X,
 } from 'lucide-react';
+import { canAccessPath, roleFromValue } from './permissions';
 import { useOperationalStore } from './useOperationalStore';
 
 type Session={user?:{firstName?:string;lastName?:string;role?:string|{name?:string};hotel?:{name?:string}}};
@@ -12,7 +13,6 @@ type DepartureChecklist={paymentChoice?:'paid'|'debtor';paymentMethod?:string;de
 type GroupControl={validatedAt?:string;locked?:boolean;commercialValidation?:'À valider'|'Validé';commercialValidatedAt?:string};
 type Group={id:string;name?:string;pax?:number;rooms?:number;arrival?:string;departure?:string;arrivalTime?:string;departureTime?:string;status?:string;agency?:string;directAgency?:string;groupControl?:GroupControl;departureChecklist?:DepartureChecklist;audit?:Audit[]};
 type Booking={id:string;title:string;room:string;date:string;start:string;end:string;attendees:number;status?:string};
-type Sheet={status?:string;lines?:Array<{groupId:string}>};
 type MaintenanceStatus='À traiter'|'En cours'|'En attente de pièce'|'Terminée';
 type MaintenancePriority='Basse'|'Normale'|'Haute'|'Urgente';
 type MaintenanceIntervention={id:string;reference?:string;title:string;status:MaintenanceStatus;priority:MaintenancePriority;building?:string;floor?:string;room?:string;zone?:string;assignee?:string;blocked?:boolean;returnedToServiceAt?:string;createdAt?:string;dueAt?:string};
@@ -21,6 +21,8 @@ type ActionCategory='reception'|'commercial'|'maintenance'|'shared';
 type ActionItem={id:string;label:string;detail:string;href:string;level:'urgent'|'warning'|'info'|'done';category:ActionCategory};
 
 const nav:NavItem[]=[
+ {label:'Réception',icon:ConciergeBell,href:'/reception'},
+ {label:'Planning opérationnel',icon:CalendarDays,href:'/planning-operationnel'},
  {label:'Commercial',icon:BriefcaseBusiness,href:'/commercial'},
  {label:'Salles de réunion',icon:CalendarDays,href:'/salles-reunion'},
  {label:'Tâches',icon:ListTodo,href:'/taches'},
@@ -46,11 +48,7 @@ function checklist(group:Group){
 function roleName(session:Session){return String(typeof session.user?.role==='object'?session.user?.role?.name:session.user?.role||'Utilisateur')}
 function normalizedRole(session:Session){return roleName(session).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase()}
 function maintenanceLocation(item:MaintenanceIntervention){return item.room?`Chambre ${item.room}`:[item.building,item.floor,item.zone].filter(Boolean).join(' · ')||'Zone à préciser'}
-function isStaleSync(updatedAt:string,maxAgeMs=120000){
- if(!updatedAt)return true;
- const timestamp=Date.parse(updatedAt);
- return !Number.isFinite(timestamp)||Date.now()-timestamp>maxAgeMs;
-}
+function isStaleSync(updatedAt:string,maxAgeMs=120000){if(!updatedAt)return true;const timestamp=Date.parse(updatedAt);return !Number.isFinite(timestamp)||Date.now()-timestamp>maxAgeMs;}
 function allowedActionCategories(role:string):Set<ActionCategory>{
  if(role.includes('direction')||role.includes('directeur')||role.includes('admin'))return new Set(['reception','commercial','maintenance','shared']);
  if(role.includes('maintenance')||role.includes('technique'))return new Set(['maintenance','shared']);
@@ -63,15 +61,14 @@ export function App(){
  const[sidebarOpen,setSidebarOpen]=useState(false);
  const groupsStore=useOperationalStore<Group[]>('group-360',[]);
  const roomsStore=useOperationalStore<Booking[]>('meeting-rooms',[]);
- const sheetsStore=useOperationalStore<Sheet[]>('function-sheets',[]);
  const maintenanceStore=useOperationalStore<MaintenanceIntervention[]>('maintenance-interventions',[]);
- const session=readSession(),today=isoDate(new Date());
+ const session=readSession(),today=isoDate(new Date()),appRole=roleFromValue(session.user?.role);
  const currentRole=normalizedRole(session);
+ const visibleNav=nav.filter(item=>canAccessPath(item.href,appRole));
  const actionCategories=allowedActionCategories(currentRole);
  const userName=`${session.user?.firstName||'Utilisateur'} ${session.user?.lastName||''}`.trim();
  const initials=`${session.user?.firstName?.[0]||'H'}${session.user?.lastName?.[0]||'C'}`.toUpperCase();
- const publishedIds=useMemo(()=>new Set(sheetsStore.data.filter(s=>['Prête à imprimer','Diffusée','Clôturée'].includes(s.status||'')).flatMap(s=>s.lines?.map(l=>l.groupId)||[])),[sheetsStore.data]);
- const groups=useMemo(()=>groupsStore.data.filter(g=>publishedIds.size===0||publishedIds.has(g.id)),[groupsStore.data,publishedIds]);
+ const groups=groupsStore.data;
  const arrivals=useMemo(()=>groups.filter(g=>g.arrival===today).sort((a,b)=>(a.arrivalTime||'99:99').localeCompare(b.arrivalTime||'99:99')),[groups,today]);
  const departures=useMemo(()=>groups.filter(g=>g.departure===today).sort((a,b)=>(a.departureTime||'99:99').localeCompare(b.departureTime||'99:99')),[groups,today]);
  const present=useMemo(()=>groups.filter(g=>String(g.arrival)<=today&&String(g.departure)>=today&&g.status!=='Parti'),[groups,today]);
@@ -95,21 +92,18 @@ export function App(){
   ...todayRooms.map(r=>({id:`room-${r.id}`,label:`${r.room} · ${r.title}`,detail:`${r.start}–${r.end} · ${r.attendees} pers.`,href:'/salles-reunion',level:'info' as const,category:'shared' as const})),
  ].filter(item=>actionCategories.has(item.category)).slice(0,12),[blockedDepartures,maintenanceUrgent,maintenanceBlocked,controlsToDo,controlsCommercial,todayRooms,currentRole]);
  const forecast=[0,1,2].map(offset=>{const date=addDays(today,offset);const a=groups.filter(g=>g.arrival===date).length;const d=groups.filter(g=>g.departure===date).length;const p=groups.filter(g=>String(g.arrival)<=date&&String(g.departure)>=date&&g.status!=='Parti').length;const c=groups.filter(g=>g.arrival===date).length;const m=roomsStore.data.filter(r=>r.date===date).length;const score=a*3+d*2+m*2;return{date,a,d,p,c,m,level:score>=18?'Critique':score>=10?'Élevée':score>=5?'Modérée':'Faible'}});
- const stores=[groupsStore,roomsStore,sheetsStore,maintenanceStore];
+ const stores=[groupsStore,roomsStore,maintenanceStore];
  const loading=stores.some(s=>s.state==='loading'||s.state==='saving');
- const reportedError=stores.find(s=>s.state==='error'||s.state==='conflict');
+ const reportedError=stores.find(s=>s.rawState==='error'||s.rawState==='conflict');
  const syncError=reportedError&&isStaleSync(reportedError.updatedAt)?reportedError:undefined;
  const syncLabel=loading?'Synchronisation…':syncError?'Synchronisation en erreur':'PostgreSQL à jour';
- const refresh=()=>{void groupsStore.refresh();void roomsStore.refresh();void sheetsStore.refresh();void maintenanceStore.refresh()};
+ const refresh=()=>{void groupsStore.refresh();void roomsStore.refresh();void maintenanceStore.refresh()};
  return <div className="app-shell executive-shell command-shell">
   <aside className={`sidebar${sidebarOpen?' open':''}`}>
    <div className="brand"><div className="brand-mark">H</div><div><strong>HospiCore</strong><span>Hôtel Paradis · Lourdes</span></div><button className="sidebar-close" onClick={()=>setSidebarOpen(false)}><X size={20}/></button></div>
    <nav className="nav-list" aria-label="Navigation principale">
     <button data-nav="/" className="nav-item active" onClick={()=>location.assign('/')}><LayoutDashboard size={19}/><span>Centre de Commandement</span></button>
-    <span aria-hidden="true" style={{display:'none'}} data-nav-spacer="true"/>
-    <button data-nav="/reception" className="nav-item reception-nav-item" onClick={()=>location.assign('/reception')}><ConciergeBell size={19}/><span>Réception</span></button>
-    <button data-nav="/planning-operationnel" className="nav-item" onClick={()=>location.assign('/planning-operationnel')}><CalendarDays size={19}/><span>Planning opérationnel</span></button>
-    {nav.map(({label,icon:Icon,href})=><button key={href} data-nav={href} className="nav-item" onClick={()=>location.assign(href)}><Icon size={19}/><span>{label}</span></button>)}
+    {visibleNav.map(({label,icon:Icon,href})=><button key={href} data-nav={href} className="nav-item" onClick={()=>location.assign(href)}><Icon size={19}/><span>{label}</span></button>)}
    </nav>
    <div className="demo-version"><Sparkles size={16}/><div><strong>HospiCore V3</strong><span>Réception · Commercial · Direction · Maintenance</span></div></div>
   </aside>
@@ -117,35 +111,15 @@ export function App(){
    <header className="live-v2-topbar command-topbar"><div className="live-v2-title"><button className="live-v2-menu" onClick={()=>setSidebarOpen(true)}><Menu size={22}/></button><div><h1>Centre de Commandement</h1><p>{session.user?.hotel?.name||'Hôtel Paradis'} · {dateLabel(today)}</p></div></div><div className="live-v2-user"><button className={`live-v2-sync${loading?' loading':''}${syncError?' error':''}`} onClick={refresh}><RefreshCw size={15}/>{syncLabel}</button><div className="command-clock"><strong>{new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}</strong><span>{roleName(session)}</span></div><div className="live-v2-avatar" title={userName}>{initials}</div></div></header>
    <div className="command-content">
     <section className="command-alerts">
-     <button className={blockedDepartures.length?'critical':'ok'} onClick={()=>location.href='/reception'}><AlertTriangle size={18}/><strong>{blockedDepartures.length}</strong><span>départ(s) bloqué(s)</span></button>
-     <button className={controlsToDo.length?'warning':'ok'} onClick={()=>location.href='/reception'}><ClipboardCheck size={18}/><strong>{controlsToDo.length}</strong><span>contrôle(s) à réaliser</span></button>
-     <button className={maintenanceUrgent.length||maintenanceBlocked.length?'critical':'ok'} onClick={()=>location.href='/tickets'}><Wrench size={18}/><strong>{maintenanceUrgent.length+maintenanceBlocked.length}</strong><span>alerte(s) maintenance</span></button>
-     <button className={syncError?'critical':'ok'} onClick={()=>location.href='/diagnostic'}><RefreshCw size={18}/><strong>{syncError?'!':'✓'}</strong><span>{syncError?'synchronisation en erreur':'PostgreSQL synchronisé'}</span></button>
+     {canAccessPath('/reception',appRole)&&<button className={blockedDepartures.length?'critical':'ok'} onClick={()=>location.href='/reception'}><AlertTriangle size={18}/><strong>{blockedDepartures.length}</strong><span>départ(s) bloqué(s)</span></button>}
+     {canAccessPath('/reception',appRole)&&<button className={controlsToDo.length?'warning':'ok'} onClick={()=>location.href='/reception'}><ClipboardCheck size={18}/><strong>{controlsToDo.length}</strong><span>contrôle(s) à réaliser</span></button>}
+     {canAccessPath('/tickets',appRole)&&<button className={maintenanceUrgent.length||maintenanceBlocked.length?'critical':'ok'} onClick={()=>location.href='/tickets'}><Wrench size={18}/><strong>{maintenanceUrgent.length+maintenanceBlocked.length}</strong><span>alerte(s) maintenance</span></button>}
+     {canAccessPath('/diagnostic',appRole)&&<button className={syncError?'critical':'ok'} onClick={()=>location.href='/diagnostic'}><RefreshCw size={18}/><strong>{syncError?'!':'✓'}</strong><span>{syncError?'synchronisation en erreur':'PostgreSQL synchronisé'}</span></button>}
     </section>
-
-    <section className="command-kpis">
-     <article><span>Groupes présents</span><strong>{present.length}</strong><small>{present.reduce((n,g)=>n+Number(g.pax||0),0)} personnes</small></article>
-     <article><span>Arrivées</span><strong>{arrivals.length}</strong><small>{arrivals.reduce((n,g)=>n+Number(g.pax||0),0)} personnes</small></article>
-     <article><span>Départs</span><strong>{departures.length}</strong><small>{departures.filter(g=>g.status==='Parti').length} terminés</small></article>
-     <article><span>Contrôles</span><strong>{groups.filter(g=>g.groupControl?.validatedAt).length}</strong><small>{controlsToDo.length} à réaliser</small></article>
-     <article><span>Maintenance ouverte</span><strong>{maintenanceOpen.length}</strong><small>{maintenanceBlocked.length} chambre(s) ou zone(s) bloquée(s)</small></article>
-    </section>
-
-    <section className="command-grid primary">
-     <article className="command-panel command-actions"><header><div><p>Boîte de réception · {roleName(session)}</p><h2><Bell size={20}/>Actions prioritaires</h2></div><b>{actions.length}</b></header><div>{actions.length?actions.map(item=><button key={item.id} className={item.level} onClick={()=>location.href=item.href}><span className="command-action-dot"/><div><strong>{item.label}</strong><small>{item.detail}</small></div><ChevronRight size={18}/></button>):<p className="command-empty"><CheckCircle2 size={20}/>Aucune action prioritaire pour votre profil.</p>}</div></article>
-     <article className="command-panel command-flow"><header><div><p>Réception</p><h2>Arrivées & départs</h2></div><button onClick={()=>location.href='/reception'}>Ouvrir</button></header><div className="command-flow-columns"><section><h3>Arrivées <b>{arrivals.length}</b></h3>{arrivals.map(g=><button key={g.id} onClick={()=>location.href='/reception'}><time>{g.arrivalTime||'—'}</time><div><strong>{g.name}</strong><span>{g.pax||0} pax · {g.status||'Préparation'}</span></div></button>)}{!arrivals.length&&<p>Aucune arrivée.</p>}</section><section><h3>Départs <b>{departures.length}</b></h3>{departures.map(g=>{const c=checklist(g);return <button key={g.id} className={c.complete?'ready':'blocked'} onClick={()=>location.href='/reception'}><time>{g.departureTime||'—'}</time><div><strong>{g.name}</strong><span>{c.complete?'Prêt au départ':'Étapes manquantes'}</span></div></button>})}{!departures.length&&<p>Aucun départ.</p>}</section></div></article>
-    </section>
-
-    <section className="command-grid secondary">
-     <article className="command-panel command-controls"><header><div><p>Contrôles Groupe</p><h2>Suivi de facturation</h2></div><button onClick={()=>location.href='/commercial'}>Commercial</button></header><div><button onClick={()=>location.href='/reception'}><span>À réaliser</span><strong>{controlsToDo.length}</strong></button><button onClick={()=>location.href='/commercial'}><span>En validation</span><strong>{controlsCommercial.length}</strong></button><button onClick={()=>location.href='/commercial'}><span>Prêts pour VEGA</span><strong>{controlsVega.length}</strong></button></div></article>
-     <article className="command-panel command-meetings"><header><div><p>Planning du jour</p><h2>Salles de réunion</h2></div><button onClick={()=>location.href='/salles-reunion'}>Agenda</button></header><div>{todayRooms.map(r=><button key={r.id} onClick={()=>location.href='/salles-reunion'}><time>{r.start}</time><div><strong>{r.room}</strong><span>{r.title} · {r.attendees} pers.</span></div></button>)}{!todayRooms.length&&<p className="command-empty">Aucune salle réservée.</p>}</div></article>
-     <article className="command-panel command-maintenance"><header><div><p>Maintenance</p><h2>Interventions</h2></div><button onClick={()=>location.href='/tickets'}>Ouvrir</button></header><div className="command-maintenance-summary"><div><span>Urgentes</span><strong>{maintenanceUrgent.length}</strong></div><div><span>En cours</span><strong>{maintenanceActive.length}</strong></div><div><span>Bloquées</span><strong>{maintenanceBlocked.length}</strong></div></div><div className="command-maintenance-list">{maintenancePreview.map(item=><button key={item.id} className={item.priority==='Urgente'?'urgent':item.blocked?'blocked':''} onClick={()=>location.href='/tickets'}><div><strong>{item.title}</strong><span>{maintenanceLocation(item)} · {item.status}</span></div><b>{item.priority}</b></button>)}{!maintenancePreview.length&&<p className="command-empty"><CheckCircle2 size={18}/>Aucune intervention ouverte.</p>}</div></article>
-    </section>
-
-    <section className="command-grid lower">
-     <article className="command-panel command-journal"><header><div><p>Traçabilité</p><h2>Journal Live</h2></div><button onClick={()=>location.href='/journal-exploitation'}>Journal complet</button></header><div>{audit.length?audit.map(item=><div key={`${item.id}-${item.group}`}><time>{item.at}</time><div><strong>{item.actor} · {item.group}</strong><span>{item.action}</span></div></div>):<p className="command-empty">Aucune action récente.</p>}</div></article>
-     <article className="command-panel command-forecast"><header><div><p>Anticipation</p><h2>Prévision à 3 jours</h2></div><button onClick={()=>location.href='/planning-operationnel'}>Planning</button></header><table><thead><tr><th>Jour</th><th>Arr.</th><th>Dép.</th><th>Présents</th><th>Contrôles</th><th>Salles</th><th>Charge</th></tr></thead><tbody>{forecast.map(f=><tr key={f.date} onClick={()=>location.href=`/planning-operationnel?date=${f.date}`}><td>{shortDate(f.date)}</td><td>{f.a}</td><td>{f.d}</td><td>{f.p}</td><td>{f.c}</td><td>{f.m}</td><td><span className={`forecast-level ${f.level.toLowerCase().replace('é','e')}`}>{f.level}</span></td></tr>)}</tbody></table></article>
-    </section>
+    <section className="command-kpis"><article><span>Groupes présents</span><strong>{present.length}</strong><small>{present.reduce((n,g)=>n+Number(g.pax||0),0)} personnes</small></article><article><span>Arrivées</span><strong>{arrivals.length}</strong><small>{arrivals.reduce((n,g)=>n+Number(g.pax||0),0)} personnes</small></article><article><span>Départs</span><strong>{departures.length}</strong><small>{departures.filter(g=>g.status==='Parti').length} terminés</small></article><article><span>Contrôles</span><strong>{groups.filter(g=>g.groupControl?.validatedAt).length}</strong><small>{controlsToDo.length} à réaliser</small></article><article><span>Maintenance ouverte</span><strong>{maintenanceOpen.length}</strong><small>{maintenanceBlocked.length} chambre(s) ou zone(s) bloquée(s)</small></article></section>
+    <section className="command-grid primary"><article className="command-panel command-actions"><header><div><p>Boîte de réception · {roleName(session)}</p><h2><Bell size={20}/>Actions prioritaires</h2></div><b>{actions.length}</b></header><div>{actions.length?actions.map(item=><button key={item.id} className={item.level} onClick={()=>location.href=item.href}><span className="command-action-dot"/><div><strong>{item.label}</strong><small>{item.detail}</small></div><ChevronRight size={18}/></button>):<p className="command-empty"><CheckCircle2 size={20}/>Aucune action prioritaire pour votre profil.</p>}</div></article>{canAccessPath('/reception',appRole)&&<article className="command-panel command-flow"><header><div><p>Réception</p><h2>Arrivées & départs</h2></div><button onClick={()=>location.href='/reception'}>Ouvrir</button></header><div className="command-flow-columns"><section><h3>Arrivées <b>{arrivals.length}</b></h3>{arrivals.map(g=><button key={g.id} onClick={()=>location.href='/reception'}><time>{g.arrivalTime||'—'}</time><div><strong>{g.name}</strong><span>{g.pax||0} pax · {g.status||'Préparation'}</span></div></button>)}{!arrivals.length&&<p>Aucune arrivée.</p>}</section><section><h3>Départs <b>{departures.length}</b></h3>{departures.map(g=>{const c=checklist(g);return <button key={g.id} className={c.complete?'ready':'blocked'} onClick={()=>location.href='/reception'}><time>{g.departureTime||'—'}</time><div><strong>{g.name}</strong><span>{c.complete?'Prêt au départ':'Étapes manquantes'}</span></div></button>})}{!departures.length&&<p>Aucun départ.</p>}</section></div></article>}</section>
+    <section className="command-grid secondary">{(canAccessPath('/reception',appRole)||canAccessPath('/commercial',appRole))&&<article className="command-panel command-controls"><header><div><p>Contrôles Groupe</p><h2>Suivi de facturation</h2></div>{canAccessPath('/commercial',appRole)&&<button onClick={()=>location.href='/commercial'}>Commercial</button>}</header><div>{canAccessPath('/reception',appRole)&&<button onClick={()=>location.href='/reception'}><span>À réaliser</span><strong>{controlsToDo.length}</strong></button>}{canAccessPath('/commercial',appRole)&&<><button onClick={()=>location.href='/commercial'}><span>En validation</span><strong>{controlsCommercial.length}</strong></button><button onClick={()=>location.href='/commercial'}><span>Prêts pour VEGA</span><strong>{controlsVega.length}</strong></button></>}</div></article>}<article className="command-panel command-meetings"><header><div><p>Planning du jour</p><h2>Salles de réunion</h2></div><button onClick={()=>location.href='/salles-reunion'}>Agenda</button></header><div>{todayRooms.map(r=><button key={r.id} onClick={()=>location.href='/salles-reunion'}><time>{r.start}</time><div><strong>{r.room}</strong><span>{r.title} · {r.attendees} pers.</span></div></button>)}{!todayRooms.length&&<p className="command-empty">Aucune salle réservée.</p>}</div></article>{canAccessPath('/tickets',appRole)&&<article className="command-panel command-maintenance"><header><div><p>Maintenance</p><h2>Interventions</h2></div><button onClick={()=>location.href='/tickets'}>Ouvrir</button></header><div className="command-maintenance-summary"><div><span>Urgentes</span><strong>{maintenanceUrgent.length}</strong></div><div><span>En cours</span><strong>{maintenanceActive.length}</strong></div><div><span>Bloquées</span><strong>{maintenanceBlocked.length}</strong></div></div><div className="command-maintenance-list">{maintenancePreview.map(item=><button key={item.id} className={item.priority==='Urgente'?'urgent':item.blocked?'blocked':''} onClick={()=>location.href='/tickets'}><div><strong>{item.title}</strong><span>{maintenanceLocation(item)} · {item.status}</span></div><b>{item.priority}</b></button>)}{!maintenancePreview.length&&<p className="command-empty"><CheckCircle2 size={18}/>Aucune intervention ouverte.</p>}</div></article>}</section>
+    <section className="command-grid lower">{canAccessPath('/journal-exploitation',appRole)&&<article className="command-panel command-journal"><header><div><p>Traçabilité</p><h2>Journal Live</h2></div><button onClick={()=>location.href='/journal-exploitation'}>Journal complet</button></header><div>{audit.length?audit.map(item=><div key={`${item.id}-${item.group}`}><time>{item.at}</time><div><strong>{item.actor} · {item.group}</strong><span>{item.action}</span></div></div>):<p className="command-empty">Aucune action récente.</p>}</div></article>}<article className="command-panel command-forecast"><header><div><p>Anticipation</p><h2>Prévision à 3 jours</h2></div><button onClick={()=>location.href='/planning-operationnel'}>Planning</button></header><table><thead><tr><th>Jour</th><th>Arr.</th><th>Dép.</th><th>Présents</th><th>Contrôles</th><th>Salles</th><th>Charge</th></tr></thead><tbody>{forecast.map(f=><tr key={f.date} onClick={()=>location.href=`/planning-operationnel?date=${f.date}`}><td>{shortDate(f.date)}</td><td>{f.a}</td><td>{f.d}</td><td>{f.p}</td><td>{f.c}</td><td>{f.m}</td><td><span className={`forecast-level ${f.level.toLowerCase().replace('é','e')}`}>{f.level}</span></td></tr>)}</tbody></table></article></section>
    </div>
   </main>
  </div>;
