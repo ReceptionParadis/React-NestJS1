@@ -29,8 +29,10 @@ const labels: Record<string, { title: string; detail: string; href: string }> = 
   'operations-center': { title: 'Centre des opérations mis à jour', detail: 'Un prêt ou un équipement a changé.', href: '/centre-operations' },
 };
 
+const receptionNamespaces = ['group-360', 'function-sheets', 'meeting-rooms', 'maintenance-interventions', 'tasks', 'general-instructions', 'operations-center'];
 const roleNamespaces: Record<string, string[]> = {
-  reception: ['group-360', 'function-sheets', 'meeting-rooms', 'maintenance-interventions', 'tasks', 'general-instructions', 'operations-center'],
+  reception: receptionNamespaces,
+  reception_manager: receptionNamespaces,
   commercial: ['group-360', 'function-sheets', 'meeting-rooms', 'tasks', 'general-instructions'],
   maintenance: ['maintenance-interventions', 'tasks', 'general-instructions'],
 };
@@ -46,6 +48,7 @@ function currentUser(): SessionUser {
 function normalizedRole(user: SessionUser) {
   const raw = String(typeof user.role === 'object' ? user.role?.name || '' : user.role || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
   if (raw.includes('direction') || raw.includes('directeur') || raw.includes('admin')) return 'direction';
+  if (raw.includes('chef de reception') || raw.includes('responsable reception') || raw.includes('front office manager')) return 'reception_manager';
   if (raw.includes('maintenance') || raw.includes('tech')) return 'maintenance';
   if (raw.includes('commercial') || raw.includes('vente')) return 'commercial';
   if (raw.includes('reception') || raw.includes('front')) return 'reception';
