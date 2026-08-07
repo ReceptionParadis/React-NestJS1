@@ -36,8 +36,8 @@ function isAllowed(path:string,role:AppRole){
  if(role==='direction'||role==='unknown')return true;
  const shared=['/','/planning-operationnel','/salles-reunion','/taches','/consignes-generales'];
  if(shared.some(route=>path===route||path.startsWith(`${route}/`)))return true;
- if(role==='reception')return path.startsWith('/reception')||path.startsWith('/centre-operations')||path.startsWith('/main-courante')||path.startsWith('/journal-exploitation')||path.startsWith('/activite');
- if(role==='commercial')return path.startsWith('/commercial')||path.startsWith('/planning-hebdomadaire')||path.startsWith('/groupes');
+ if(role==='reception')return path.startsWith('/reception')||path.startsWith('/centre-operations')||path.startsWith('/main-courante')||path.startsWith('/journal-exploitation')||path.startsWith('/activite')||path.startsWith('/tickets');
+ if(role==='commercial')return path.startsWith('/commercial')||path.startsWith('/planning-hebdomadaire')||path.startsWith('/groupes')||path.startsWith('/tickets');
  if(role==='maintenance')return path.startsWith('/tickets');
  return false;
 }
