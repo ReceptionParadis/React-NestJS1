@@ -1,4 +1,4 @@
-import { AlertTriangle, ArrowLeft, BellRing, CalendarDays, CheckCircle2, ChevronRight, ClipboardCheck, FileCheck2, UsersRound } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, BellRing, CalendarDays, CheckCircle2, ChevronRight, ClipboardCheck, FileCheck2, ReceiptText, Send, UsersRound } from 'lucide-react';
 import { can, currentRole } from './permissions';
 import { useOperationalStore } from './useOperationalStore';
 
@@ -7,7 +7,8 @@ type GroupControl={locked?:boolean;printedBy?:string;printedAt?:string;totalPax?
 type Group={
  id:string;name?:string;agency?:string;directAgency?:string;dmc?:string;status?:string;arrival?:string;departure?:string;
  arrivalTime?:string;departureTime?:string;pax?:number;rooms?:number;leaderPhone?:string;stayType?:string;paymentStatus?:string;
- rooming?:boolean;roomingReceivedAt?:string;commercialValidated?:boolean;validatedAt?:string;groupControl?:GroupControl;audit?:Audit[]
+ rooming?:boolean;roomingReceivedAt?:string;commercialValidated?:boolean;validatedAt?:string;groupControl?:GroupControl;audit?:Audit[];
+ vegaInvoiceSentAt?:string;vegaInvoiceSentBy?:string
 };
 
 const items=[
@@ -34,13 +35,16 @@ function receptionMissing(group:Group){
 export function CommercialHubPage(){
  const store=useOperationalStore<Group[]>('group-360',[]);const user=sessionUser();const role=currentRole();const canValidate=can('commercial.validate-control',role);
  const pending=store.data.filter(g=>g.status==='Parti'&&g.groupControl?.locked&&g.groupControl?.commercialValidation!=='Validé').sort((a,b)=>String(b.departure).localeCompare(String(a.departure)));
+ const readyToInvoice=store.data.filter(g=>g.status==='Parti'&&g.groupControl?.commercialValidation==='Validé'&&!g.vegaInvoiceSentAt).sort((a,b)=>String(b.departure).localeCompare(String(a.departure)));
+ const invoiced=store.data.filter(g=>Boolean(g.vegaInvoiceSentAt)).sort((a,b)=>String(b.vegaInvoiceSentAt).localeCompare(String(a.vegaInvoiceSentAt))).slice(0,8);
  const active=store.data.filter(g=>g.status!=='Parti');
  const readiness=active.map(group=>({group,missing:receptionMissing(group)}));
  const ready=readiness.filter(item=>item.missing.length===0);
  const incomplete=readiness.filter(item=>item.missing.length>0).sort((a,b)=>a.missing.length-b.missing.length);
- async function validate(group:Group){if(!canValidate)return;const control={...group.groupControl,commercialValidation:'Validé' as const,commercialValidatedBy:user.name,commercialValidatedAt:stamp()};const audit={id:crypto.randomUUID(),action:'Contrôle Groupe validé par le Commercial · Facture à envoyer depuis VEGA',actor:user.name,role:user.role,at:stamp()};await store.save(store.data.map(g=>g.id===group.id?{...g,groupControl:control,audit:[...(g.audit||[]),audit]}:g))}
+ async function validate(group:Group){if(!canValidate)return;const at=stamp();const control={...group.groupControl,commercialValidation:'Validé' as const,commercialValidatedBy:user.name,commercialValidatedAt:at};const audit={id:crypto.randomUUID(),action:'Contrôle Groupe validé par le Commercial · Prêt pour facturation VEGA',actor:user.name,role:user.role,at};await store.save(store.data.map(g=>g.id===group.id?{...g,groupControl:control,audit:[...(g.audit||[]),audit]}:g))}
+ async function markInvoiceSent(group:Group){if(!canValidate)return;const at=stamp();const audit={id:crypto.randomUUID(),action:'Facture finale marquée comme envoyée depuis VEGA',actor:user.name,role:user.role,at};await store.save(store.data.map(g=>g.id===group.id?{...g,vegaInvoiceSentAt:at,vegaInvoiceSentBy:user.name,audit:[...(g.audit||[]),audit]}:g))}
  return <main className="commercial-hub">
-  <header className="commercial-hub-header"><button onClick={()=>{window.location.href='/'}}><ArrowLeft size={18}/>Tableau de bord</button><p>HospiCore · Espace Commercial</p><h1><ClipboardCheck size={32}/>Pilotage des groupes</h1><span>Préparez les dossiers groupes et validez les contrôles transmis par la Réception.</span></header>
+  <header className="commercial-hub-header"><button onClick={()=>{window.location.href='/'}}><ArrowLeft size={18}/>Tableau de bord</button><p>HospiCore · Espace Commercial</p><h1><ClipboardCheck size={32}/>Pilotage des groupes</h1><span>Préparez les dossiers groupes, validez les contrôles transmis par la Réception et suivez la facturation VEGA.</span></header>
 
   <section className="commercial-control-notices"><header><div>{incomplete.length?<AlertTriangle size={22}/>:<CheckCircle2 size={22}/>}<div><p>Préparation avant arrivée</p><h2>Dossiers prêts pour la Réception</h2></div></div><b>{ready.length}/{active.length}</b></header>
    {active.length===0?<div className="commercial-control-empty"><FileCheck2 size={22}/><div><strong>Aucun groupe actif</strong><span>Les dossiers en préparation apparaîtront ici automatiquement.</span></div></div>:
@@ -48,8 +52,14 @@ export function CommercialHubPage(){
    <div>{incomplete.map(({group,missing})=><article key={group.id}><div><strong>{group.name||'Groupe sans nom'}</strong><span>{group.directAgency||group.agency||'Agence non renseignée'} · arrivée {group.arrival||'à confirmer'}</span><small>{missing.length} élément(s) manquant(s) : {missing.join(' · ')}</small></div><div><button onClick={()=>{window.location.href='/commercial/groupes'}}>Compléter la fiche</button></div></article>)}</div>}
   </section>
 
-  {pending.length>0&&<section className="commercial-control-notices"><header><div><BellRing size={22}/><div><p>Notification Réception</p><h2>Contrôles Groupe à valider</h2></div></div><b>{pending.length}</b></header><div>{pending.map(group=><article key={group.id}><div><strong>{group.name||'Groupe sans nom'}</strong><span>{group.agency||'Agence non renseignée'} · départ confirmé · {group.groupControl?.totalPax||0} personnes</span><small>Contrôle imprimé le {group.groupControl?.printedAt||'—'} par {group.groupControl?.printedBy||'—'} · {group.groupControl?.taxableAdults||0} taxes de séjour</small></div><div><button onClick={()=>{window.location.href='/commercial/groupes'}}>Voir la fiche</button>{canValidate?<button className="validate" onClick={()=>void validate(group)}><CheckCircle2 size={16}/>Valider pour facturation VEGA</button>:<span title="Votre profil n’est pas habilité à valider ce contrôle">Validation réservée au Commercial / Direction</span>}</div></article>)}</div></section>}
+  {pending.length>0&&<section className="commercial-control-notices"><header><div><BellRing size={22}/><div><p>Notification Réception</p><h2>Contrôles Groupe à valider</h2></div></div><b>{pending.length}</b></header><div>{pending.map(group=><article key={group.id}><div><strong>{group.name||'Groupe sans nom'}</strong><span>{group.directAgency||group.agency||'Agence non renseignée'} · départ confirmé · {group.groupControl?.totalPax||0} personnes</span><small>Contrôle imprimé le {group.groupControl?.printedAt||'—'} par {group.groupControl?.printedBy||'—'} · {group.groupControl?.taxableAdults||0} taxes de séjour</small></div><div><button onClick={()=>{window.location.href='/commercial/groupes'}}>Voir la fiche</button>{canValidate?<button className="validate" onClick={()=>void validate(group)}><CheckCircle2 size={16}/>Valider le contrôle</button>:<span title="Votre profil n’est pas habilité à valider ce contrôle">Validation réservée au Commercial / Direction</span>}</div></article>)}</div></section>}
+
+  {readyToInvoice.length>0&&<section className="commercial-control-notices"><header><div><ReceiptText size={22}/><div><p>Après validation du contrôle</p><h2>Prêts pour facturation VEGA</h2></div></div><b>{readyToInvoice.length}</b></header><div>{readyToInvoice.map(group=><article key={group.id}><div><strong>{group.name||'Groupe sans nom'}</strong><span>{group.directAgency||group.agency||'Agence non renseignée'} · départ {group.departure||'—'} · {group.groupControl?.totalPax||0} personnes</span><small>Contrôle validé le {group.groupControl?.commercialValidatedAt||'—'} par {group.groupControl?.commercialValidatedBy||'—'} · dossier prêt à être facturé dans VEGA</small></div><div>{canValidate?<button className="validate" onClick={()=>void markInvoiceSent(group)}><Send size={16}/>Facture envoyée depuis VEGA</button>:<span>Suivi réservé au Commercial / Direction</span>}</div></article>)}</div></section>}
+
   <section className="commercial-hub-grid">{items.map(({title,description,href,icon:Icon})=><button key={href} onClick={()=>{window.location.href=href}}><span className="commercial-hub-icon"><Icon size={30}/></span><div><h2>{title}</h2><p>{description}</p><strong>Ouvrir le module <ChevronRight size={17}/></strong></div></button>)}</section>
-  {pending.length===0&&<section className="commercial-control-empty"><FileCheck2 size={22}/><div><strong>Aucun contrôle en attente</strong><span>Les contrôles apparaissent ici dès que la Réception met un groupe en départ.</span></div></section>}
+
+  {pending.length===0&&readyToInvoice.length===0&&<section className="commercial-control-empty"><FileCheck2 size={22}/><div><strong>Aucune action après départ</strong><span>Aucun contrôle n’attend de validation ou de facturation VEGA.</span></div></section>}
+
+  {invoiced.length>0&&<section className="commercial-control-notices"><header><div><CheckCircle2 size={22}/><div><p>Traçabilité</p><h2>Dernières factures envoyées</h2></div></div><b>{invoiced.length}</b></header><div>{invoiced.map(group=><article key={group.id}><div><strong>{group.name||'Groupe sans nom'}</strong><span>{group.directAgency||group.agency||'Agence non renseignée'}</span><small>Facture marquée envoyée le {group.vegaInvoiceSentAt} par {group.vegaInvoiceSentBy||'—'}</small></div></article>)}</div></section>}
  </main>
 }
