@@ -31,6 +31,7 @@ import './reception-group-control.css';
 import './group-control-workflow.css';
 import './reception-control-uniform.css';
 import './group-control-print-fix.css';
+import './operational-group-buckets.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
