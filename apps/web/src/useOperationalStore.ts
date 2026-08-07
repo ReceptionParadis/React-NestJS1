@@ -17,7 +17,18 @@ export type OperationalStore<T> = {
   save: (next: T) => Promise<boolean>;
 };
 
+export type OperationalChangeDetail = {
+  namespace: string;
+  version: number;
+  at: number;
+  source: 'local' | 'remote';
+};
+
 const DEFAULT_REFRESH_MS = 10_000;
+
+function emitOperationalChange(detail: OperationalChangeDetail) {
+  window.dispatchEvent(new CustomEvent<OperationalChangeDetail>('hospicore:operational-change', { detail }));
+}
 
 export function useOperationalStore<T>(
   namespace: string,
@@ -58,6 +69,7 @@ export function useOperationalStore<T>(
     }
 
     try {
+      const previousVersion = versionRef.current;
       const result = await loadSharedData<T>(namespace, initialValueRef.current);
       if (!mountedRef.current) return false;
 
@@ -68,6 +80,9 @@ export function useOperationalStore<T>(
       }
 
       markSuccess(result.payload, result.version, 'Données partagées à jour');
+      if (silent && previousVersion > 0 && result.version > previousVersion) {
+        emitOperationalChange({ namespace, version: result.version, at: Date.now(), source: 'remote' });
+      }
       return true;
     } catch (error) {
       if (!mountedRef.current) return false;
@@ -89,6 +104,7 @@ export function useOperationalStore<T>(
       const result = await saveSharedData<T>(namespace, next, versionRef.current);
       if (!mountedRef.current) return false;
       markSuccess(result.payload, result.version, 'Enregistré pour tous les services');
+      emitOperationalChange({ namespace, version: result.version, at: Date.now(), source: 'local' });
       channelRef.current?.postMessage({ namespace, version: result.version, at: Date.now() });
       return true;
     } catch (error) {
