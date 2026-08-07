@@ -61,6 +61,7 @@ const matrix: Record<AppRole, ReadonlySet<Capability>> = {
     'dashboard.view','reception.view','reception.operate','group-control.create','group-control.unlock',
     'maintenance.view','maintenance.create','planning.view','meeting-rooms.view','meeting-rooms.edit',
     'tasks.view','tasks.edit','instructions.view','operations-center.view','operations-center.edit','journal.view',
+    'diagnostic.view','administration.view',
   ]),
   reception: new Set<Capability>([
     'dashboard.view','reception.view','reception.operate','group-control.create',
