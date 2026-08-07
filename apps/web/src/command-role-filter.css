@@ -1,0 +1,53 @@
+/* Role-aware simplification of the HospiCore command center.
+   Shared operational awareness stays visible to every profile:
+   arrivals/departures, meeting rooms, KPIs and forecast. */
+
+/* Commercial: group controls + meeting rooms. Maintenance detail is not part of the commercial workflow. */
+html[data-hospicore-role='commercial'] .command-grid.secondary .command-maintenance,
+body[data-hospicore-role='commercial'] .command-grid.secondary .command-maintenance {
+  display: none;
+}
+
+html[data-hospicore-role='commercial'] .command-grid.secondary,
+body[data-hospicore-role='commercial'] .command-grid.secondary {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+/* Maintenance: interventions + meeting-room awareness. Group billing controls stay with Reception/Commercial. */
+html[data-hospicore-role='maintenance'] .command-grid.secondary .command-controls,
+body[data-hospicore-role='maintenance'] .command-grid.secondary .command-controls {
+  display: none;
+}
+
+html[data-hospicore-role='maintenance'] .command-grid.secondary,
+body[data-hospicore-role='maintenance'] .command-grid.secondary {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+/* Reception keeps controls, meeting rooms and Maintenance because blocked rooms affect arrivals directly. */
+
+/* The detailed live audit journal is a management view. Operational profiles keep the 3-day forecast. */
+html[data-hospicore-role='reception'] .command-journal,
+html[data-hospicore-role='commercial'] .command-journal,
+html[data-hospicore-role='maintenance'] .command-journal,
+body[data-hospicore-role='reception'] .command-journal,
+body[data-hospicore-role='commercial'] .command-journal,
+body[data-hospicore-role='maintenance'] .command-journal {
+  display: none;
+}
+
+html[data-hospicore-role='reception'] .command-grid.lower,
+html[data-hospicore-role='commercial'] .command-grid.lower,
+html[data-hospicore-role='maintenance'] .command-grid.lower,
+body[data-hospicore-role='reception'] .command-grid.lower,
+body[data-hospicore-role='commercial'] .command-grid.lower,
+body[data-hospicore-role='maintenance'] .command-grid.lower {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (max-width: 760px) {
+  html[data-hospicore-role] .command-grid.secondary,
+  body[data-hospicore-role] .command-grid.secondary {
+    grid-template-columns: 1fr;
+  }
+}
