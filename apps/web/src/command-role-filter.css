@@ -24,8 +24,6 @@ body[data-hospicore-role='maintenance'] .command-grid.secondary {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-/* Reception keeps controls, meeting rooms and Maintenance because blocked rooms affect arrivals directly. */
-
 /* The detailed live audit journal is a management view. Operational profiles keep the 3-day forecast. */
 html[data-hospicore-role='reception'] .command-journal,
 html[data-hospicore-role='commercial'] .command-journal,
@@ -43,6 +41,44 @@ body[data-hospicore-role='reception'] .command-grid.lower,
 body[data-hospicore-role='commercial'] .command-grid.lower,
 body[data-hospicore-role='maintenance'] .command-grid.lower {
   grid-template-columns: minmax(0, 1fr);
+}
+
+/* Sidebar permissions — hiding is paired with route protection in AppRouter.tsx. */
+html[data-hospicore-role='reception'] .nav-list [data-nav='/commercial'],
+html[data-hospicore-role='reception'] .nav-list [data-nav='/diagnostic'],
+html[data-hospicore-role='reception'] .nav-list [data-nav='/administration'],
+body[data-hospicore-role='reception'] .nav-list [data-nav='/commercial'],
+body[data-hospicore-role='reception'] .nav-list [data-nav='/diagnostic'],
+body[data-hospicore-role='reception'] .nav-list [data-nav='/administration'] {
+  display: none !important;
+}
+
+html[data-hospicore-role='commercial'] .nav-list [data-nav='/reception'],
+html[data-hospicore-role='commercial'] .nav-list [data-nav='/journal-exploitation'],
+html[data-hospicore-role='commercial'] .nav-list [data-nav='/centre-operations'],
+html[data-hospicore-role='commercial'] .nav-list [data-nav='/diagnostic'],
+html[data-hospicore-role='commercial'] .nav-list [data-nav='/administration'],
+body[data-hospicore-role='commercial'] .nav-list [data-nav='/reception'],
+body[data-hospicore-role='commercial'] .nav-list [data-nav='/journal-exploitation'],
+body[data-hospicore-role='commercial'] .nav-list [data-nav='/centre-operations'],
+body[data-hospicore-role='commercial'] .nav-list [data-nav='/diagnostic'],
+body[data-hospicore-role='commercial'] .nav-list [data-nav='/administration'] {
+  display: none !important;
+}
+
+html[data-hospicore-role='maintenance'] .nav-list [data-nav='/reception'],
+html[data-hospicore-role='maintenance'] .nav-list [data-nav='/commercial'],
+html[data-hospicore-role='maintenance'] .nav-list [data-nav='/journal-exploitation'],
+html[data-hospicore-role='maintenance'] .nav-list [data-nav='/centre-operations'],
+html[data-hospicore-role='maintenance'] .nav-list [data-nav='/diagnostic'],
+html[data-hospicore-role='maintenance'] .nav-list [data-nav='/administration'],
+body[data-hospicore-role='maintenance'] .nav-list [data-nav='/reception'],
+body[data-hospicore-role='maintenance'] .nav-list [data-nav='/commercial'],
+body[data-hospicore-role='maintenance'] .nav-list [data-nav='/journal-exploitation'],
+body[data-hospicore-role='maintenance'] .nav-list [data-nav='/centre-operations'],
+body[data-hospicore-role='maintenance'] .nav-list [data-nav='/diagnostic'],
+body[data-hospicore-role='maintenance'] .nav-list [data-nav='/administration'] {
+  display: none !important;
 }
 
 @media (max-width: 760px) {
