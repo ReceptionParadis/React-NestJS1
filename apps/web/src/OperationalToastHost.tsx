@@ -44,11 +44,11 @@ function currentUser(): SessionUser {
 }
 
 function normalizedRole(user: SessionUser) {
-  const raw = String(typeof user.role === 'object' ? user.role?.name || '' : user.role || '').toLowerCase();
+  const raw = String(typeof user.role === 'object' ? user.role?.name || '' : user.role || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
   if (raw.includes('direction') || raw.includes('directeur') || raw.includes('admin')) return 'direction';
   if (raw.includes('maintenance') || raw.includes('tech')) return 'maintenance';
-  if (raw.includes('commercial')) return 'commercial';
-  if (raw.includes('réception') || raw.includes('reception') || raw.includes('front')) return 'reception';
+  if (raw.includes('commercial') || raw.includes('vente')) return 'commercial';
+  if (raw.includes('reception') || raw.includes('front')) return 'reception';
   return 'direction';
 }
 
@@ -94,6 +94,15 @@ export function OperationalToastHost() {
 
   const markAllRead = () => persist(history.map((item) => ({ ...item, read: true })));
   const unread = history.filter((item) => !item.read).length;
+
+  useEffect(() => {
+    document.documentElement.dataset.hospicoreRole = role;
+    document.body.dataset.hospicoreRole = role;
+    return () => {
+      delete document.documentElement.dataset.hospicoreRole;
+      delete document.body.dataset.hospicoreRole;
+    };
+  }, [role]);
 
   useEffect(() => {
     const onChange = (event: Event) => {
