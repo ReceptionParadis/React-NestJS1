@@ -9,7 +9,9 @@ import { GroupsPage } from './GroupsPage';
 import { MeetingRoomsPage } from './MeetingRoomsPage';
 import { OperationalPlanningPage } from './OperationalPlanningPage';
 import { OperationsCenterV2Page } from './OperationsCenterV2Page';
+import { ReceptionArchivesPage } from './ReceptionArchivesPage';
 import { ReceptionDailyPage } from './ReceptionDailyPage';
+import { ReceptionHubPage } from './ReceptionHubPage';
 import { RoomingListImportPage } from './RoomingListImportPage';
 import { TasksPage } from './TasksPage';
 import { TicketsPage } from './TicketsPage';
@@ -51,7 +53,10 @@ function CurrentPage(){
  if(path.startsWith('/commercial/planning-hebdomadaire'))return <WeeklyPlanningPage/>;
  if(path==='/commercial'||path==='/commercial/')return <CommercialHubPage/>;
  if(path.startsWith('/planning-hebdomadaire'))return <WeeklyPlanningPage/>;
- if(path.startsWith('/reception'))return <ReceptionDailyPage/>;
+ if(path==='/reception'||path==='/reception/')return <ReceptionHubPage/>;
+ if(path.startsWith('/reception/archives'))return <ReceptionArchivesPage/>;
+ if(path.startsWith('/reception/fiche-fonction'))return <WeeklyPlanningPage/>;
+ if(path.startsWith('/reception/groupes')||path.startsWith('/reception/controles'))return <ReceptionDailyPage/>;
  if(path.startsWith('/salles-reunion'))return <MeetingRoomsPage/>;
  if(path.startsWith('/chambres')||path.startsWith('/groupes/allocation')){window.history.replaceState({},'','/salles-reunion');return <MeetingRoomsPage/>}
  if(path.startsWith('/tickets'))return <TicketsPage/>;
