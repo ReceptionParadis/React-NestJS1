@@ -55,7 +55,6 @@ const JOURNAL_META:Record<string,{service:string;source:string}>={
 @Injectable()
 export class OperationalSyncService implements OnModuleInit {
   constructor(private readonly prisma: PrismaService) {}
-
   async onModuleInit() { await this.resetHotelParadisProductionDataOnce(); }
 
   async get(hotelId: string | undefined, namespace: string, userId?: string) {
@@ -97,7 +96,7 @@ export class OperationalSyncService implements OnModuleInit {
       const updated=await this.prisma.operationalStore.updateMany({where:{id:store.id,version:store.version},data:{payload:[entry,...entries] as any,updatedById:userId,version:{increment:1}}});
       if(updated.count===1)return;
     }
-    throw new ConflictException('Impossible de journaliser l’action après plusieurs mises à jour simultanées.');
+    console.error(`[HospiCore] Journal Live: impossible d'ajouter l'événement ${entry.id} après plusieurs écritures concurrentes.`);
   }
 
   private serviceFromRole(role:string,fallback:string){const r=role.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();if(r.includes('direction')||r.includes('directeur')||r.includes('admin'))return'Direction';if(r.includes('commercial')||r.includes('vente'))return'Commercial';if(r.includes('maintenance')||r.includes('technique')||r.includes('technicien'))return'Maintenance';if(r.includes('reception')||r.includes('front'))return'Réception';return fallback}
