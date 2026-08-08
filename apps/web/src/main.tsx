@@ -33,6 +33,7 @@ import './operational-group-buckets.css';
 import './reception-hub.css';
 import './reception-nav.css';
 import './reception-night.css';
+import './reception-workspace.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
