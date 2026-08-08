@@ -4,7 +4,6 @@ import { AppRouter } from './AppRouter';
 import { OperationalToastHost } from './OperationalToastHost';
 import './styles.css';
 import './executive-dashboard.css';
-import './shift-log.css';
 import './tickets.css';
 import './maintenance-v2.css';
 import './groups.css';
