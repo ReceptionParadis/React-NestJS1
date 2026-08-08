@@ -6,7 +6,6 @@ import { CommercialHubPage } from './CommercialHubPage';
 import { DiagnosticPage } from './DiagnosticPage';
 import { GeneralInstructionsPage } from './GeneralInstructionsPage';
 import { GroupsPage } from './GroupsPage';
-import { InterserviceControlPage } from './InterserviceControlPage';
 import { MainCourante } from './MainCourante';
 import { MeetingRoomsPage } from './MeetingRoomsPage';
 import { OperationalPlanningPage } from './OperationalPlanningPage';
@@ -22,17 +21,17 @@ function CurrentPage(){
  const path=window.location.pathname;
  const role=currentRole();
 
- if(path.startsWith('/restaurant')||path.startsWith('/cuisine')||path.startsWith('/housekeeping')){
+ if(
+  path.startsWith('/restaurant')||
+  path.startsWith('/cuisine')||
+  path.startsWith('/housekeeping')||
+  path.startsWith('/suivi-interservice')
+ ){
   window.history.replaceState({},'','/');
   return <App/>;
  }
 
- if(path.startsWith('/suivi-interservice')&&role!=='direction'){
-  window.history.replaceState({},'','/');
-  return <App/>;
- }
-
- if(!canAccessPath(path,role)&&!path.startsWith('/suivi-interservice')){
+ if(!canAccessPath(path,role)){
   window.history.replaceState({},'','/');
   return <App/>;
  }
@@ -44,7 +43,6 @@ function CurrentPage(){
  if(path.startsWith('/journal-exploitation')||path.startsWith('/activite'))return <ActivityJournalPage/>;
  if(path.startsWith('/consignes-generales'))return <GeneralInstructionsPage/>;
  if(path.startsWith('/centre-operations')||path.startsWith('/cahier-consignes')||path.startsWith('/prets')||path.startsWith('/inventaire'))return <OperationsCenterV2Page/>;
- if(path.startsWith('/suivi-interservice'))return <InterserviceControlPage/>;
  if(path.startsWith('/commercial/groupes'))return <GroupsPage/>;
  if(path.startsWith('/commercial/planning-hebdomadaire'))return <WeeklyPlanningPage/>;
  if(path==='/commercial'||path==='/commercial/')return <CommercialHubPage/>;
