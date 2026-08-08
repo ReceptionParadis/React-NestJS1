@@ -31,7 +31,6 @@ import './reception-control-uniform.css';
 import './group-control-print-fix.css';
 import './operational-group-buckets.css';
 import './reception-hub.css';
-import './reception-archives.css';
 import './reception-nav.css';
 import './reception-night.css';
 
