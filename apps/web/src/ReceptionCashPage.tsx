@@ -1,0 +1,26 @@
+import { useMemo } from 'react';
+import { ArrowLeft, Calculator, Paperclip, Printer, RefreshCw, Save } from 'lucide-react';
+import { useOperationalStore } from './useOperationalStore';
+import './reception-cash.css';
+
+type CashDay={date:string;cash:string;card:string;bankTransfer:string;ancvPaper:string;ancvConnect:string;amex:string;adyen:string;bankCheque:string;vegaTotal:string;telecollections:string;notes:string;preparedBy:string;updatedAt?:string};
+const METHODS=[['cash','Espèces'],['card','Carte bancaire · CB sans contact + CB EMX'],['bankTransfer','Virement bancaire'],['ancvPaper','Chèques-Vacances papier'],['ancvConnect','ANCV Connect'],['amex','American Express · Amex'],['adyen','Adyen'],['bankCheque','Chèques bancaires']] as const;
+function iso(){const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}
+function money(v:string){const n=Number(String(v||'').replace(',','.'));return Number.isFinite(n)?n:0}
+function euro(n:number){return n.toLocaleString('fr-FR',{style:'currency',currency:'EUR'})}
+function sessionName(){try{const u=JSON.parse(localStorage.getItem('hospicore.session')||'{}')?.user;return `${u?.firstName||''} ${u?.lastName||''}`.trim()}catch{return''}}
+const EMPTY:CashDay={date:iso(),cash:'',card:'',bankTransfer:'',ancvPaper:'',ancvConnect:'',amex:'',adyen:'',bankCheque:'',vegaTotal:'',telecollections:'',notes:'',preparedBy:sessionName()};
+export function ReceptionCashPage(){
+ const store=useOperationalStore<CashDay>('reception-cash-day',EMPTY),d=store.data;
+ const total=useMemo(()=>METHODS.reduce((s,[k])=>s+money(d[k]),0),[d]);
+ const vega=money(d.vegaTotal),difference=total-vega;
+ const set=(key:keyof CashDay,value:string)=>void store.save({...d,[key]:value,updatedAt:new Date().toISOString()});
+ const print=()=>{void store.save({...d,preparedBy:d.preparedBy||sessionName(),updatedAt:new Date().toISOString()});setTimeout(()=>window.print(),120)};
+ return <div className="cash-page"><header className="cash-toolbar no-print"><button onClick={()=>location.href='/'}><ArrowLeft size={17}/>Centre de Commandement</button><div><strong>Caisse Réception</strong><span>Rapprochement journalier</span></div><button onClick={()=>void store.refresh()}><RefreshCw size={16}/>Actualiser</button><button className="primary" onClick={print}><Printer size={16}/>Imprimer A4</button></header>
+ <main className="cash-sheet"><header className="cash-head"><div><p>HÔTEL PARADIS · LOURDES</p><h1>Caisse du jour</h1><span>Réception · Rapprochement des encaissements</span></div><div className="cash-date"><label>Date<input type="date" value={d.date} onChange={e=>set('date',e.target.value)}/></label><small>Dernière saisie<br/><strong>{d.updatedAt?new Date(d.updatedAt).toLocaleString('fr-FR'):'—'}</strong></small></div></header>
+ <section className="cash-section"><div className="section-title"><Calculator size={18}/><div><h2>Encaissements</h2><p>Reporter les montants réellement encaissés pour la journée.</p></div></div><div className="cash-methods">{METHODS.map(([key,label])=><label key={key}><span>{label}</span><div><input inputMode="decimal" value={d[key]} onChange={e=>set(key,e.target.value)} placeholder="0,00"/><b>€</b></div></label>)}</div></section>
+ <section className="cash-totals"><article><span>Total caisse du jour</span><strong>{euro(total)}</strong><small>Calcul automatique des moyens de paiement</small></article><article><label>Total caisse VEGA<div><input inputMode="decimal" value={d.vegaTotal} onChange={e=>set('vegaTotal',e.target.value)} placeholder="0,00"/><b>€</b></div></label><small>À reporter depuis VEGA</small></article><article className={Math.abs(difference)<0.005?'balanced':'difference'}><span>Écart</span><strong>{euro(difference)}</strong><small>{Math.abs(difference)<0.005?'Caisse équilibrée':'À contrôler avant validation'}</small></article></section>
+ <section className="cash-section attachment"><div className="section-title"><Paperclip size={18}/><div><h2>Télécollectes du jour</h2><p>Zone réservée pour agrafer les tickets de télécollecte après impression.</p></div></div><div className="staple-zone"><span>AGRAFER ICI</span><p>CB / Amex / Adyen / ANCV Connect</p><textarea className="no-print-input" value={d.telecollections} onChange={e=>set('telecollections',e.target.value)} placeholder="Références ou observations télécollectes…"/></div></section>
+ <section className="cash-notes"><label>Observations / écarts à justifier<textarea value={d.notes} onChange={e=>set('notes',e.target.value)} placeholder="Commentaire éventuel…"/></label></section>
+ <footer className="cash-sign"><div><span>Établi par</span><input value={d.preparedBy} onChange={e=>set('preparedBy',e.target.value)} placeholder="Nom et prénom"/></div><div><span>Horodatage d'impression</span><strong className="print-timestamp">Généré lors de l'impression</strong></div><div className="signature"><span>Signature</span><i/></div></footer><div className="cash-footnote"><Save size={13}/>Les données sont enregistrées dans HospiCore au fil de la saisie.</div></main></div>;
+}
