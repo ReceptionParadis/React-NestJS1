@@ -68,11 +68,12 @@ export class OperationalSyncService implements OnModuleInit {
   }
 
   async save(input:{hotelId?:string;namespace:string;payload:Prisma.InputJsonValue;updatedById?:string;expectedVersion?:number}) {
+    if(input.namespace===JOURNAL_NAMESPACE)throw new BadRequestException('Le Journal Live est en lecture seule.');
     const hotelId=await this.resolveHotelId(input.hotelId,input.updatedById);
     const current=await this.prisma.operationalStore.findUnique({where:{hotelId_namespace:{hotelId,namespace:input.namespace}}});
     if(current&&input.expectedVersion!==undefined&&current.version!==input.expectedVersion)throw new ConflictException({message:'Ces données ont été modifiées par un autre utilisateur.',currentVersion:current.version,updatedAt:current.updatedAt});
     const saved=await this.prisma.operationalStore.upsert({where:{hotelId_namespace:{hotelId,namespace:input.namespace}},create:{hotelId,namespace:input.namespace,payload:input.payload,updatedById:input.updatedById},update:{payload:input.payload,updatedById:input.updatedById,version:{increment:1}},include:{updatedBy:{select:{id:true,firstName:true,lastName:true,role:{select:{name:true}}}}}});
-    if(input.namespace!==JOURNAL_NAMESPACE&&!input.namespace.startsWith('_system-'))await this.appendJournal(hotelId,input.namespace,input.updatedById);
+    if(!input.namespace.startsWith('_system-'))await this.appendJournal(hotelId,input.namespace,input.updatedById);
     return saved;
   }
 
