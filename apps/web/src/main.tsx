@@ -12,7 +12,6 @@ import './rooming-import.css';
 import './auth.css';
 import './meeting-rooms.css';
 import './weekly-planning.css';
-import './interservice-control.css';
 import './operations-center.css';
 import './general-instructions.css';
 import './activity-journal.css';
