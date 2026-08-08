@@ -17,7 +17,9 @@ export class DirectoryController {
     return users.filter(user=>!user.email.endsWith('@hospicore.invalid')).map(user=>{
       let roleLabel=user.role.name,baseRole='';
       try{const meta=JSON.parse(user.role.description||'{}');roleLabel=String(meta.label||user.role.name);baseRole=String(meta.baseRole||'');}catch{}
-      return{id:user.id,firstName:user.firstName,lastName:user.lastName,email:user.email,role:user.role.name,roleLabel,baseRole,status:'ACTIVE'};
+      return{id:user.id,firstName:user.firstName,lastName:user.lastName,email:user.email,role:user.role.name,roleLabel,baseRole,service:this.serviceForRole(baseRole||user.role.name),status:'ACTIVE'};
     });
   }
+
+  private serviceForRole(value:string){const r=value.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();if(r.includes('direction')||r.includes('directeur')||r.includes('admin'))return'Direction';if(r.includes('commercial')||r.includes('vente'))return'Commercial';if(r.includes('maintenance')||r.includes('tech'))return'Maintenance';return'Réception'}
 }
