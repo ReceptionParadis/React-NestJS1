@@ -17,6 +17,7 @@ import './general-instructions.css';
 import './activity-journal.css';
 import './tasks.css';
 import './administration.css';
+import './administration-security.css';
 import './diagnostic.css';
 import './hospicore-live.css';
 import './command-center.css';
