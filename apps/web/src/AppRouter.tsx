@@ -3,7 +3,9 @@ import { AdministrationPage } from './AdministrationPage';
 import { App } from './App';
 import { AuthGate } from './AuthGate';
 import { CommercialHubPage } from './CommercialHubPage';
+import { ComplaintsPage } from './ComplaintsPage';
 import { DiagnosticPage } from './DiagnosticPage';
+import { DirectionReportsPage } from './DirectionReportsPage';
 import { GeneralInstructionsPage } from './GeneralInstructionsPage';
 import { GroupsPage } from './GroupsPage';
 import { IndividualRequestsPage } from './IndividualRequestsPage';
@@ -29,6 +31,7 @@ function CurrentPage(){
  if(path.startsWith('/restaurant')||path.startsWith('/cuisine')||path.startsWith('/housekeeping')||path.startsWith('/suivi-interservice')){window.history.replaceState({},'','/');return <App/>}
  if(path.startsWith('/main-courante')){window.history.replaceState({},'','/journal-exploitation');return canAccessPath('/journal-exploitation',role)?<ActivityJournalPage/>:<App/>}
  if(!canAccessPath(path,role)){window.history.replaceState({},'','/');return <App/>}
+ if(path.startsWith('/rapports-direction'))return <DirectionReportsPage/>;
  if(path.startsWith('/diagnostic'))return <DiagnosticPage/>;
  if(path.startsWith('/administration')||path.startsWith('/parametres'))return <AdministrationPage/>;
  if(path.startsWith('/planning-operationnel'))return <OperationalPlanningPage/>;
@@ -42,6 +45,7 @@ function CurrentPage(){
  if(path.startsWith('/planning-hebdomadaire'))return <WeeklyPlanningPage/>;
  if(path==='/reception'||path==='/reception/')return <ReceptionHubPage/>;
  if(path.startsWith('/reception/archives'))return <ReceptionArchivesPage/>;
+ if(path.startsWith('/reception/plaintes'))return <ComplaintsPage/>;
  if(path.startsWith('/reception/demandes-individuelles'))return <IndividualRequestsPage/>;
  if(path.startsWith('/reception/paniers-repas-pdj'))return <MealOrdersPage/>;
  if(path.startsWith('/reception/feuille-route-veilleur'))return <NightWatchRoutePage/>;
