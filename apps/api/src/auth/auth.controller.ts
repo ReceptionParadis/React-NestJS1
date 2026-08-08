@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post } from '@nestjs/common';
+import { Body, Controller, Get, Headers, Param, Patch, Post } from '@nestjs/common';
 import { AuthService } from './auth.service';
 
 @Controller('auth')
@@ -18,5 +18,41 @@ export class AuthController {
   @Post('login')
   login(@Body() body: { email?: string; password?: string }) {
     return this.auth.login(body);
+  }
+
+  @Get('admin/users')
+  adminUsers(@Headers('authorization') authorization?: string) {
+    return this.auth.adminUsers(authorization);
+  }
+
+  @Get('admin/roles')
+  adminRoles(@Headers('authorization') authorization?: string) {
+    return this.auth.adminRoles(authorization);
+  }
+
+  @Post('admin/users')
+  createUser(
+    @Headers('authorization') authorization: string | undefined,
+    @Body() body: { firstName?: string; lastName?: string; email?: string; password?: string; role?: string },
+  ) {
+    return this.auth.createUser(authorization, body);
+  }
+
+  @Patch('admin/users/:id')
+  updateUser(
+    @Headers('authorization') authorization: string | undefined,
+    @Param('id') id: string,
+    @Body() body: { firstName?: string; lastName?: string; email?: string; role?: string; status?: 'ACTIVE' | 'INACTIVE' },
+  ) {
+    return this.auth.updateUser(authorization, id, body);
+  }
+
+  @Post('admin/users/:id/password')
+  resetPassword(
+    @Headers('authorization') authorization: string | undefined,
+    @Param('id') id: string,
+    @Body() body: { password?: string },
+  ) {
+    return this.auth.resetPassword(authorization, id, body.password);
   }
 }
