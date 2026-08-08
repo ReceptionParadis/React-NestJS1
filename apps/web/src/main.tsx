@@ -5,6 +5,7 @@ import { OperationalToastHost } from './OperationalToastHost';
 import { ReceptionMealNav } from './ReceptionMealNav';
 import { UserAccountMenu } from './UserAccountMenu';
 import { TaskNotificationHost } from './TaskNotificationHost';
+import { HandrailNotificationHost } from './HandrailNotificationHost';
 import { cleanupLegacyLocalData } from './legacy-cleanup';
 import './styles.css';
 import './executive-dashboard.css';
@@ -17,6 +18,7 @@ import './meeting-rooms.css';
 import './weekly-planning.css';
 import './operations-center.css';
 import './general-instructions.css';
+import './handrail-notifications.css';
 import './activity-journal.css';
 import './tasks.css';
 import './task-notifications.css';
@@ -52,5 +54,6 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <ReceptionMealNav />
     <UserAccountMenu />
     <TaskNotificationHost />
+    <HandrailNotificationHost />
   </React.StrictMode>,
 );
