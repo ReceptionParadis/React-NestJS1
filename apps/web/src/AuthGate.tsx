@@ -1,7 +1,7 @@
 import { FormEvent, ReactNode, useEffect, useState } from 'react';
 import { FunctionSheetNotice } from './FunctionSheetNotice';
 
-type Session = { token: string; user: { firstName: string; lastName: string; email: string; role: string } };
+type Session = { token: string; user: { firstName: string; lastName: string; email: string; role: string; mustChangePassword?: boolean } };
 
 export function AuthGate({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(() => {
@@ -45,13 +45,8 @@ export function AuthGate({ children }: { children: ReactNode }) {
     const submittedEmail = String(body.email ?? '').trim();
     setEmail(submittedEmail);
     const endpoint = setupRequired ? '/api/auth/setup' : '/api/auth/login';
-
     try {
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
+      const response = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       const data = await response.json();
       if (!response.ok) {
         const message = String(data.message || 'Connexion impossible.');
@@ -69,6 +64,21 @@ export function AuthGate({ children }: { children: ReactNode }) {
     }
   }
 
+  async function changeTemporaryPassword(event:FormEvent<HTMLFormElement>){
+    event.preventDefault();
+    if(!session)return;
+    setError('');
+    const form=new FormData(event.currentTarget),password=String(form.get('password')||''),confirm=String(form.get('confirm')||'');
+    if(password!==confirm){setError('Les deux mots de passe ne correspondent pas.');return}
+    try{
+      const response=await fetch('/api/auth/change-password',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${session.token}`},body:JSON.stringify({password})});
+      const data=await response.json().catch(()=>({}));
+      if(!response.ok){setError(String(data.message||'Modification impossible.'));return}
+      saveSession({...session,user:{...session.user,mustChangePassword:false}});
+    }catch{setError('Impossible de contacter HospiCore. Réessayez dans quelques instants.')}
+  }
+
+  if(session?.user.mustChangePassword)return <main className="auth-page"><section className="auth-card"><div className="auth-brand"><span>H</span><div><strong>HospiCore</strong><small>Hôtel Paradis · Lourdes</small></div></div><p className="auth-eyebrow">Sécurité du compte</p><h1>Choisissez votre mot de passe</h1><p>Vous êtes connecté avec un mot de passe temporaire. Définissez maintenant votre mot de passe personnel avant d’accéder à HospiCore.</p><form onSubmit={changeTemporaryPassword}><label>Nouveau mot de passe<input name="password" type="password" minLength={10} required autoComplete="new-password"/></label><label>Confirmer le mot de passe<input name="confirm" type="password" minLength={10} required autoComplete="new-password"/></label><small className="auth-hint">10 caractères minimum. Ce mot de passe ne sera jamais visible par l’administrateur.</small>{error&&<div className="auth-error">{error}</div>}<button type="submit">Enregistrer et accéder à HospiCore</button></form></section></main>;
   if (session) return <><FunctionSheetNotice/>{children}</>;
   if (loading) return <div className="auth-loading">Ouverture de HospiCore…</div>;
 
