@@ -12,6 +12,7 @@ import { NightWatchRoutePage } from './NightWatchRoutePage';
 import { OperationalPlanningPage } from './OperationalPlanningPage';
 import { OperationsCenterV2Page } from './OperationsCenterV2Page';
 import { ReceptionArchivesPage } from './ReceptionArchivesPage';
+import { ReceptionCashPage } from './ReceptionCashPage';
 import { ReceptionControlsPage } from './ReceptionControlsPage';
 import { ReceptionGroupsPage } from './ReceptionGroupsPage';
 import { ReceptionHubPage } from './ReceptionHubPage';
@@ -23,8 +24,7 @@ import { WeeklyPlanningPage } from './WeeklyPlanningPage';
 import { canAccessPath, currentRole } from './permissions';
 
 function CurrentPage(){
- const path=window.location.pathname;
- const role=currentRole();
+ const path=window.location.pathname;const role=currentRole();
  if(path.startsWith('/restaurant')||path.startsWith('/cuisine')||path.startsWith('/housekeeping')||path.startsWith('/suivi-interservice')){window.history.replaceState({},'','/');return <App/>}
  if(path.startsWith('/main-courante')){window.history.replaceState({},'','/journal-exploitation');return canAccessPath('/journal-exploitation',role)?<ActivityJournalPage/>:<App/>}
  if(!canAccessPath(path,role)){window.history.replaceState({},'','/');return <App/>}
@@ -44,6 +44,7 @@ function CurrentPage(){
  if(path.startsWith('/reception/demandes-individuelles'))return <IndividualRequestsPage/>;
  if(path.startsWith('/reception/feuille-route-veilleur'))return <NightWatchRoutePage/>;
  if(path.startsWith('/reception/fiche-fonction'))return <WeeklyPlanningPage/>;
+ if(path.startsWith('/reception/caisse'))return <ReceptionCashPage/>;
  if(path.startsWith('/reception/arrivees-departs'))return <ReceptionOperationsPage/>;
  if(path.startsWith('/reception/controles'))return <ReceptionControlsPage/>;
  if(path.startsWith('/reception/groupes'))return <ReceptionGroupsPage/>;
