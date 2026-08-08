@@ -6,6 +6,7 @@ import { ReceptionMealNav } from './ReceptionMealNav';
 import { UserAccountMenu } from './UserAccountMenu';
 import { TaskNotificationHost } from './TaskNotificationHost';
 import { HandrailNotificationHost } from './HandrailNotificationHost';
+import { DashboardJournalBridge } from './DashboardJournalBridge';
 import { cleanupLegacyLocalData } from './legacy-cleanup';
 import './styles.css';
 import './executive-dashboard.css';
@@ -55,5 +56,6 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <UserAccountMenu />
     <TaskNotificationHost />
     <HandrailNotificationHost />
+    <DashboardJournalBridge />
   </React.StrictMode>,
 );
