@@ -16,5 +16,5 @@ export function DashboardJournalBridge(){
  const target=document.querySelector<HTMLElement>('.command-journal > div:not(:first-child)');
  useEffect(()=>{const header=document.querySelector<HTMLElement>('.command-journal header p');if(header)header.textContent=`Traçabilité · ${new Date().toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric'})}`},[today]);
  if(!target)return null;
- return createPortal(<>{entries.length?entries.map(e=>{const d=new Date(e.timestamp);return <div key={e.id}><time>{d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit',second:'2-digit'})}</time><div><strong>{e.actor||'HospiCore'} · {e.reference||e.source||e.namespace||e.service}</strong><span>{e.action||'Mise à jour'}</span></div></div>}):<p className="command-empty">Aucune action enregistrée aujourd’hui.</p>}</>,target);
+ return createPortal(<div className="dashboard-journal-live">{entries.length?entries.map(e=>{const d=new Date(e.timestamp);return <div key={e.id}><time>{d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit',second:'2-digit'})}</time><div><strong>{e.actor||'HospiCore'} · {e.reference||e.source||e.namespace||e.service}</strong><span>{e.action||'Mise à jour'}</span></div></div>}):<p className="command-empty">Aucune action enregistrée aujourd’hui.</p>}</div>,target);
 }
