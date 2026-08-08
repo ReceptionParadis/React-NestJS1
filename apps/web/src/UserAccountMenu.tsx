@@ -1,0 +1,64 @@
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { CheckCircle2, ChevronDown, LogOut, ShieldCheck, UserRound } from 'lucide-react';
+import { capabilitiesForRole, roleFromValue, type Capability } from './permissions';
+
+type SessionRole=string|{name?:string;label?:string;baseRole?:string};
+type SessionUser={firstName?:string;lastName?:string;email?:string;role?:SessionRole;permissions?:string[]};
+type Session={user?:SessionUser};
+
+const labels:Record<Capability,string>={
+ 'dashboard.view':'Centre de Commandement',
+ 'reception.view':'Réception · lecture',
+ 'reception.operate':'Réception · opérations',
+ 'group-control.create':'Contrôles Groupe',
+ 'group-control.unlock':'Déverrouillage des contrôles',
+ 'commercial.view':'Commercial · lecture',
+ 'commercial.edit':'Commercial · modification',
+ 'commercial.validate-control':'Validation commerciale',
+ 'maintenance.view':'Maintenance · lecture',
+ 'maintenance.create':'Créer une intervention',
+ 'maintenance.manage':'Piloter la maintenance',
+ 'planning.view':'Planning opérationnel',
+ 'meeting-rooms.view':'Salles de réunion · lecture',
+ 'meeting-rooms.edit':'Salles de réunion · modification',
+ 'tasks.view':'Tâches · lecture',
+ 'tasks.edit':'Tâches · modification',
+ 'instructions.view':'Consignes · lecture',
+ 'instructions.edit':'Consignes · modification',
+ 'operations-center.view':'Centre des opérations · lecture',
+ 'operations-center.edit':'Centre des opérations · modification',
+ 'journal.view':'Journal d’exploitation',
+ 'diagnostic.view':'Diagnostic',
+ 'administration.view':'Administration',
+};
+
+function readSession():Session{try{return JSON.parse(localStorage.getItem('hospicore.session')||'{}')}catch{return{}}}
+function roleLabel(role?:SessionRole){if(typeof role==='object'&&role)return role.label||role.name||'Utilisateur';return String(role||'Utilisateur')}
+
+export function UserAccountMenu(){
+ const[open,setOpen]=useState(false);
+ const root=useRef<HTMLDivElement>(null);
+ const session=readSession(),user=session.user||{};
+ const name=`${user.firstName||'Utilisateur'} ${user.lastName||''}`.trim();
+ const initials=`${user.firstName?.[0]||'H'}${user.lastName?.[0]||'C'}`.toUpperCase();
+ const baseRole=roleFromValue(user.role);
+ const effective=useMemo(()=>{
+  const explicit=Array.isArray(user.permissions)?user.permissions.filter((v):v is Capability=>v in labels):null;
+  return explicit||capabilitiesForRole(baseRole);
+ },[baseRole,user.permissions]);
+ const individualized=Array.isArray(user.permissions);
+ useEffect(()=>{function close(e:MouseEvent){if(root.current&&!root.current.contains(e.target as Node))setOpen(false)}function key(e:KeyboardEvent){if(e.key==='Escape')setOpen(false)}document.addEventListener('mousedown',close);document.addEventListener('keydown',key);return()=>{document.removeEventListener('mousedown',close);document.removeEventListener('keydown',key)}},[]);
+ function logout(){localStorage.removeItem('hospicore.session');localStorage.removeItem('hospicore.token');location.assign('/')}
+ return <div className="user-account" ref={root}>
+  <button className="user-account-trigger" onClick={()=>setOpen(v=>!v)} aria-expanded={open} aria-haspopup="menu" title="Mon compte">
+   <span className="live-v2-avatar">{initials}</span><ChevronDown size={15}/>
+  </button>
+  {open&&<section className="user-account-menu" role="menu">
+   <header><span className="user-account-large-avatar">{initials}</span><div><strong>{name}</strong><small>{user.email||'Adresse e-mail non renseignée'}</small><b>{roleLabel(user.role)}</b></div></header>
+   <div className="user-account-rights-head"><div><ShieldCheck size={17}/><strong>Mes droits</strong></div><span>{effective.length}</span></div>
+   <p className="user-account-rights-note">Lecture seule · {individualized?'droits personnalisés appliqués':'droits hérités du profil'}</p>
+   <div className="user-account-rights">{effective.length?effective.map(cap=><div key={cap}><CheckCircle2 size={14}/><span>{labels[cap]}</span></div>):<div className="empty"><UserRound size={15}/><span>Aucun droit attribué</span></div>}</div>
+   <footer><button onClick={logout}><LogOut size={17}/>Déconnexion</button></footer>
+  </section>}
+ </div>;
+}
