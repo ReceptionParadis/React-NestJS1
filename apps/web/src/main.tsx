@@ -7,6 +7,7 @@ import { UserAccountMenu } from './UserAccountMenu';
 import { TaskNotificationHost } from './TaskNotificationHost';
 import { HandrailNotificationHost } from './HandrailNotificationHost';
 import { DashboardJournalBridge } from './DashboardJournalBridge';
+import { CommandCenterButton } from './CommandCenterButton';
 import { cleanupLegacyLocalData } from './legacy-cleanup';
 import './styles.css';
 import './executive-dashboard.css';
@@ -46,6 +47,7 @@ import './reception-nav.css';
 import './reception-night.css';
 import './reception-workspace.css';
 import './user-account-menu.css';
+import './command-center-button.css';
 
 cleanupLegacyLocalData();
 
@@ -58,5 +60,6 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <TaskNotificationHost />
     <HandrailNotificationHost />
     <DashboardJournalBridge />
+    <CommandCenterButton />
   </React.StrictMode>,
 );
