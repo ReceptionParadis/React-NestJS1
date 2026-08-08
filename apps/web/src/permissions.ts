@@ -4,6 +4,9 @@ export type Capability =
   | 'dashboard.view'
   | 'reception.view'
   | 'reception.operate'
+  | 'cash.view'
+  | 'cash.edit'
+  | 'cash.validate'
   | 'group-control.create'
   | 'group-control.unlock'
   | 'commercial.view'
@@ -45,9 +48,9 @@ function sessionUser(){try{return JSON.parse(localStorage.getItem('hospicore.ses
 export function currentRole(): AppRole { return roleFromValue(sessionUser().role); }
 
 const matrix: Record<AppRole, ReadonlySet<Capability>> = {
-  direction: new Set<Capability>(['dashboard.view','reception.view','reception.operate','group-control.create','group-control.unlock','commercial.view','commercial.edit','commercial.validate-control','maintenance.view','maintenance.create','maintenance.manage','planning.view','meeting-rooms.view','meeting-rooms.edit','tasks.view','tasks.edit','instructions.view','instructions.edit','operations-center.view','operations-center.edit','journal.view','diagnostic.view','administration.view']),
-  reception_manager: new Set<Capability>(['dashboard.view','reception.view','reception.operate','group-control.create','group-control.unlock','maintenance.view','maintenance.create','planning.view','meeting-rooms.view','meeting-rooms.edit','tasks.view','tasks.edit','instructions.view','operations-center.view','operations-center.edit','journal.view','diagnostic.view']),
-  reception: new Set<Capability>(['dashboard.view','reception.view','reception.operate','group-control.create','maintenance.view','maintenance.create','planning.view','meeting-rooms.view','meeting-rooms.edit','tasks.view','tasks.edit','instructions.view','operations-center.view','operations-center.edit','journal.view']),
+  direction: new Set<Capability>(['dashboard.view','reception.view','reception.operate','cash.view','cash.edit','cash.validate','group-control.create','group-control.unlock','commercial.view','commercial.edit','commercial.validate-control','maintenance.view','maintenance.create','maintenance.manage','planning.view','meeting-rooms.view','meeting-rooms.edit','tasks.view','tasks.edit','instructions.view','instructions.edit','operations-center.view','operations-center.edit','journal.view','diagnostic.view','administration.view']),
+  reception_manager: new Set<Capability>(['dashboard.view','reception.view','reception.operate','cash.view','cash.edit','group-control.create','group-control.unlock','maintenance.view','maintenance.create','planning.view','meeting-rooms.view','meeting-rooms.edit','tasks.view','tasks.edit','instructions.view','operations-center.view','operations-center.edit','journal.view','diagnostic.view']),
+  reception: new Set<Capability>(['dashboard.view','reception.view','reception.operate','cash.view','cash.edit','group-control.create','maintenance.view','maintenance.create','planning.view','meeting-rooms.view','meeting-rooms.edit','tasks.view','tasks.edit','instructions.view','operations-center.view','operations-center.edit','journal.view']),
   commercial: new Set<Capability>(['dashboard.view','commercial.view','commercial.edit','commercial.validate-control','group-control.unlock','maintenance.view','maintenance.create','planning.view','meeting-rooms.view','meeting-rooms.edit','tasks.view','tasks.edit','instructions.view','journal.view']),
   maintenance: new Set<Capability>(['dashboard.view','maintenance.view','maintenance.create','maintenance.manage','planning.view','meeting-rooms.view','tasks.view','tasks.edit','instructions.view']),
   unknown: new Set<Capability>(['dashboard.view']),
@@ -65,6 +68,7 @@ export function can(capability: Capability, role: AppRole = currentRole()) {
 
 export function canAccessPath(path: string, role: AppRole = currentRole()) {
   if (path === '/' || path === '') return can('dashboard.view', role);
+  if (path.startsWith('/reception/caisse')) return can('cash.view', role);
   if (path.startsWith('/reception')) return can('reception.view', role);
   if (path.startsWith('/commercial') || path.startsWith('/groupes') || path.startsWith('/planning-hebdomadaire')) return can('commercial.view', role);
   if (path.startsWith('/tickets')) return can('maintenance.view', role);
