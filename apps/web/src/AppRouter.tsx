@@ -6,7 +6,6 @@ import { CommercialHubPage } from './CommercialHubPage';
 import { DiagnosticPage } from './DiagnosticPage';
 import { GeneralInstructionsPage } from './GeneralInstructionsPage';
 import { GroupsPage } from './GroupsPage';
-import { MainCourante } from './MainCourante';
 import { MeetingRoomsPage } from './MeetingRoomsPage';
 import { OperationalPlanningPage } from './OperationalPlanningPage';
 import { OperationsCenterV2Page } from './OperationsCenterV2Page';
@@ -31,6 +30,11 @@ function CurrentPage(){
   return <App/>;
  }
 
+ if(path.startsWith('/main-courante')){
+  window.history.replaceState({},'','/journal-exploitation');
+  return canAccessPath('/journal-exploitation',role)?<ActivityJournalPage/>:<App/>;
+ }
+
  if(!canAccessPath(path,role)){
   window.history.replaceState({},'','/');
   return <App/>;
@@ -48,7 +52,6 @@ function CurrentPage(){
  if(path==='/commercial'||path==='/commercial/')return <CommercialHubPage/>;
  if(path.startsWith('/planning-hebdomadaire'))return <WeeklyPlanningPage/>;
  if(path.startsWith('/reception'))return <ReceptionDailyPage/>;
- if(path.startsWith('/main-courante'))return <MainCourante/>;
  if(path.startsWith('/salles-reunion'))return <MeetingRoomsPage/>;
  if(path.startsWith('/chambres')||path.startsWith('/groupes/allocation')){window.history.replaceState({},'','/salles-reunion');return <MeetingRoomsPage/>}
  if(path.startsWith('/tickets'))return <TicketsPage/>;
