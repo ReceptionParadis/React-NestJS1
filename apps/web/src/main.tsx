@@ -2,6 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { AppRouter } from './AppRouter';
 import { OperationalToastHost } from './OperationalToastHost';
+import { ReceptionMealNav } from './ReceptionMealNav';
 import { UserAccountMenu } from './UserAccountMenu';
 import { cleanupLegacyLocalData } from './legacy-cleanup';
 import './styles.css';
@@ -45,6 +46,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <AppRouter />
     <OperationalToastHost />
+    <ReceptionMealNav />
     <UserAccountMenu />
   </React.StrictMode>,
 );
