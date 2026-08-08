@@ -46,6 +46,7 @@ import './reception-hub.css';
 import './reception-nav.css';
 import './reception-night.css';
 import './reception-workspace.css';
+import './reception-archives-tree.css';
 import './user-account-menu.css';
 import './command-center-button.css';
 import './hospicore-consistency.css';
