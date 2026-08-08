@@ -47,7 +47,7 @@ const JOURNAL_META:Record<string,{service:string;source:string}>={
   'operations-center':{service:'Réception',source:'Centre des opérations'},
   'loans-equipment':{service:'Réception',source:'Prêts & matériel'},
   tasks:{service:'Réception',source:'Tâches'},
-  'general-instructions':{service:'Réception',source:'Consignes'},
+  'general-instructions':{service:'Réception',source:'Main courante'},
   'maintenance-interventions':{service:'Maintenance',source:'Maintenance'},
   'administration-settings':{service:'Direction',source:'Administration'},
 };
@@ -87,10 +87,17 @@ export class OperationalSyncService implements OnModuleInit {
     const actor=user?`${user.firstName} ${user.lastName}`.trim():'HospiCore';
     const role=user?.role?.name||'Système';
     const service=this.serviceFromRole(role,meta.service);
-    const store=await this.prisma.operationalStore.findUnique({where:{hotelId_namespace:{hotelId,namespace:JOURNAL_NAMESPACE}}});
-    const entries:Array<JournalEntry>=Array.isArray(store?.payload)?store!.payload as unknown as JournalEntry[]:[];
     const entry:JournalEntry={id:`${Date.now()}-${Math.random().toString(36).slice(2,9)}`,at:new Date().toISOString(),actorId:user?.id,actor,role,service,namespace,source:meta.source,action:`Mise à jour · ${meta.source}`};
-    await this.prisma.operationalStore.upsert({where:{hotelId_namespace:{hotelId,namespace:JOURNAL_NAMESPACE}},create:{hotelId,namespace:JOURNAL_NAMESPACE,payload:[entry] as any,updatedById:userId},update:{payload:[entry,...entries] as any,updatedById:userId,version:{increment:1}}});
+    for(let attempt=0;attempt<6;attempt++){
+      const store=await this.prisma.operationalStore.findUnique({where:{hotelId_namespace:{hotelId,namespace:JOURNAL_NAMESPACE}}});
+      if(!store){
+        try{await this.prisma.operationalStore.create({data:{hotelId,namespace:JOURNAL_NAMESPACE,payload:[entry] as any,updatedById:userId}});return}catch{continue}
+      }
+      const entries:Array<JournalEntry>=Array.isArray(store.payload)?store.payload as unknown as JournalEntry[]:[];
+      const updated=await this.prisma.operationalStore.updateMany({where:{id:store.id,version:store.version},data:{payload:[entry,...entries] as any,updatedById:userId,version:{increment:1}}});
+      if(updated.count===1)return;
+    }
+    throw new ConflictException('Impossible de journaliser l’action après plusieurs mises à jour simultanées.');
   }
 
   private serviceFromRole(role:string,fallback:string){const r=role.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();if(r.includes('direction')||r.includes('directeur')||r.includes('admin'))return'Direction';if(r.includes('commercial')||r.includes('vente'))return'Commercial';if(r.includes('maintenance')||r.includes('technique')||r.includes('technicien'))return'Maintenance';if(r.includes('reception')||r.includes('front'))return'Réception';return fallback}
