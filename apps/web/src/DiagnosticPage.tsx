@@ -7,7 +7,7 @@ type Session={token?:string;user?:SessionUser};
 type Namespace={namespace:string;version:number;updatedAt:string;updatedById?:string};
 type DiagnosticResponse={status:string;checkedAt:string;responseTimeMs:number;database:{connected:boolean;serverTime?:string};hotel?:{id:string;name:string;slug:string}|null;user?:{id:string;firstName:string;lastName:string;email:string;hotelId:string;role:{name:string}}|null;operationalStore:{available:boolean;namespaces:Namespace[]}};
 type CheckState='ok'|'warning'|'error'|'loading';
-const expectedNamespaces=['group-360','meeting-rooms','maintenance-interventions','tasks','general-instructions','operations-center','function-sheets'] as const;
+const expectedNamespaces=['group-360','meeting-rooms','maintenance-interventions','tasks','general-instructions','operations-center','function-sheets','individual-requests','night-route-notes'] as const;
 const namespaceInitialValues:Record<(typeof expectedNamespaces)[number],unknown>={
  'group-360':[],
  'meeting-rooms':[],
@@ -16,6 +16,8 @@ const namespaceInitialValues:Record<(typeof expectedNamespaces)[number],unknown>
  'general-instructions':[],
  'operations-center':{loans:[],equipment:[]},
  'function-sheets':[],
+ 'individual-requests':[],
+ 'night-route-notes':[],
 };
 function readSession():Session{try{return JSON.parse(localStorage.getItem('hospicore.session')||'{}')}catch{return{}}}
 function roleLabel(role:SessionUser['role']){return typeof role==='object'?role?.name||'Absent':role||'Absent'}
