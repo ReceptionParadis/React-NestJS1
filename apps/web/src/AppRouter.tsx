@@ -12,7 +12,8 @@ import { NightWatchRoutePage } from './NightWatchRoutePage';
 import { OperationalPlanningPage } from './OperationalPlanningPage';
 import { OperationsCenterV2Page } from './OperationsCenterV2Page';
 import { ReceptionArchivesPage } from './ReceptionArchivesPage';
-import { ReceptionDailyPage } from './ReceptionDailyPage';
+import { ReceptionControlsPage } from './ReceptionControlsPage';
+import { ReceptionGroupsPage } from './ReceptionGroupsPage';
 import { ReceptionHubPage } from './ReceptionHubPage';
 import { RoomingListImportPage } from './RoomingListImportPage';
 import { TasksPage } from './TasksPage';
@@ -24,21 +25,14 @@ function CurrentPage(){
  const path=window.location.pathname;
  const role=currentRole();
 
- if(
-  path.startsWith('/restaurant')||
-  path.startsWith('/cuisine')||
-  path.startsWith('/housekeeping')||
-  path.startsWith('/suivi-interservice')
- ){
+ if(path.startsWith('/restaurant')||path.startsWith('/cuisine')||path.startsWith('/housekeeping')||path.startsWith('/suivi-interservice')){
   window.history.replaceState({},'','/');
   return <App/>;
  }
-
  if(path.startsWith('/main-courante')){
   window.history.replaceState({},'','/journal-exploitation');
   return canAccessPath('/journal-exploitation',role)?<ActivityJournalPage/>:<App/>;
  }
-
  if(!canAccessPath(path,role)){
   window.history.replaceState({},'','/');
   return <App/>;
@@ -60,7 +54,8 @@ function CurrentPage(){
  if(path.startsWith('/reception/demandes-individuelles'))return <IndividualRequestsPage/>;
  if(path.startsWith('/reception/feuille-route-veilleur'))return <NightWatchRoutePage/>;
  if(path.startsWith('/reception/fiche-fonction'))return <WeeklyPlanningPage/>;
- if(path.startsWith('/reception/groupes')||path.startsWith('/reception/controles'))return <ReceptionDailyPage/>;
+ if(path.startsWith('/reception/controles'))return <ReceptionControlsPage/>;
+ if(path.startsWith('/reception/groupes'))return <ReceptionGroupsPage/>;
  if(path.startsWith('/salles-reunion'))return <MeetingRoomsPage/>;
  if(path.startsWith('/chambres')||path.startsWith('/groupes/allocation')){window.history.replaceState({},'','/salles-reunion');return <MeetingRoomsPage/>}
  if(path.startsWith('/tickets'))return <TicketsPage/>;
