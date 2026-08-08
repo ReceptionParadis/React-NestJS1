@@ -29,6 +29,7 @@ import './diagnostic.css';
 import './hospicore-live.css';
 import './command-center.css';
 import './command-journal-readability.css';
+import './dashboard-journal-sync.css';
 import './command-role-filter.css';
 import './command-maintenance-widget.css';
 import './commercial-hub.css';
