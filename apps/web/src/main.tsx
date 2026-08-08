@@ -2,6 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { AppRouter } from './AppRouter';
 import { OperationalToastHost } from './OperationalToastHost';
+import { cleanupLegacyLocalData } from './legacy-cleanup';
 import './styles.css';
 import './executive-dashboard.css';
 import './tickets.css';
@@ -34,6 +35,8 @@ import './reception-hub.css';
 import './reception-nav.css';
 import './reception-night.css';
 import './reception-workspace.css';
+
+cleanupLegacyLocalData();
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
