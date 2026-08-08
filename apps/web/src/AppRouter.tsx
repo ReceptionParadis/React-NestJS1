@@ -15,6 +15,7 @@ import { ReceptionArchivesPage } from './ReceptionArchivesPage';
 import { ReceptionControlsPage } from './ReceptionControlsPage';
 import { ReceptionGroupsPage } from './ReceptionGroupsPage';
 import { ReceptionHubPage } from './ReceptionHubPage';
+import { ReceptionOperationsPage } from './ReceptionOperationsPage';
 import { RoomingListImportPage } from './RoomingListImportPage';
 import { TasksPage } from './TasksPage';
 import { TicketsPage } from './TicketsPage';
@@ -24,20 +25,9 @@ import { canAccessPath, currentRole } from './permissions';
 function CurrentPage(){
  const path=window.location.pathname;
  const role=currentRole();
-
- if(path.startsWith('/restaurant')||path.startsWith('/cuisine')||path.startsWith('/housekeeping')||path.startsWith('/suivi-interservice')){
-  window.history.replaceState({},'','/');
-  return <App/>;
- }
- if(path.startsWith('/main-courante')){
-  window.history.replaceState({},'','/journal-exploitation');
-  return canAccessPath('/journal-exploitation',role)?<ActivityJournalPage/>:<App/>;
- }
- if(!canAccessPath(path,role)){
-  window.history.replaceState({},'','/');
-  return <App/>;
- }
-
+ if(path.startsWith('/restaurant')||path.startsWith('/cuisine')||path.startsWith('/housekeeping')||path.startsWith('/suivi-interservice')){window.history.replaceState({},'','/');return <App/>}
+ if(path.startsWith('/main-courante')){window.history.replaceState({},'','/journal-exploitation');return canAccessPath('/journal-exploitation',role)?<ActivityJournalPage/>:<App/>}
+ if(!canAccessPath(path,role)){window.history.replaceState({},'','/');return <App/>}
  if(path.startsWith('/diagnostic'))return <DiagnosticPage/>;
  if(path.startsWith('/administration')||path.startsWith('/parametres'))return <AdministrationPage/>;
  if(path.startsWith('/planning-operationnel'))return <OperationalPlanningPage/>;
@@ -54,6 +44,7 @@ function CurrentPage(){
  if(path.startsWith('/reception/demandes-individuelles'))return <IndividualRequestsPage/>;
  if(path.startsWith('/reception/feuille-route-veilleur'))return <NightWatchRoutePage/>;
  if(path.startsWith('/reception/fiche-fonction'))return <WeeklyPlanningPage/>;
+ if(path.startsWith('/reception/arrivees-departs'))return <ReceptionOperationsPage/>;
  if(path.startsWith('/reception/controles'))return <ReceptionControlsPage/>;
  if(path.startsWith('/reception/groupes'))return <ReceptionGroupsPage/>;
  if(path.startsWith('/salles-reunion'))return <MeetingRoomsPage/>;
@@ -63,5 +54,4 @@ function CurrentPage(){
  if(path.startsWith('/groupes')){window.history.replaceState({},'','/commercial/groupes');return <GroupsPage/>}
  return <App/>;
 }
-
 export function AppRouter(){return <AuthGate><CurrentPage/></AuthGate>}
