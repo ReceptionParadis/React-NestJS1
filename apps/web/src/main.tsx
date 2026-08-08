@@ -4,6 +4,7 @@ import { AppRouter } from './AppRouter';
 import { OperationalToastHost } from './OperationalToastHost';
 import { ReceptionMealNav } from './ReceptionMealNav';
 import { UserAccountMenu } from './UserAccountMenu';
+import { TaskNotificationHost } from './TaskNotificationHost';
 import { cleanupLegacyLocalData } from './legacy-cleanup';
 import './styles.css';
 import './executive-dashboard.css';
@@ -18,6 +19,7 @@ import './operations-center.css';
 import './general-instructions.css';
 import './activity-journal.css';
 import './tasks.css';
+import './task-notifications.css';
 import './administration.css';
 import './administration-security.css';
 import './diagnostic.css';
@@ -49,5 +51,6 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <OperationalToastHost />
     <ReceptionMealNav />
     <UserAccountMenu />
+    <TaskNotificationHost />
   </React.StrictMode>,
 );
