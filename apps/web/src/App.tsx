@@ -37,6 +37,8 @@ const receptionSubmenu:NavItem[]=[
  {label:'Fiche Groupe 360°',icon:ConciergeBell,href:'/reception/groupes'},
  {label:'Fiche de fonction hebdomadaire',icon:FileText,href:'/reception/fiche-fonction'},
  {label:'Contrôles Groupe à compléter',icon:ClipboardCheck,href:'/reception/controles'},
+ {label:'Demandes clients individuels',icon:Bell,href:'/reception/demandes-individuelles'},
+ {label:'Feuille de route veilleur',icon:History,href:'/reception/feuille-route-veilleur'},
  {label:'Archives',icon:FileArchive,href:'/reception/archives'},
 ];
 
