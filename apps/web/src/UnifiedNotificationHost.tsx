@@ -20,7 +20,10 @@ function serviceForRole(value:string):Service{const r=value.normalize('NFD').rep
 function classify(e:JournalEntry):ImportantNotification|null{
  const raw=text(e);
  let kind:NotificationKind|null=null,title='',href='';
- if(raw.includes('group-360')||raw.includes('groupe 360')||raw.includes('fiche groupe')){kind='group';title='Fiche Groupe 360°';href='/reception/groupes'}
+ if(raw.includes('group-360')||raw.includes('groupe 360')||raw.includes('fiche groupe')){
+  if(!(raw.includes('valide')||raw.includes('revalide')))return null;
+  kind='group';title=raw.includes('revalide')?'Fiche Groupe 360° revalidée':'Fiche Groupe 360° validée';href='/reception/groupes';
+ }
  else if(raw.includes('weekly-planning')||raw.includes('fiche de fonction')||raw.includes('function-sheet')){kind='function';title='Fiche de fonction';href='/reception/fiche-fonction'}
  else if(raw.includes('operations-center')||raw.includes('loan')||raw.includes('pret')||raw.includes('prêt')){kind='loan';title='Prêt';href='/centre-operations'}
  else if(raw.includes('complaint')||raw.includes('plainte')){kind='complaint';title='Plainte client';href='/reception/plaintes'}
