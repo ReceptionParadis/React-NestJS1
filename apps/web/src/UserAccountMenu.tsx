@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { CheckCircle2, ChevronDown, LogOut, ShieldCheck, UserRound } from 'lucide-react';
 import { capabilitiesForRole, roleFromValue, type Capability } from './permissions';
 
