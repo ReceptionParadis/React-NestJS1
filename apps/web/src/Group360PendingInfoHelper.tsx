@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useOperationalStore } from './useOperationalStore';
+import './group-pending-helper.css';
 
 type Group360Record={id:string;commercialValidated?:boolean;validatedAt?:string;validatedBy?:string;roomingPending?:boolean;arrivalTimePending?:boolean;departureTimePending?:boolean;[key:string]:unknown};
 
