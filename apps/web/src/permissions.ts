@@ -1,9 +1,13 @@
-export type AppRole = 'direction' | 'reception_manager' | 'reception' | 'commercial' | 'maintenance' | 'unknown';
+export type AppRole = 'direction' | 'reception_manager' | 'reception' | 'night_auditor' | 'commercial' | 'maintenance' | 'unknown';
 
 export type Capability =
   | 'dashboard.view'
   | 'reception.view'
   | 'reception.operate'
+  | 'complaints.view'
+  | 'complaints.edit'
+  | 'night-route.view'
+  | 'night-route.edit'
   | 'cash.view'
   | 'cash.edit'
   | 'cash.validate'
@@ -34,10 +38,11 @@ function normalize(value: string) { return value.normalize('NFD').replace(/[\u03
 export function roleFromValue(value: unknown): AppRole {
   if (typeof value === 'object' && value) {
     const baseRole = String((value as { baseRole?: string }).baseRole || '') as AppRole;
-    if (['direction','reception_manager','reception','commercial','maintenance'].includes(baseRole)) return baseRole;
+    if (['direction','reception_manager','reception','night_auditor','commercial','maintenance'].includes(baseRole)) return baseRole;
   }
   const raw = normalize(String(typeof value === 'object' && value && 'name' in value ? (value as { name?: string }).name || '' : value || ''));
   if (raw.includes('direction') || raw.includes('directeur') || raw.includes('admin')) return 'direction';
+  if (raw.includes('veilleur') || raw.includes('night auditor') || raw.includes('night audit')) return 'night_auditor';
   if (raw.includes('chef de reception') || raw.includes('chef reception') || raw.includes('responsable de reception') || raw.includes('responsable reception') || raw.includes('front office manager')) return 'reception_manager';
   if (raw.includes('maintenance') || raw.includes('technique') || raw.includes('technicien')) return 'maintenance';
   if (raw.includes('commercial') || raw.includes('vente')) return 'commercial';
@@ -49,9 +54,10 @@ function sessionUser(){try{return JSON.parse(localStorage.getItem('hospicore.ses
 export function currentRole(): AppRole { return roleFromValue(sessionUser().role); }
 
 const matrix: Record<AppRole, ReadonlySet<Capability>> = {
-  direction: new Set<Capability>(['dashboard.view','reception.view','reception.operate','cash.view','cash.edit','cash.validate','group-control.create','group-control.unlock','commercial.view','commercial.edit','commercial.validate-control','maintenance.view','maintenance.create','maintenance.manage','planning.view','meeting-rooms.view','meeting-rooms.edit','tasks.view','tasks.edit','instructions.view','instructions.edit','operations-center.view','operations-center.edit','journal.view','direction-reports.view','diagnostic.view','administration.view']),
-  reception_manager: new Set<Capability>(['dashboard.view','reception.view','reception.operate','cash.view','cash.edit','group-control.create','group-control.unlock','maintenance.view','maintenance.create','planning.view','meeting-rooms.view','meeting-rooms.edit','tasks.view','tasks.edit','instructions.view','instructions.edit','operations-center.view','operations-center.edit','journal.view','diagnostic.view']),
-  reception: new Set<Capability>(['dashboard.view','reception.view','reception.operate','cash.view','cash.edit','group-control.create','maintenance.view','maintenance.create','planning.view','meeting-rooms.view','meeting-rooms.edit','tasks.view','tasks.edit','instructions.view','instructions.edit','operations-center.view','operations-center.edit','journal.view']),
+  direction: new Set<Capability>(['dashboard.view','reception.view','reception.operate','complaints.view','complaints.edit','night-route.view','night-route.edit','cash.view','cash.edit','cash.validate','group-control.create','group-control.unlock','commercial.view','commercial.edit','commercial.validate-control','maintenance.view','maintenance.create','maintenance.manage','planning.view','meeting-rooms.view','meeting-rooms.edit','tasks.view','tasks.edit','instructions.view','instructions.edit','operations-center.view','operations-center.edit','journal.view','direction-reports.view','diagnostic.view','administration.view']),
+  reception_manager: new Set<Capability>(['dashboard.view','reception.view','reception.operate','complaints.view','complaints.edit','night-route.view','night-route.edit','cash.view','cash.edit','group-control.create','group-control.unlock','maintenance.view','maintenance.create','planning.view','meeting-rooms.view','meeting-rooms.edit','tasks.view','tasks.edit','instructions.view','instructions.edit','operations-center.view','operations-center.edit','journal.view','diagnostic.view']),
+  reception: new Set<Capability>(['dashboard.view','reception.view','reception.operate','complaints.view','complaints.edit','night-route.view','night-route.edit','cash.view','cash.edit','group-control.create','maintenance.view','maintenance.create','planning.view','meeting-rooms.view','meeting-rooms.edit','tasks.view','tasks.edit','instructions.view','instructions.edit','operations-center.view','operations-center.edit','journal.view']),
+  night_auditor: new Set<Capability>(['dashboard.view','complaints.view','complaints.edit','night-route.view','night-route.edit','instructions.view']),
   commercial: new Set<Capability>(['dashboard.view','commercial.view','commercial.edit','commercial.validate-control','group-control.unlock','maintenance.view','maintenance.create','planning.view','meeting-rooms.view','meeting-rooms.edit','tasks.view','tasks.edit','instructions.view','instructions.edit','journal.view']),
   maintenance: new Set<Capability>(['dashboard.view','maintenance.view','maintenance.create','maintenance.manage','planning.view','meeting-rooms.view','tasks.view','tasks.edit','instructions.view','instructions.edit']),
   unknown: new Set<Capability>(['dashboard.view']),
@@ -70,7 +76,10 @@ export function can(capability: Capability, role: AppRole = currentRole()) {
 export function canAccessPath(path: string, role: AppRole = currentRole()) {
   if (path === '/' || path === '') return can('dashboard.view', role);
   if (path.startsWith('/rapports-direction')) return role==='direction';
+  if (path.startsWith('/reception/plaintes')) return can('complaints.view', role);
+  if (path.startsWith('/reception/feuille-route-veilleur')) return can('night-route.view', role);
   if (path.startsWith('/reception/caisse')) return can('cash.view', role);
+  if (path === '/reception' || path === '/reception/') return can('reception.view', role);
   if (path.startsWith('/reception')) return can('reception.view', role);
   if (path.startsWith('/commercial') || path.startsWith('/groupes') || path.startsWith('/planning-hebdomadaire')) return can('commercial.view', role);
   if (path.startsWith('/tickets')) return can('maintenance.view', role);
