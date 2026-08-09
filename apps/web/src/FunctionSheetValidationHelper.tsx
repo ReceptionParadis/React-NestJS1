@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { CheckCheck } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { can, currentRole } from './permissions';
@@ -7,7 +7,6 @@ import { useOperationalStore } from './useOperationalStore';
 type LineStatus='À relire'|'Validée';
 type FunctionLine={id:string;groupId:string;groupName?:string;lineStatus?:LineStatus;validatedBy?:string;validatedAt?:string;[key:string]:unknown};
 type WeeklySheet={id:string;weekStart:string;weekEnd:string;status?:string;lines?:FunctionLine[];validatedForPrintBy?:string;validatedForPrintAt?:string;lockedBy?:string;lockedAt?:string;[key:string]:unknown};
-
 type SessionUser={name:string};
 function sessionUser():SessionUser{try{const s=JSON.parse(localStorage.getItem('hospicore.session')||'{}'),u=s.user||{};return{name:`${u.firstName||'Utilisateur'} ${u.lastName||'HospiCore'}`.trim()}}catch{return{name:'Utilisateur HospiCore'}}}
 function stamp(){return new Date().toLocaleString('fr-FR')}
@@ -15,10 +14,10 @@ function isoFromFr(value:string){const m=value.match(/(\d{2})\/(\d{2})\/(\d{4})/
 function displayedWeekStart(){return isoFromFr(document.querySelector<HTMLElement>('.weekly-nav strong')?.textContent||'')}
 
 export function FunctionSheetValidationHelper(){
- const store=useOperationalStore<WeeklySheet[]>('function-sheets',[]);
- const role=currentRole(),allowed=can('commercial.edit',role),user=sessionUser(),mountRef=useRef<HTMLElement|null>(null);
+ const store=useOperationalStore<WeeklySheet[]>('function-sheets',[]),[mount,setMount]=useState<HTMLElement|null>(null);
+ const role=currentRole(),allowed=can('commercial.edit',role),user=sessionUser();
  useEffect(()=>{
-  if(!allowed||!window.location.pathname.startsWith('/reception/fiche-fonction'))return;
+  if(!allowed||!window.location.pathname.startsWith('/reception/fiche-fonction')){setMount(null);return;}
   const bind=()=>{
    const weekStart=displayedWeekStart(),sheet=store.data.find(s=>s.weekStart===weekStart);if(!sheet)return;
    document.querySelectorAll<HTMLButtonElement>('.function-sheet-table tbody button').forEach(button=>{
@@ -35,14 +34,15 @@ export function FunctionSheetValidationHelper(){
      void store.save(store.data.map(s=>s.id===currentSheet.id?{...s,lines,status:'Préparation',validatedForPrintBy:'',validatedForPrintAt:'',lockedBy:'',lockedAt:''}:s));
     },true);
    });
-   const footer=document.querySelector<HTMLElement>('.function-sheet-footer');
-   if(footer&&!mountRef.current){let mount=footer.querySelector<HTMLElement>('.function-validate-all-mount');if(!mount){mount=document.createElement('div');mount.className='function-validate-all-mount';footer.appendChild(mount)}mountRef.current=mount;}
+   const footer=document.querySelector<HTMLElement>('.function-sheet-footer');if(!footer)return;
+   let node=footer.querySelector<HTMLElement>('.function-validate-all-mount');if(!node){node=document.createElement('div');node.className='function-validate-all-mount';footer.appendChild(node)}
+   if(node!==mount)setMount(node);
   };
   bind();const observer=new MutationObserver(()=>queueMicrotask(bind));observer.observe(document.body,{subtree:true,childList:true,attributes:true,attributeFilter:['disabled','class']});
-  return()=>{observer.disconnect();document.querySelectorAll('[data-function-validation-helper="true"]').forEach(el=>el.removeAttribute('data-function-validation-helper'));document.querySelectorAll('.function-validate-all-mount').forEach(el=>el.remove());mountRef.current=null};
- },[allowed,store.data]);
- if(!allowed||!mountRef.current)return null;
+  return()=>{observer.disconnect();document.querySelectorAll('[data-function-validation-helper="true"]').forEach(el=>el.removeAttribute('data-function-validation-helper'));document.querySelectorAll('.function-validate-all-mount').forEach(el=>el.remove());setMount(null)};
+ },[allowed,store.data,mount]);
+ if(!allowed||!mount)return null;
  const weekStart=displayedWeekStart(),sheet=store.data.find(s=>s.weekStart===weekStart),pending=(sheet?.lines||[]).filter(l=>l.lineStatus!=='Validée').length;
  const validateAll=()=>{if(!sheet||!(sheet.lines||[]).length)return;const at=stamp(),lines=(sheet.lines||[]).map(line=>({...line,lineStatus:'Validée' as const,validatedBy:user.name,validatedAt:at}));void store.save(store.data.map(s=>s.id===sheet.id?{...s,lines,status:'Préparation',validatedForPrintBy:'',validatedForPrintAt:'',lockedBy:'',lockedAt:''}:s));};
- return createPortal(<button type="button" className="function-validate-all" disabled={!pending} onClick={validateAll}><CheckCheck size={17}/>{pending?`Valider toute la fiche (${pending})`:'Toute la fiche est validée'}</button>,mountRef.current);
+ return createPortal(<button type="button" className="function-validate-all" disabled={!pending} onClick={validateAll}><CheckCheck size={17}/>{pending?`Valider toute la fiche (${pending})`:'Toute la fiche est validée'}</button>,mount);
 }
