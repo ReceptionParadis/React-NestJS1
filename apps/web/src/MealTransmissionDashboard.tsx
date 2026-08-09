@@ -19,8 +19,8 @@ export function MealTransmissionDashboard(){
   if(window.location.pathname!=='/'&&window.location.pathname!=='')return;
   let node=document.getElementById('meal-transmission-dashboard-mount') as HTMLElement|null;
   const attach=()=>{
-   const host=document.querySelector('.executive-main');if(!host)return false;
-   if(!node){node=document.createElement('div');node.id='meal-transmission-dashboard-mount';const metrics=host.querySelector('.executive-metrics');metrics?.after(node);if(!metrics)host.appendChild(node);}
+   const host=document.querySelector('.command-content') as HTMLElement|null;if(!host)return false;
+   if(!node){node=document.createElement('div');node.id='meal-transmission-dashboard-mount';const kpis=host.querySelector('.command-kpis');if(kpis)kpis.after(node);else host.prepend(node);}
    setMount(node);return true;
   };
   if(attach())return()=>{node?.remove()};
