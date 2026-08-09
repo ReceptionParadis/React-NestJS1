@@ -36,13 +36,13 @@ export type Capability =
 function normalize(value: string) { return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim(); }
 
 export function roleFromValue(value: unknown): AppRole {
+  const raw = normalize(String(typeof value === 'object' && value && 'name' in value ? (value as { name?: string }).name || '' : value || ''));
+  if (raw.includes('veilleur') || raw.includes('night auditor') || raw.includes('night audit')) return 'night_auditor';
   if (typeof value === 'object' && value) {
     const baseRole = String((value as { baseRole?: string }).baseRole || '') as AppRole;
     if (['direction','reception_manager','reception','night_auditor','commercial','maintenance'].includes(baseRole)) return baseRole;
   }
-  const raw = normalize(String(typeof value === 'object' && value && 'name' in value ? (value as { name?: string }).name || '' : value || ''));
   if (raw.includes('direction') || raw.includes('directeur') || raw.includes('admin')) return 'direction';
-  if (raw.includes('veilleur') || raw.includes('night auditor') || raw.includes('night audit')) return 'night_auditor';
   if (raw.includes('chef de reception') || raw.includes('chef reception') || raw.includes('responsable de reception') || raw.includes('responsable reception') || raw.includes('front office manager')) return 'reception_manager';
   if (raw.includes('maintenance') || raw.includes('technique') || raw.includes('technicien')) return 'maintenance';
   if (raw.includes('commercial') || raw.includes('vente')) return 'commercial';
@@ -69,7 +69,9 @@ export function allCapabilities(): Capability[]{return Array.from(new Set(Object
 function sessionPermissions():ReadonlySet<Capability>|null{const raw=sessionUser().permissions;if(!Array.isArray(raw))return null;return new Set(raw.filter((item:unknown)=>typeof item==='string') as Capability[])}
 
 export function can(capability: Capability, role: AppRole = currentRole()) {
-  const current=currentRole(),overrides=role===current?sessionPermissions():null;
+  const current=currentRole();
+  if(current==='night_auditor'&&role==='night_auditor')return matrix.night_auditor.has(capability);
+  const overrides=role===current?sessionPermissions():null;
   return overrides ? overrides.has(capability) : matrix[role].has(capability);
 }
 
