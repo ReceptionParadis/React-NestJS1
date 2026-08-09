@@ -11,6 +11,7 @@ import { HandrailNotificationHost } from './HandrailNotificationHost';
 import { DirectionReportNotificationHost } from './DirectionReportNotificationHost';
 import { DashboardJournalBridge } from './DashboardJournalBridge';
 import { CommandCenterButton } from './CommandCenterButton';
+import { NightAuditorRoleBootstrap } from './NightAuditorRoleBootstrap';
 import { cleanupLegacyLocalData } from './legacy-cleanup';
 import './styles.css';
 import './executive-dashboard.css';
@@ -72,5 +73,6 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <DirectionReportNotificationHost />
     <DashboardJournalBridge />
     <CommandCenterButton />
+    <NightAuditorRoleBootstrap />
   </React.StrictMode>,
 );
