@@ -14,6 +14,7 @@ import { FunctionSheetPrintCleanup } from './FunctionSheetPrintCleanup';
 import { MealOrderAutoSync } from './MealOrderAutoSync';
 import { PdjBoxMealRow } from './PdjBoxMealRow';
 import { MealTransmissionDashboard } from './MealTransmissionDashboard';
+import { Group360PendingInfoHelper } from './Group360PendingInfoHelper';
 import { cleanupLegacyLocalData } from './legacy-cleanup';
 import './styles.css';
 import './executive-dashboard.css';
@@ -68,6 +69,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <MealOrderAutoSync />
     <PdjBoxMealRow />
     <MealTransmissionDashboard />
+    <Group360PendingInfoHelper />
     <OperationalToastHost />
     <ReceptionMealNav />
     <ReceptionComplaintsNav />
