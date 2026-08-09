@@ -15,6 +15,7 @@ import { MealOrderAutoSync } from './MealOrderAutoSync';
 import { PdjBoxMealRow } from './PdjBoxMealRow';
 import { MealTransmissionDashboard } from './MealTransmissionDashboard';
 import { Group360PendingInfoHelper } from './Group360PendingInfoHelper';
+import { GroupCreateExperience } from './GroupCreateExperience';
 import { cleanupLegacyLocalData } from './legacy-cleanup';
 import './styles.css';
 import './executive-dashboard.css';
@@ -70,6 +71,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <PdjBoxMealRow />
     <MealTransmissionDashboard />
     <Group360PendingInfoHelper />
+    <GroupCreateExperience />
     <OperationalToastHost />
     <ReceptionMealNav />
     <ReceptionComplaintsNav />
