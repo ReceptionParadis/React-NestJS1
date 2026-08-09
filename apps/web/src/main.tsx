@@ -11,10 +11,13 @@ import { DashboardJournalBridge } from './DashboardJournalBridge';
 import { CommandCenterButton } from './CommandCenterButton';
 import { NightAuditorNav } from './NightAuditorNav';
 import { FunctionSheetPrintCleanup } from './FunctionSheetPrintCleanup';
+import { FunctionSheetSourceSync } from './FunctionSheetSourceSync';
+import { FunctionSheetRedistributionControl } from './FunctionSheetRedistributionControl';
 import { MealOrderAutoSync } from './MealOrderAutoSync';
 import { PdjBoxMealRow } from './PdjBoxMealRow';
 import { MealTransmissionDashboard } from './MealTransmissionDashboard';
 import { Group360PendingInfoHelper } from './Group360PendingInfoHelper';
+import { Group360DeleteAction } from './Group360DeleteAction';
 import { GroupCreateExperience } from './GroupCreateExperience';
 import { cleanupLegacyLocalData } from './legacy-cleanup';
 import './styles.css';
@@ -22,6 +25,7 @@ import './executive-dashboard.css';
 import './tickets.css';
 import './maintenance-v2.css';
 import './groups.css';
+import './group-delete-action.css';
 import './group-meal-highlights.css';
 import './rooming-import.css';
 import './auth.css';
@@ -66,11 +70,14 @@ cleanupLegacyLocalData();
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <AppRouter />
+    <FunctionSheetSourceSync />
     <FunctionSheetPrintCleanup />
+    <FunctionSheetRedistributionControl />
     <MealOrderAutoSync />
     <PdjBoxMealRow />
     <MealTransmissionDashboard />
     <Group360PendingInfoHelper />
+    <Group360DeleteAction />
     <GroupCreateExperience />
     <OperationalToastHost />
     <ReceptionMealNav />
