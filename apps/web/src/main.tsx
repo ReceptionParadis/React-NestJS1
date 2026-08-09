@@ -13,7 +13,7 @@ import { NightAuditorNav } from './NightAuditorNav';
 import { FunctionSheetPrintCleanup } from './FunctionSheetPrintCleanup';
 import { FunctionSheetSourceSync } from './FunctionSheetSourceSync';
 import { FunctionSheetRedistributionControl } from './FunctionSheetRedistributionControl';
-import { FunctionSheetValidationHelper } from './FunctionSheetValidationHelper';
+import { FunctionSheetBulkValidation } from './FunctionSheetBulkValidation';
 import { MealOrderAutoSync } from './MealOrderAutoSync';
 import { PdjBoxMealRow } from './PdjBoxMealRow';
 import { MealTransmissionDashboard } from './MealTransmissionDashboard';
@@ -75,7 +75,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <FunctionSheetSourceSync />
     <FunctionSheetPrintCleanup />
     <FunctionSheetRedistributionControl />
-    <FunctionSheetValidationHelper />
+    <FunctionSheetBulkValidation />
     <MealOrderAutoSync />
     <PdjBoxMealRow />
     <MealTransmissionDashboard />
