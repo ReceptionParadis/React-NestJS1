@@ -3,7 +3,7 @@ import { createHmac, randomBytes, scryptSync, timingSafeEqual } from 'node:crypt
 import { PrismaService } from '../prisma.service';
 
 const ADMIN_ROLES=['ADMIN','ADMINISTRATEUR','DIRECTEUR GENERAL','DIRECTEUR HEBERGEMENT'];
-const BASE_ROLES=['direction','reception_manager','reception','commercial','maintenance'] as const;
+const BASE_ROLES=['direction','reception_manager','reception','night_auditor','commercial','maintenance'] as const;
 type BaseRole=(typeof BASE_ROLES)[number];
 type ProfileMeta={label:string;description:string;baseRole:BaseRole;custom?:boolean};
 const ALL_CAPABILITIES=['dashboard.view','reception.view','reception.operate','cash.view','cash.edit','cash.validate','group-control.create','group-control.unlock','commercial.view','commercial.edit','commercial.validate-control','maintenance.view','maintenance.create','maintenance.manage','planning.view','meeting-rooms.view','meeting-rooms.edit','tasks.view','tasks.edit','instructions.view','instructions.edit','operations-center.view','operations-center.edit','journal.view','diagnostic.view','administration.view'] as const;
@@ -12,6 +12,7 @@ const BASE_CAPABILITIES:Record<BaseRole,Capability[]>={
  direction:[...ALL_CAPABILITIES],
  reception_manager:['dashboard.view','reception.view','reception.operate','cash.view','cash.edit','group-control.create','group-control.unlock','maintenance.view','maintenance.create','planning.view','meeting-rooms.view','meeting-rooms.edit','tasks.view','tasks.edit','instructions.view','operations-center.view','operations-center.edit','journal.view','diagnostic.view'],
  reception:['dashboard.view','reception.view','reception.operate','cash.view','cash.edit','group-control.create','maintenance.view','maintenance.create','planning.view','meeting-rooms.view','meeting-rooms.edit','tasks.view','tasks.edit','instructions.view','operations-center.view','operations-center.edit','journal.view'],
+ night_auditor:['dashboard.view','instructions.view'],
  commercial:['dashboard.view','commercial.view','commercial.edit','commercial.validate-control','group-control.unlock','maintenance.view','maintenance.create','planning.view','meeting-rooms.view','meeting-rooms.edit','tasks.view','tasks.edit','instructions.view','journal.view'],
  maintenance:['dashboard.view','maintenance.view','maintenance.create','maintenance.manage','planning.view','meeting-rooms.view','tasks.view','tasks.edit','instructions.view'],
 };
@@ -21,10 +22,11 @@ const MANAGED_ROLES=[
  {name:'DIRECTEUR HEBERGEMENT',label:'Directeur Hébergement',description:'Direction Hébergement et supervision opérationnelle',baseRole:'direction' as BaseRole},
  {name:'CHEF DE RECEPTION',label:'Chef de Réception',description:'Pilotage Réception et contrôles Groupe',baseRole:'reception_manager' as BaseRole},
  {name:'RECEPTIONNISTE',label:'Réceptionniste',description:'Exploitation quotidienne de la Réception',baseRole:'reception' as BaseRole},
+ {name:'VEILLEUR DE NUIT',label:'Veilleur de nuit',description:'Accès nuit : plaintes clients, feuille de route veilleur et consignes en lecture avec accusé de lecture.',baseRole:'night_auditor' as BaseRole},
  {name:'COMMERCIAL',label:'Commercial',description:'Fiches Groupe, validation et suivi de facturation',baseRole:'commercial' as BaseRole},
  {name:'TECHNICIEN',label:'Technicien Maintenance',description:'Interventions et suivi Maintenance',baseRole:'maintenance' as BaseRole},
 ] as const;
-const PREFIX:Record<BaseRole,string>={direction:'DIRECTION',reception_manager:'CHEF DE RECEPTION',reception:'RECEPTION',commercial:'COMMERCIAL',maintenance:'MAINTENANCE'};
+const PREFIX:Record<BaseRole,string>={direction:'DIRECTION',reception_manager:'CHEF DE RECEPTION',reception:'RECEPTION',night_auditor:'VEILLEUR DE NUIT',commercial:'COMMERCIAL',maintenance:'MAINTENANCE'};
 const PERMISSIONS_NAMESPACE='user-permissions';
 const SECURITY_NAMESPACE='user-security';
 const CASH_RIGHTS_MIGRATION_VERSION=1;
