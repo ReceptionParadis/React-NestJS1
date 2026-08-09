@@ -12,6 +12,7 @@ import { DirectionReportNotificationHost } from './DirectionReportNotificationHo
 import { DashboardJournalBridge } from './DashboardJournalBridge';
 import { CommandCenterButton } from './CommandCenterButton';
 import { NightAuditorRoleBootstrap } from './NightAuditorRoleBootstrap';
+import { NightAuditorNav } from './NightAuditorNav';
 import { cleanupLegacyLocalData } from './legacy-cleanup';
 import './styles.css';
 import './executive-dashboard.css';
@@ -74,5 +75,6 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <DashboardJournalBridge />
     <CommandCenterButton />
     <NightAuditorRoleBootstrap />
+    <NightAuditorNav />
   </React.StrictMode>,
 );
