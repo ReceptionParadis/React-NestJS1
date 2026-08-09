@@ -1,6 +1,9 @@
 import { Body, Controller, Delete, Get, Headers, Param, Patch, Post } from '@nestjs/common';
 import { AuthService } from './auth.service';
 
+const NIGHT_AUDITOR_PERMISSIONS=['dashboard.view','tasks.view','tasks.edit','instructions.view'];
+function normalize(value:string){return value.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim()}
+
 @Controller('auth')
 export class AuthController {
   constructor(private readonly auth: AuthService) {}
@@ -9,8 +12,24 @@ export class AuthController {
   @Post('setup') setup(@Body() body:{firstName?:string;lastName?:string;email?:string;password?:string}){return this.auth.setup(body)}
   @Post('login') login(@Body() body:{email?:string;password?:string}){return this.auth.login(body)}
   @Post('change-password') changePassword(@Headers('authorization') authorization:string|undefined,@Body() body:{password?:string}){return this.auth.changeOwnPassword(authorization,body.password)}
-  @Get('admin/users') adminUsers(@Headers('authorization') authorization?:string){return this.auth.adminUsers(authorization)}
-  @Get('admin/roles') adminRoles(@Headers('authorization') authorization?:string){return this.auth.adminRoles(authorization)}
+  @Get('admin/users') async adminUsers(@Headers('authorization') authorization?:string){
+    const users=await this.auth.adminUsers(authorization) as any[];
+    return users.map(user=>user.baseRole==='night_auditor'&&!user.permissionsCustomized?{...user,inheritedPermissions:NIGHT_AUDITOR_PERMISSIONS,permissions:NIGHT_AUDITOR_PERMISSIONS}:user);
+  }
+  @Get('admin/roles') async adminRoles(@Headers('authorization') authorization?:string){
+    const roles=await this.auth.adminRoles(authorization) as any[];
+    const canonical=roles.find(role=>role.name==='VEILLEUR DE NUIT');
+    let nightAuditorSeen=false;
+    return roles.filter(role=>{
+      if(role.baseRole!=='night_auditor')return true;
+      const sameCanonicalLabel=normalize(String(role.label||''))==='veilleur de nuit';
+      if(!sameCanonicalLabel)return true;
+      if(canonical)return role.name===canonical.name;
+      if(nightAuditorSeen)return false;
+      nightAuditorSeen=true;
+      return true;
+    });
+  }
   @Post('admin/roles') createRole(@Headers('authorization') authorization:string|undefined,@Body() body:{label?:string;description?:string;baseRole?:string}){return this.auth.createRole(authorization,body)}
   @Post('admin/users') createUser(@Headers('authorization') authorization:string|undefined,@Body() body:{firstName?:string;lastName?:string;email?:string;password?:string;role?:string}){return this.auth.createUser(authorization,body)}
   @Patch('admin/users/:id') updateUser(@Headers('authorization') authorization:string|undefined,@Param('id') id:string,@Body() body:{firstName?:string;lastName?:string;email?:string;role?:string;status?:'ACTIVE'|'INACTIVE'}){return this.auth.updateUser(authorization,id,body)}
