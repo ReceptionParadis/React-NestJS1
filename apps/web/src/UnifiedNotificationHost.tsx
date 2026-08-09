@@ -33,8 +33,6 @@ export function UnifiedNotificationHost(){
  const userName=`${s.user?.firstName||'Utilisateur'} ${s.user?.lastName||'HospiCore'}`.trim(),userRole=String(s.user?.role?.baseRole||s.user?.role?.name||s.user?.role||''),userService=serviceForRole(userRole);
  const items=useMemo(()=>journal.data.map(classify).filter((n):n is ImportantNotification=>Boolean(n)).sort((a,b)=>Date.parse(b.at)-Date.parse(a.at)).slice(0,100),[journal.data]);
  const unread=items.filter(i=>!seen.has(i.id));
- const unreadInstructions=useMemo(()=>instructions.data
-  .filter(i=>Array.isArray(i.recipients)&&i.recipients.some(r=>r.userId===userId)&&!Array.isArray(i.readBy)||false),[instructions.data,userId]);
  const instructionInbox=useMemo(()=>instructions.data
   .filter(i=>Array.isArray(i.recipients)&&i.recipients.some(r=>r.userId===userId)&&!(i.readBy||[]).some(r=>r.userId===userId))
   .sort((a,b)=>Date.parse(a.createdAt)-Date.parse(b.createdAt)),[instructions.data,userId]);
