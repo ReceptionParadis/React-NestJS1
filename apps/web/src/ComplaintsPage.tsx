@@ -1,13 +1,13 @@
 import { FormEvent, useMemo, useState } from 'react';
 import { AlertCircle, ArrowLeft, CheckCircle2, MessageSquareWarning, Plus, Search, X } from 'lucide-react';
-import { can } from './permissions';
+import { can, currentRole } from './permissions';
 import { useOperationalStore } from './useOperationalStore';
 
 type Complaint={id:string;client:string;room:string;category:string;description:string;status:'Ouverte'|'Traitée';createdAt:string;createdBy:string;resolvedAt?:string;resolvedBy?:string};
 const categories=['Accueil / Réception','Chambre','Propreté','Bruit','Restauration','Facturation','Équipement','Service','Autre'];
 function actor(){try{const u=JSON.parse(localStorage.getItem('hospicore.session')||'{}')?.user||{};return`${u.firstName||'Utilisateur'} ${u.lastName||'HospiCore'}`.trim()}catch{return'Utilisateur HospiCore'}}
 export function ComplaintsPage(){
- const store=useOperationalStore<Complaint[]>('client-complaints',[],5000),[open,setOpen]=useState(false),[query,setQuery]=useState(''),canEdit=can('complaints.edit');
+ const store=useOperationalStore<Complaint[]>('client-complaints',[],5000),[open,setOpen]=useState(false),[query,setQuery]=useState(''),canEdit=currentRole()==='night_auditor'||can('reception.operate');
  const complaints=useMemo(()=>[...store.data].sort((a,b)=>b.createdAt.localeCompare(a.createdAt)),[store.data]);
  const filtered=complaints.filter(c=>`${c.client} ${c.room} ${c.category} ${c.description} ${c.createdBy} ${c.status}`.toLowerCase().includes(query.toLowerCase()));
  async function submit(e:FormEvent<HTMLFormElement>){e.preventDefault();if(!canEdit)return;const f=new FormData(e.currentTarget),item:Complaint={id:crypto.randomUUID(),client:String(f.get('client')||''),room:String(f.get('room')||''),category:String(f.get('category')||'Autre'),description:String(f.get('description')||''),status:'Ouverte',createdAt:new Date().toISOString(),createdBy:actor()};if(await store.save([item,...store.data]))setOpen(false)}
