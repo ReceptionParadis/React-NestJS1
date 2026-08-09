@@ -5,6 +5,7 @@ import { PrismaService } from '../prisma.service';
 const JOURNAL_NAMESPACE = 'activity-journal';
 const DIRECTION_REPORT_NAMESPACE='direction-daily-reports';
 type JournalEntry={id:string;at:string;actorId?:string;actor:string;role:string;service:string;namespace:string;source:string;action:string};
+type Group360Like={id?:string;name?:string;commercialValidated?:boolean;validatedAt?:string;audit?:Array<{action?:string}>};
 
 const DEFAULT_STORES: Record<string, Prisma.InputJsonValue> = {
   tasks: [],
@@ -78,7 +79,20 @@ export class OperationalSyncService implements OnModuleInit {
     const current=await this.prisma.operationalStore.findUnique({where:{hotelId_namespace:{hotelId,namespace:input.namespace}}});
     if(current&&input.expectedVersion!==undefined&&current.version!==input.expectedVersion)throw new ConflictException({message:'Ces données ont été modifiées par un autre utilisateur.',currentVersion:current.version,updatedAt:current.updatedAt});
     const saved=await this.prisma.operationalStore.upsert({where:{hotelId_namespace:{hotelId,namespace:input.namespace}},create:{hotelId,namespace:input.namespace,payload:input.payload,updatedById:input.updatedById},update:{payload:input.payload,updatedById:input.updatedById,version:{increment:1}},include:{updatedBy:{select:{id:true,firstName:true,lastName:true,role:{select:{name:true}}}}}});
-    if(!input.namespace.startsWith('_system-'))await this.appendJournal(hotelId,input.namespace,input.updatedById);
+    if(!input.namespace.startsWith('_system-')){
+      if(input.namespace==='group-360'){
+        const previous=Array.isArray(current?.payload)?current?.payload as unknown as Group360Like[]:[];
+        const next=Array.isArray(input.payload)?input.payload as unknown as Group360Like[]:[];
+        const previousById=new Map(previous.map(group=>[String(group.id||''),group]));
+        for(const group of next){
+          const before=previousById.get(String(group.id||''));
+          if(!group.commercialValidated||before?.commercialValidated)continue;
+          const validations=(group.audit||[]).filter(item=>String(item.action||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().includes('valid')).length;
+          const action=`Fiche Groupe 360° ${validations>1?'revalidée':'validée'} · ${group.name||'Groupe'}`;
+          await this.appendJournal(hotelId,input.namespace,input.updatedById,action);
+        }
+      }else await this.appendJournal(hotelId,input.namespace,input.updatedById);
+    }
     return saved;
   }
 
@@ -86,13 +100,13 @@ export class OperationalSyncService implements OnModuleInit {
 
   async diagnostic(hotelId?:string,userId?:string){const startedAt=Date.now(),resolvedHotelId=await this.resolveHotelId(hotelId,userId);await this.ensureDefaultStores(resolvedHotelId,userId);const[hotel,user,stores,databaseProbe]=await Promise.all([this.prisma.hotel.findUnique({where:{id:resolvedHotelId},select:{id:true,name:true,slug:true}}),userId?this.prisma.user.findUnique({where:{id:userId},select:{id:true,firstName:true,lastName:true,email:true,hotelId:true,role:{select:{name:true}}}}):null,this.prisma.operationalStore.findMany({where:{hotelId:resolvedHotelId,namespace:{not:{startsWith:'_system-'}}},select:{namespace:true,version:true,updatedAt:true,updatedById:true},orderBy:{namespace:'asc'}}),this.prisma.$queryRaw<Array<{now:Date}>>`SELECT NOW() as now`]);return{status:'ok',checkedAt:new Date().toISOString(),responseTimeMs:Date.now()-startedAt,database:{connected:true,serverTime:databaseProbe[0]?.now??null},hotel,user,operationalStore:{available:true,namespaces:stores}}}
 
-  private async appendJournal(hotelId:string,namespace:string,userId?:string){
+  private async appendJournal(hotelId:string,namespace:string,userId?:string,customAction?:string){
     const meta=JOURNAL_META[namespace]||{service:'Direction',source:namespace};
     const user=userId?await this.prisma.user.findUnique({where:{id:userId},select:{id:true,firstName:true,lastName:true,role:{select:{name:true}}}}):null;
     const actor=user?`${user.firstName} ${user.lastName}`.trim():'HospiCore';
     const role=user?.role?.name||'Système';
     const service=this.serviceFromRole(role,meta.service);
-    const entry:JournalEntry={id:`${Date.now()}-${Math.random().toString(36).slice(2,9)}`,at:new Date().toISOString(),actorId:user?.id,actor,role,service,namespace,source:meta.source,action:`Mise à jour · ${meta.source}`};
+    const entry:JournalEntry={id:`${Date.now()}-${Math.random().toString(36).slice(2,9)}`,at:new Date().toISOString(),actorId:user?.id,actor,role,service,namespace,source:meta.source,action:customAction||`Mise à jour · ${meta.source}`};
     for(let attempt=0;attempt<6;attempt++){
       const store=await this.prisma.operationalStore.findUnique({where:{hotelId_namespace:{hotelId,namespace:JOURNAL_NAMESPACE}}});
       if(!store){
