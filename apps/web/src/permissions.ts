@@ -4,10 +4,6 @@ export type Capability =
   | 'dashboard.view'
   | 'reception.view'
   | 'reception.operate'
-  | 'complaints.view'
-  | 'complaints.edit'
-  | 'night-route.view'
-  | 'night-route.edit'
   | 'cash.view'
   | 'cash.edit'
   | 'cash.validate'
@@ -54,10 +50,10 @@ function sessionUser(){try{return JSON.parse(localStorage.getItem('hospicore.ses
 export function currentRole(): AppRole { return roleFromValue(sessionUser().role); }
 
 const matrix: Record<AppRole, ReadonlySet<Capability>> = {
-  direction: new Set<Capability>(['dashboard.view','reception.view','reception.operate','complaints.view','complaints.edit','night-route.view','night-route.edit','cash.view','cash.edit','cash.validate','group-control.create','group-control.unlock','commercial.view','commercial.edit','commercial.validate-control','maintenance.view','maintenance.create','maintenance.manage','planning.view','meeting-rooms.view','meeting-rooms.edit','tasks.view','tasks.edit','instructions.view','instructions.edit','operations-center.view','operations-center.edit','journal.view','direction-reports.view','diagnostic.view','administration.view']),
-  reception_manager: new Set<Capability>(['dashboard.view','reception.view','reception.operate','complaints.view','complaints.edit','night-route.view','night-route.edit','cash.view','cash.edit','group-control.create','group-control.unlock','maintenance.view','maintenance.create','planning.view','meeting-rooms.view','meeting-rooms.edit','tasks.view','tasks.edit','instructions.view','instructions.edit','operations-center.view','operations-center.edit','journal.view','diagnostic.view']),
-  reception: new Set<Capability>(['dashboard.view','reception.view','reception.operate','complaints.view','complaints.edit','night-route.view','night-route.edit','cash.view','cash.edit','group-control.create','maintenance.view','maintenance.create','planning.view','meeting-rooms.view','meeting-rooms.edit','tasks.view','tasks.edit','instructions.view','instructions.edit','operations-center.view','operations-center.edit','journal.view']),
-  night_auditor: new Set<Capability>(['dashboard.view','complaints.view','complaints.edit','night-route.view','night-route.edit','instructions.view']),
+  direction: new Set<Capability>(['dashboard.view','reception.view','reception.operate','cash.view','cash.edit','cash.validate','group-control.create','group-control.unlock','commercial.view','commercial.edit','commercial.validate-control','maintenance.view','maintenance.create','maintenance.manage','planning.view','meeting-rooms.view','meeting-rooms.edit','tasks.view','tasks.edit','instructions.view','instructions.edit','operations-center.view','operations-center.edit','journal.view','direction-reports.view','diagnostic.view','administration.view']),
+  reception_manager: new Set<Capability>(['dashboard.view','reception.view','reception.operate','cash.view','cash.edit','group-control.create','group-control.unlock','maintenance.view','maintenance.create','planning.view','meeting-rooms.view','meeting-rooms.edit','tasks.view','tasks.edit','instructions.view','instructions.edit','operations-center.view','operations-center.edit','journal.view','diagnostic.view']),
+  reception: new Set<Capability>(['dashboard.view','reception.view','reception.operate','cash.view','cash.edit','group-control.create','maintenance.view','maintenance.create','planning.view','meeting-rooms.view','meeting-rooms.edit','tasks.view','tasks.edit','instructions.view','instructions.edit','operations-center.view','operations-center.edit','journal.view']),
+  night_auditor: new Set<Capability>(['dashboard.view','instructions.view']),
   commercial: new Set<Capability>(['dashboard.view','commercial.view','commercial.edit','commercial.validate-control','group-control.unlock','maintenance.view','maintenance.create','planning.view','meeting-rooms.view','meeting-rooms.edit','tasks.view','tasks.edit','instructions.view','instructions.edit','journal.view']),
   maintenance: new Set<Capability>(['dashboard.view','maintenance.view','maintenance.create','maintenance.manage','planning.view','meeting-rooms.view','tasks.view','tasks.edit','instructions.view','instructions.edit']),
   unknown: new Set<Capability>(['dashboard.view']),
@@ -78,8 +74,8 @@ export function can(capability: Capability, role: AppRole = currentRole()) {
 export function canAccessPath(path: string, role: AppRole = currentRole()) {
   if (path === '/' || path === '') return can('dashboard.view', role);
   if (path.startsWith('/rapports-direction')) return role==='direction';
-  if (path.startsWith('/reception/plaintes')) return can('complaints.view', role);
-  if (path.startsWith('/reception/feuille-route-veilleur')) return can('night-route.view', role);
+  if (role==='night_auditor'&&path.startsWith('/reception/plaintes')) return true;
+  if (role==='night_auditor'&&path.startsWith('/reception/feuille-route-veilleur')) return true;
   if (path.startsWith('/reception/caisse')) return can('cash.view', role);
   if (path === '/reception' || path === '/reception/') return can('reception.view', role);
   if (path.startsWith('/reception')) return can('reception.view', role);
