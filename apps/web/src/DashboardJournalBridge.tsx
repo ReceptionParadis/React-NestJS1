@@ -15,12 +15,15 @@ export function DashboardJournalBridge(){
  const role=roleFromValue(session()?.user?.role),department=serviceForRole(),today=isoDate();
  const entries=useMemo(()=>store.data.map(e=>({...e,timestamp:parseDate(e.at),service:normalizeService(e.service)})).filter(e=>e.timestamp&&isoDate(new Date(e.timestamp))===today&&(role==='direction'||e.service===department)).sort((a,b)=>b.timestamp-a.timestamp).slice(0,10),[store.data,today,role,department]);
  const target=document.querySelector<HTMLElement>('.command-journal > div:not(:first-child)');
- useEffect(()=>{const header=document.querySelector<HTMLElement>('.command-journal header p');if(header)header.textContent='Dernières activités en temps réel'},[today]);
+ useEffect(()=>{const header=document.querySelector<HTMLElement>('.command-journal header p');if(header)header.textContent=`Aujourd’hui · ${new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'2-digit',month:'long'})}`},[today]);
  if(!target)return null;
  return createPortal(<div className="dashboard-journal-live">{entries.length?entries.map(e=>{const d=new Date(e.timestamp);const reference=e.reference||e.source||e.namespace||e.service||'HospiCore';return <article className={`journal-live-entry tone-${actionTone(e.action)}`} key={e.id}>
-   <div className="journal-live-marker" aria-hidden="true"><span/></div>
-   <div className="journal-live-date"><b>{d.toLocaleDateString('fr-FR',{day:'2-digit'})}</b><span>{d.toLocaleDateString('fr-FR',{month:'short'}).replace('.','')}</span></div>
-   <div className="journal-live-content"><strong>{reference}</strong><p>{e.action||'Mise à jour'}</p><small>{e.actor||'HospiCore'}{e.service?` · ${e.service}`:''}</small></div>
-   <time>{d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit',second:'2-digit'})}</time>
+   <div className="journal-live-dot" aria-hidden="true"/>
+   <time>{d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}</time>
+   <div className="journal-live-content">
+    <strong>{reference}</strong>
+    <p>{e.action||'Mise à jour'}</p>
+    <small>{e.actor||'HospiCore'}{e.service?` · ${e.service}`:''}</small>
+   </div>
   </article>}):<p className="command-empty">Aucune action enregistrée aujourd’hui.</p>}</div>,target);
 }
