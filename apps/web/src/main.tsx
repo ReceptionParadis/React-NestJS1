@@ -3,9 +3,12 @@ import ReactDOM from 'react-dom/client';
 import { AppRouter } from './AppRouter';
 import { OperationalToastHost } from './OperationalToastHost';
 import { ReceptionMealNav } from './ReceptionMealNav';
+import { ReceptionComplaintsNav } from './ReceptionComplaintsNav';
+import { DirectionReportsNav } from './DirectionReportsNav';
 import { UserAccountMenu } from './UserAccountMenu';
 import { TaskNotificationHost } from './TaskNotificationHost';
 import { HandrailNotificationHost } from './HandrailNotificationHost';
+import { DirectionReportNotificationHost } from './DirectionReportNotificationHost';
 import { DashboardJournalBridge } from './DashboardJournalBridge';
 import { CommandCenterButton } from './CommandCenterButton';
 import { cleanupLegacyLocalData } from './legacy-cleanup';
@@ -47,6 +50,9 @@ import './reception-nav.css';
 import './reception-night.css';
 import './reception-workspace.css';
 import './reception-archives-tree.css';
+import './complaints.css';
+import './direction-reports.css';
+import './direction-report-notifications.css';
 import './user-account-menu.css';
 import './command-center-button.css';
 import './hospicore-consistency.css';
@@ -58,9 +64,12 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <AppRouter />
     <OperationalToastHost />
     <ReceptionMealNav />
+    <ReceptionComplaintsNav />
+    <DirectionReportsNav />
     <UserAccountMenu />
     <TaskNotificationHost />
     <HandrailNotificationHost />
+    <DirectionReportNotificationHost />
     <DashboardJournalBridge />
     <CommandCenterButton />
   </React.StrictMode>,
