@@ -29,9 +29,12 @@ export function FunctionSheetValidationHelper(){
      const currentWeek=displayedWeekStart(),currentSheet=store.data.find(s=>s.weekStart===currentWeek);if(!currentSheet)return;
      const row=button.closest('tr'),groupName=row?.querySelector<HTMLElement>('td:nth-child(2) strong')?.textContent?.trim()||'';
      const current=(currentSheet.lines||[]).find(line=>String(line.groupName||'').trim()===groupName);if(!current)return;
-     const validating=current.lineStatus!=='Validée',at=validating?stamp():'';
-     const lines=(currentSheet.lines||[]).map(line=>line.id===current.id?{...line,lineStatus:validating?'Validée':'À relire',validatedBy:validating?user.name:'',validatedAt:at}:line);
-     void store.save(store.data.map(s=>s.id===currentSheet.id?{...s,lines,status:'Préparation',validatedForPrintBy:'',validatedForPrintAt:'',lockedBy:'',lockedAt:''}:s));
+     const validating=current.lineStatus!=='Validée';
+     const nextStatus:LineStatus=validating?'Validée':'À relire';
+     const at=validating?stamp():'';
+     const lines:FunctionLine[]=(currentSheet.lines||[]).map((line):FunctionLine=>line.id===current.id?{...line,lineStatus:nextStatus,validatedBy:validating?user.name:'',validatedAt:at}:line);
+     const next:WeeklySheet[]=store.data.map((s):WeeklySheet=>s.id===currentSheet.id?{...s,lines,status:'Préparation',validatedForPrintBy:'',validatedForPrintAt:'',lockedBy:'',lockedAt:''}:s);
+     void store.save(next);
     },true);
    });
    const footer=document.querySelector<HTMLElement>('.function-sheet-footer');if(!footer)return;
@@ -43,6 +46,12 @@ export function FunctionSheetValidationHelper(){
  },[allowed,store.data]);
  if(!allowed||!mount)return null;
  const weekStart=displayedWeekStart(),sheet=store.data.find(s=>s.weekStart===weekStart),pending=(sheet?.lines||[]).filter(l=>l.lineStatus!=='Validée').length;
- const validateAll=()=>{if(!sheet||!(sheet.lines||[]).length)return;const at=stamp(),lines=(sheet.lines||[]).map(line=>({...line,lineStatus:'Validée' as const,validatedBy:user.name,validatedAt:at}));void store.save(store.data.map(s=>s.id===sheet.id?{...s,lines,status:'Préparation',validatedForPrintBy:'',validatedForPrintAt:'',lockedBy:'',lockedAt:''}:s));};
+ const validateAll=()=>{
+  if(!sheet||!(sheet.lines||[]).length)return;
+  const at=stamp();
+  const lines:FunctionLine[]=(sheet.lines||[]).map((line):FunctionLine=>({...line,lineStatus:'Validée',validatedBy:user.name,validatedAt:at}));
+  const next:WeeklySheet[]=store.data.map((s):WeeklySheet=>s.id===sheet.id?{...s,lines,status:'Préparation',validatedForPrintBy:'',validatedForPrintAt:'',lockedBy:'',lockedAt:''}:s);
+  void store.save(next);
+ };
  return createPortal(<button type="button" className="function-validate-all" disabled={!pending} onClick={validateAll}><CheckCheck size={17}/>{pending?`Valider toute la fiche (${pending})`:'Toute la fiche est validée'}</button>,mount);
 }
