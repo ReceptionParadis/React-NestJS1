@@ -69,7 +69,7 @@ export function can(capability: Capability, role: AppRole = currentRole()) {
 
 export function canAccessPath(path: string, role: AppRole = currentRole()) {
   if (path === '/' || path === '') return can('dashboard.view', role);
-  if (path.startsWith('/rapports-direction')) return can('direction-reports.view', role);
+  if (path.startsWith('/rapports-direction')) return role==='direction';
   if (path.startsWith('/reception/caisse')) return can('cash.view', role);
   if (path.startsWith('/reception')) return can('reception.view', role);
   if (path.startsWith('/commercial') || path.startsWith('/groupes') || path.startsWith('/planning-hebdomadaire')) return can('commercial.view', role);
