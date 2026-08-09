@@ -12,6 +12,7 @@ import { CommandCenterButton } from './CommandCenterButton';
 import { NightAuditorNav } from './NightAuditorNav';
 import { FunctionSheetPrintCleanup } from './FunctionSheetPrintCleanup';
 import { MealOrderAutoSync } from './MealOrderAutoSync';
+import { PdjBoxMealRow } from './PdjBoxMealRow';
 import { cleanupLegacyLocalData } from './legacy-cleanup';
 import './styles.css';
 import './executive-dashboard.css';
@@ -63,6 +64,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <AppRouter />
     <FunctionSheetPrintCleanup />
     <MealOrderAutoSync />
+    <PdjBoxMealRow />
     <OperationalToastHost />
     <ReceptionMealNav />
     <ReceptionComplaintsNav />
