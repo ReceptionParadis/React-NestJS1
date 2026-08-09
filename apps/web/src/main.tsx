@@ -6,9 +6,7 @@ import { ReceptionMealNav } from './ReceptionMealNav';
 import { ReceptionComplaintsNav } from './ReceptionComplaintsNav';
 import { DirectionReportsNav } from './DirectionReportsNav';
 import { UserAccountMenu } from './UserAccountMenu';
-import { TaskNotificationHost } from './TaskNotificationHost';
-import { HandrailNotificationHost } from './HandrailNotificationHost';
-import { DirectionReportNotificationHost } from './DirectionReportNotificationHost';
+import { UnifiedNotificationHost } from './UnifiedNotificationHost';
 import { DashboardJournalBridge } from './DashboardJournalBridge';
 import { CommandCenterButton } from './CommandCenterButton';
 import { NightAuditorNav } from './NightAuditorNav';
@@ -24,10 +22,8 @@ import './meeting-rooms.css';
 import './weekly-planning.css';
 import './operations-center.css';
 import './general-instructions.css';
-import './handrail-notifications.css';
 import './activity-journal.css';
 import './tasks.css';
-import './task-notifications.css';
 import './administration.css';
 import './administration-security.css';
 import './diagnostic.css';
@@ -53,10 +49,10 @@ import './reception-workspace.css';
 import './reception-archives-tree.css';
 import './complaints.css';
 import './direction-reports.css';
-import './direction-report-notifications.css';
 import './user-account-menu.css';
 import './command-center-button.css';
 import './hospicore-consistency.css';
+import './unified-notifications.css';
 
 cleanupLegacyLocalData();
 
@@ -68,9 +64,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <ReceptionComplaintsNav />
     <DirectionReportsNav />
     <UserAccountMenu />
-    <TaskNotificationHost />
-    <HandrailNotificationHost />
-    <DirectionReportNotificationHost />
+    <UnifiedNotificationHost />
     <DashboardJournalBridge />
     <CommandCenterButton />
     <NightAuditorNav />
