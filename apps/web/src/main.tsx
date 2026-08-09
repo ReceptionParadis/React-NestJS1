@@ -19,6 +19,7 @@ import './executive-dashboard.css';
 import './tickets.css';
 import './maintenance-v2.css';
 import './groups.css';
+import './group-meal-highlights.css';
 import './rooming-import.css';
 import './auth.css';
 import './meeting-rooms.css';
