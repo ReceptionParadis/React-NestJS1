@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { useOperationalStore } from './useOperationalStore';
 import './group-pending-helper.css';
 
-type Group360Record={id:string;commercialValidated?:boolean;validatedAt?:string;validatedBy?:string;roomingPending?:boolean;arrivalTimePending?:boolean;departureTimePending?:boolean;[key:string]:unknown};
+type Group360Record={id:string;commercialValidated?:boolean;validatedAt?:string;validatedBy?:string;roomingPending?:boolean;arrivalTimePending?:boolean;departureTimePending?:boolean;audit?:Array<{action?:string}>;[key:string]:unknown};
 
 type PendingTarget={label:string;field?:string;flag?:'roomingPending'|'arrivalTimePending'|'departureTimePending'};
 const targets:PendingTarget[]=[
@@ -17,6 +17,7 @@ const targets:PendingTarget[]=[
 ];
 
 function selectedGroupId(data:Group360Record[]){const code=document.querySelector<HTMLElement>('.group-code')?.textContent?.trim().toLowerCase()||'';return data.find(group=>group.id.toLowerCase().startsWith(code))?.id||''}
+function hadPreviousValidation(group:Group360Record){return (group.audit||[]).some(item=>String(item.action||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().includes('fiche verrouillee et validee'))}
 
 export function Group360PendingInfoHelper(){
  const store=useOperationalStore<Group360Record[]>('group-360',[]);
@@ -48,6 +49,10 @@ export function Group360PendingInfoHelper(){
     const labels=Array.from(document.querySelectorAll<HTMLElement>('.group-detail .group-fields label'));
     const badges:[string,boolean][]=[['Rooming List',Boolean(group.roomingPending)],['Heure arrivée',Boolean(group.arrivalTimePending)],['Heure départ',Boolean(group.departureTimePending)]];
     badges.forEach(([text,active])=>{const label=labels.find(item=>(item.childNodes[0]?.textContent||'').trim().startsWith(text));if(!label)return;let badge=label.querySelector<HTMLElement>('.group-pending-badge');if(active&&!badge){badge=document.createElement('span');badge.className='group-pending-badge';badge.textContent='À venir';label.appendChild(badge)}else if(!active&&badge)badge.remove()});
+    const validationButton=document.querySelector<HTMLButtonElement>('.commercial-lock button');
+    if(validationButton&&!group.commercialValidated&&hadPreviousValidation(group))validationButton.textContent='Revalider la fiche';
+    const lockNote=document.querySelector<HTMLElement>('.commercial-lock.validated small');
+    if(lockNote&&group.commercialValidated&&!lockNote.dataset.editHint){lockNote.dataset.editHint='1';lockNote.textContent=`${lockNote.textContent||''} · Modifiable : toute modification demandera une revalidation.`}
    }
   };
   render();const observer=new MutationObserver(render);observer.observe(document.body,{childList:true,subtree:true});
