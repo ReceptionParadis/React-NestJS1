@@ -146,7 +146,7 @@ export function App() {
             </label>
             <button className="icon-button" type="button" aria-label="Notifications">
               <Bell size={20} />
-              <span className="notification-dot">3</span>
+              <span className="notification-dot" style={{ top: '-8px', right: '-8px' }}>3</span>
             </button>
             <div className="avatar">TP</div>
           </div>
