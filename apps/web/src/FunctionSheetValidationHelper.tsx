@@ -36,11 +36,11 @@ export function FunctionSheetValidationHelper(){
    });
    const footer=document.querySelector<HTMLElement>('.function-sheet-footer');if(!footer)return;
    let node=footer.querySelector<HTMLElement>('.function-validate-all-mount');if(!node){node=document.createElement('div');node.className='function-validate-all-mount';footer.appendChild(node)}
-   if(node!==mount)setMount(node);
+   setMount(previous=>previous===node?previous:node);
   };
   bind();const observer=new MutationObserver(()=>queueMicrotask(bind));observer.observe(document.body,{subtree:true,childList:true,attributes:true,attributeFilter:['disabled','class']});
   return()=>{observer.disconnect();document.querySelectorAll('[data-function-validation-helper="true"]').forEach(el=>el.removeAttribute('data-function-validation-helper'));document.querySelectorAll('.function-validate-all-mount').forEach(el=>el.remove());setMount(null)};
- },[allowed,store.data,mount]);
+ },[allowed,store.data]);
  if(!allowed||!mount)return null;
  const weekStart=displayedWeekStart(),sheet=store.data.find(s=>s.weekStart===weekStart),pending=(sheet?.lines||[]).filter(l=>l.lineStatus!=='Validée').length;
  const validateAll=()=>{if(!sheet||!(sheet.lines||[]).length)return;const at=stamp(),lines=(sheet.lines||[]).map(line=>({...line,lineStatus:'Validée' as const,validatedBy:user.name,validatedAt:at}));void store.save(store.data.map(s=>s.id===sheet.id?{...s,lines,status:'Préparation',validatedForPrintBy:'',validatedForPrintAt:'',lockedBy:'',lockedAt:''}:s));};
