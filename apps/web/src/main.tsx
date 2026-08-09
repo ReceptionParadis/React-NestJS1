@@ -13,6 +13,7 @@ import { NightAuditorNav } from './NightAuditorNav';
 import { FunctionSheetPrintCleanup } from './FunctionSheetPrintCleanup';
 import { FunctionSheetSourceSync } from './FunctionSheetSourceSync';
 import { FunctionSheetRedistributionControl } from './FunctionSheetRedistributionControl';
+import { FunctionSheetValidationHelper } from './FunctionSheetValidationHelper';
 import { MealOrderAutoSync } from './MealOrderAutoSync';
 import { PdjBoxMealRow } from './PdjBoxMealRow';
 import { MealTransmissionDashboard } from './MealTransmissionDashboard';
@@ -31,6 +32,7 @@ import './rooming-import.css';
 import './auth.css';
 import './meeting-rooms.css';
 import './weekly-planning.css';
+import './function-sheet-validation.css';
 import './operations-center.css';
 import './general-instructions.css';
 import './activity-journal.css';
@@ -73,6 +75,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <FunctionSheetSourceSync />
     <FunctionSheetPrintCleanup />
     <FunctionSheetRedistributionControl />
+    <FunctionSheetValidationHelper />
     <MealOrderAutoSync />
     <PdjBoxMealRow />
     <MealTransmissionDashboard />
