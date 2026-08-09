@@ -13,6 +13,7 @@ import { NightAuditorNav } from './NightAuditorNav';
 import { FunctionSheetPrintCleanup } from './FunctionSheetPrintCleanup';
 import { MealOrderAutoSync } from './MealOrderAutoSync';
 import { PdjBoxMealRow } from './PdjBoxMealRow';
+import { MealTransmissionDashboard } from './MealTransmissionDashboard';
 import { cleanupLegacyLocalData } from './legacy-cleanup';
 import './styles.css';
 import './executive-dashboard.css';
@@ -66,6 +67,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <FunctionSheetPrintCleanup />
     <MealOrderAutoSync />
     <PdjBoxMealRow />
+    <MealTransmissionDashboard />
     <OperationalToastHost />
     <ReceptionMealNav />
     <ReceptionComplaintsNav />
