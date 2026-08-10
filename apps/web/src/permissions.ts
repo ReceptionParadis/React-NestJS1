@@ -63,17 +63,22 @@ export function capabilitiesForRole(role: AppRole) { return Array.from(matrix[ro
 export function allCapabilities(): Capability[]{return Array.from(new Set(Object.values(matrix).flatMap(set=>Array.from(set)))) as Capability[]}
 
 function sessionPermissions():ReadonlySet<Capability>|null{const raw=sessionUser().permissions;if(!Array.isArray(raw))return null;return new Set(raw.filter((item:unknown)=>typeof item==='string') as Capability[])}
+function standardManagedRole(value:unknown){const raw=normalize(String(typeof value==='object'&&value&&'name' in value?(value as {name?:string}).name||'':value||''));return['admin','administrateur','directeur general','directeur hebergement','chef de reception','receptionniste','veilleur de nuit','commercial','technicien','technicien maintenance'].includes(raw)}
 
 export function can(capability: Capability, role: AppRole = currentRole()) {
   const current=currentRole();
-  if(current==='night_auditor'&&role==='night_auditor')return matrix.night_auditor.has(capability);
-  const overrides=role===current?sessionPermissions():null;
-  return overrides ? overrides.has(capability) : matrix[role].has(capability);
+  if(role!==current)return matrix[role].has(capability);
+  // Les rôles standards suivent toujours la matrice HospiCore courante. Cela évite
+  // qu'une session créée avant l'ajout d'un module conserve des droits obsolètes.
+  if(standardManagedRole(sessionUser().role))return matrix[current].has(capability);
+  const overrides=sessionPermissions();
+  return overrides ? overrides.has(capability) : matrix[current].has(capability);
 }
 
 export function canAccessPath(path: string, role: AppRole = currentRole()) {
   if (path === '/' || path === '') return can('dashboard.view', role);
-  if (path.startsWith('/rapports-direction')) return role==='direction';
+  if (path.startsWith('/rapports-direction')) return can('direction-reports.view', role);
+  // Le veilleur dispose d'un espace Réception volontairement limité aux outils de nuit.
   if (role==='night_auditor'&&path.startsWith('/reception/plaintes')) return true;
   if (role==='night_auditor'&&path.startsWith('/reception/feuille-route-veilleur')) return true;
   if (path.startsWith('/reception/caisse')) return can('cash.view', role);
