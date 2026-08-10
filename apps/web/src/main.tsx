@@ -10,6 +10,7 @@ import { UnifiedNotificationHost } from './UnifiedNotificationHost';
 import { DashboardJournalBridge } from './DashboardJournalBridge';
 import { CommandCenterButton } from './CommandCenterButton';
 import { NightAuditorNav } from './NightAuditorNav';
+import { NightRouteGroupRequestsBridge } from './NightRouteGroupRequestsBridge';
 import { FunctionSheetPrintCleanup } from './FunctionSheetPrintCleanup';
 import { FunctionSheetSourceSync } from './FunctionSheetSourceSync';
 import { MealOrderAutoSync } from './MealOrderAutoSync';
@@ -95,5 +96,6 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <DashboardJournalBridge />
     <CommandCenterButton />
     <NightAuditorNav />
+    <NightRouteGroupRequestsBridge />
   </React.StrictMode>,
 );
