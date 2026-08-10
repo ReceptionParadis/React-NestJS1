@@ -38,6 +38,7 @@ const receptionSubmenu:NavItem[]=[
  {label:'Arrivées & départs',icon:CalendarDays,href:'/reception/arrivees-departs'},
  {label:'Fiche Groupe 360°',icon:ConciergeBell,href:'/reception/groupes'},
  {label:'Contrôles Groupe à compléter',icon:ClipboardCheck,href:'/reception/controles'},
+ {label:'Demandes groupe',icon:Bell,href:'/reception/demandes-groupe'},
  {label:'Demandes clients individuels',icon:Bell,href:'/reception/demandes-individuelles'},
  {label:'Caisse',icon:Calculator,href:'/reception/caisse'},
  {label:'Fiche de fonction hebdomadaire',icon:FileText,href:'/reception/fiche-fonction'},
