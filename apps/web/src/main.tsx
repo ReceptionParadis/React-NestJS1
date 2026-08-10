@@ -13,6 +13,7 @@ import { NightAuditorNav } from './NightAuditorNav';
 import { NightRouteGroupRequestsBridge } from './NightRouteGroupRequestsBridge';
 import { GroupControlPrintRecovery } from './GroupControlPrintRecovery';
 import { AdministrationRoleProfileBridge } from './AdministrationRoleProfileBridge';
+import { MaintenanceExperienceBridge } from './MaintenanceExperienceBridge';
 import { FunctionSheetPrintCleanup } from './FunctionSheetPrintCleanup';
 import { FunctionSheetSourceSync } from './FunctionSheetSourceSync';
 import { MealOrderAutoSync } from './MealOrderAutoSync';
@@ -29,6 +30,7 @@ import './styles.css';
 import './executive-dashboard.css';
 import './tickets.css';
 import './maintenance-v2.css';
+import './maintenance-readability.css';
 import './groups.css';
 import './group-delete-action.css';
 import './group-meal-highlights.css';
@@ -101,5 +103,6 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <NightRouteGroupRequestsBridge />
     <GroupControlPrintRecovery />
     <AdministrationRoleProfileBridge />
+    <MaintenanceExperienceBridge />
   </React.StrictMode>,
 );
