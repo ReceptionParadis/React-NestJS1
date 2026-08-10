@@ -1,0 +1,30 @@
+import { FormEvent, useMemo, useState } from 'react';
+import { ArrowLeft, BellRing, CheckCircle2, Plus, RefreshCw, Trash2, UsersRound, X } from 'lucide-react';
+import { useOperationalStore } from './useOperationalStore';
+
+type Group={id:string;name?:string;arrival?:string;departure?:string;arrivalTime?:string;departureTime?:string;pax?:number;rooms?:number;status?:string};
+type Wakeup={id:string;groupId:string;groupName:string;date:string;time:string;notes?:string;createdBy?:string;createdAt?:string;completedAt?:string;completedBy?:string};
+type SessionUser={name:string;role:string};
+
+function actor():SessionUser{try{const s=JSON.parse(localStorage.getItem('hospicore.session')||'{}');const u=s.user||{};return{name:`${u.firstName||'Utilisateur'} ${u.lastName||'HospiCore'}`.trim(),role:String(u.role?.name||u.role||'Réception')}}catch{return{name:'Utilisateur HospiCore',role:'Réception'}}}
+function isoToday(){const d=new Date();return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}
+function fmt(v:string){return new Date(`${v}T12:00:00`).toLocaleDateString('fr-FR',{weekday:'short',day:'2-digit',month:'2-digit',year:'numeric'})}
+
+export function GroupRequestsPage(){
+ const groups=useOperationalStore<Group[]>('group-360',[]),wakeups=useOperationalStore<Wakeup[]>('group-wakeups',[]),user=actor();
+ const[open,setOpen]=useState(false),[groupId,setGroupId]=useState('');
+ const today=isoToday();
+ const eligible=useMemo(()=>groups.data.filter(g=>['Arrivé','En séjour'].includes(g.status||'')&&String(g.departure||today)>=today).sort((a,b)=>String(a.departure).localeCompare(String(b.departure))||String(a.name||'').localeCompare(String(b.name||''))),[groups.data,today]);
+ const active=useMemo(()=>wakeups.data.filter(w=>!w.completedAt&&w.date>=today).sort((a,b)=>`${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`)),[wakeups.data,today]);
+ const history=useMemo(()=>wakeups.data.filter(w=>Boolean(w.completedAt)||w.date<today).sort((a,b)=>`${b.date}${b.time}`.localeCompare(`${a.date}${a.time}`)).slice(0,30),[wakeups.data,today]);
+ async function create(e:FormEvent<HTMLFormElement>){e.preventDefault();const form=new FormData(e.currentTarget),gid=String(form.get('groupId')||groupId),g=groups.data.find(x=>x.id===gid);if(!g)return;const date=String(form.get('date')||''),time=String(form.get('time')||'');if(!date||!time)return;const item:Wakeup={id:crypto.randomUUID(),groupId:g.id,groupName:g.name||'Groupe sans nom',date,time,notes:String(form.get('notes')||''),createdBy:user.name,createdAt:new Date().toISOString()};await wakeups.save([...wakeups.data,item]);setOpen(false);setGroupId('')}
+ async function complete(w:Wakeup){await wakeups.save(wakeups.data.map(x=>x.id===w.id?{...x,completedAt:new Date().toISOString(),completedBy:user.name}:x))}
+ async function remove(id:string){await wakeups.save(wakeups.data.filter(x=>x.id!==id))}
+ const busy=[groups,wakeups].some(s=>s.state==='loading'||s.state==='saving');
+ return <main className="reception-workspace-page"><header className="reception-workspace-header"><button onClick={()=>location.href='/reception'}><ArrowLeft size={18}/>Espace Réception</button><div><p>Réception · Groupes</p><h1><BellRing size={29}/>Demandes groupe</h1><span>Réveils des groupes arrivés ou en séjour · synchronisés avec le Contrôle Groupe.</span></div><button className="reception-workspace-refresh" onClick={()=>{void groups.refresh();void wakeups.refresh()}}><RefreshCw size={17}/>{busy?'Synchronisation…':'Actualiser'}</button></header>
+ <section className="reception-control-list" style={{marginBottom:18}}><article><div><strong>{active.length} réveil(s) à venir</strong><span>{eligible.length} groupe(s) actuellement éligible(s)</span></div><button onClick={()=>setOpen(true)}><Plus size={17}/>Ajouter un réveil</button></article></section>
+ {active.length===0?<section className="reception-workspace-empty"><CheckCircle2 size={31}/><h2>Aucun réveil groupe à venir</h2><p>Ajoutez une demande dès qu’un groupe est mis en arrivée.</p></section>:<section className="reception-control-list">{active.map(w=><article key={w.id}><div style={{display:'flex',gap:12,alignItems:'center'}}><BellRing size={20}/><div><strong>{w.groupName}</strong><span>{fmt(w.date)} · {w.time}{w.notes?` · ${w.notes}`:''}</span></div></div><div style={{display:'flex',gap:8}}><button onClick={()=>void complete(w)}><CheckCircle2 size={16}/>Effectué</button><button aria-label="Supprimer" onClick={()=>void remove(w.id)}><Trash2 size={16}/></button></div></article>)}</section>}
+ {history.length>0&&<section style={{marginTop:22}}><h2 style={{fontSize:'1.05rem',marginBottom:10}}>Historique récent</h2><div className="reception-control-list">{history.map(w=><article key={w.id}><div><strong>{w.groupName}</strong><span>{fmt(w.date)} · {w.time} · {w.completedAt?'Effectué':'Échu'}</span></div></article>)}</div></section>}
+ {open&&<div className="group-control-backdrop" onMouseDown={()=>setOpen(false)}><form className="group-control-modal" style={{maxWidth:620}} onSubmit={e=>void create(e)} onMouseDown={e=>e.stopPropagation()}><header className="group-control-title"><div><p>Réception · Demande groupe</p><h2>Nouveau réveil</h2></div><button type="button" onClick={()=>setOpen(false)}><X size={19}/></button></header><section className="control-leader"><h3><UsersRound size={17}/> Groupe</h3><div><label>Groupe<select name="groupId" required value={groupId} onChange={e=>setGroupId(e.target.value)}><option value="">Choisir…</option>{eligible.map(g=><option key={g.id} value={g.id}>{g.name} · {g.pax||0} pers.</option>)}</select></label><label>Date<input name="date" type="date" min={today} required/></label><label>Heure<input name="time" type="time" required/></label><label>Consigne<input name="notes" placeholder="Ex. réveil général / appel tour leader"/></label></div></section><footer><button type="button" className="control-print" onClick={()=>setOpen(false)}>Annuler</button><button className="control-save" type="submit"><Plus size={17}/>Créer le réveil</button></footer></form></div>}
+ </main>
+}
