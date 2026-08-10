@@ -18,6 +18,7 @@ import { MealTransmissionDashboard } from './MealTransmissionDashboard';
 import { Group360PendingInfoHelper } from './Group360PendingInfoHelper';
 import { Group360DeleteAction } from './Group360DeleteAction';
 import { GroupCreateExperience } from './GroupCreateExperience';
+import { Group360ArchiveFilter } from './Group360ArchiveFilter';
 import { IndividualRequestsCommandDashboard } from './IndividualRequestsCommandDashboard';
 import { OperationalArchiveAdditions } from './OperationalArchiveAdditions';
 import { cleanupLegacyLocalData } from './legacy-cleanup';
@@ -84,6 +85,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <Group360PendingInfoHelper />
     <Group360DeleteAction />
     <GroupCreateExperience />
+    <Group360ArchiveFilter />
     <OperationalToastHost />
     <ReceptionMealNav />
     <ReceptionComplaintsNav />
