@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { ArrowLeft, BellRing, CheckCircle2, CircleAlert, CreditCard, KeyRound, LogIn, LogOut, Luggage, RefreshCw, Save, UtensilsCrossed, UsersRound, X } from 'lucide-react';
+import { ArrowLeft, BellRing, CheckCircle2, CircleAlert, CreditCard, KeyRound, LockKeyhole, LogIn, LogOut, Luggage, RefreshCw, Save, UtensilsCrossed, UsersRound, X } from 'lucide-react';
 import { useOperationalStore } from './useOperationalStore';
 
 type Audit={id:string;action:string;actor:string;role:string;at:string};
@@ -21,6 +21,8 @@ function actor(){try{const s=JSON.parse(localStorage.getItem('hospicore.session'
 function stamp(){return new Date().toLocaleString('fr-FR')}
 function checklist(g:Group){return{...EMPTY,...g.departureChecklist}}
 function ready(g:Group){const c=checklist(g);return(c.settlementStatus==='paid'||c.settlementStatus==='debtor')&&c.keysRecovered&&Boolean(g.groupControl?.validatedAt)}
+function arrivalTimeLocked(g:Group){return Boolean(g.arrivalConfirmedAt)||['Arrivé','En séjour','Parti'].includes(g.status||'')}
+function departureTimeLocked(g:Group){return Boolean(g.departureConfirmedAt)||g.status==='Parti'}
 function fmtDate(v:string){return new Date(`${v}T12:00:00`).toLocaleDateString('fr-FR',{weekday:'long',day:'2-digit',month:'2-digit'})}
 function lastService(g:Group){
  const day=(g.mealDays||[]).find(d=>d.date===g.departure);if(!day)return null;
@@ -37,13 +39,21 @@ export function ReceptionOperationsPage(){
  const tomorrowDepartures=useMemo(()=>store.data.filter(g=>g.departure===tomorrow).sort((a,b)=>(a.departureTime||'99:99').localeCompare(b.departureTime||'99:99')),[store.data,tomorrow]);
  function groupWakeups(g:Group){return wakeups.data.filter(w=>w.groupId===g.id&&w.status!=='Effectué'&&w.date<=String(g.departure||'9999')).sort((a,b)=>`${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`))}
  async function saveGroup(group:Group,patch:Partial<Group>,action:string){const audit={id:crypto.randomUUID(),action,actor:user.name,role:user.role,at:stamp()};await store.save(store.data.map(g=>g.id===group.id?{...g,...patch,audit:[...(g.audit||[]),audit]}:g))}
- async function updateTime(group:Group,kind:'arrival'|'departure',value:string){const current=kind==='arrival'?group.arrivalTime||'':group.departureTime||'';if(value===current)return;const label=kind==='arrival'?'arrivée':'départ';await saveGroup(group,kind==='arrival'?{arrivalTime:value}:{departureTime:value},`Heure ${label} modifiée · ${current||'À confirmer'} → ${value||'À confirmer'}`)}
+ async function updateTime(group:Group,kind:'arrival'|'departure',value:string){
+  if(kind==='arrival'&&arrivalTimeLocked(group))return;
+  if(kind==='departure'&&departureTimeLocked(group))return;
+  const current=kind==='arrival'?group.arrivalTime||'':group.departureTime||'';if(value===current)return;const label=kind==='arrival'?'arrivée':'départ';await saveGroup(group,kind==='arrival'?{arrivalTime:value}:{departureTime:value},`Heure ${label} modifiée · ${current||'À confirmer'} → ${value||'À confirmer'}`)
+ }
  async function arrive(g:Group){const at=stamp();await saveGroup(g,{status:'Arrivé',arrivalConfirmedAt:at,arrivalConfirmedBy:user.name},`Arrivée confirmée par ${user.name} · ${at}`)}
  async function depart(g:Group){if(!ready(g))return;const at=stamp();await saveGroup(g,{status:'Parti',departureConfirmedAt:at,departureConfirmedBy:user.name,groupControl:{...(g.groupControl||{}),commercialValidation:'À valider'}},`Départ confirmé par ${user.name} · checklist complète · contrôle transmis au Commercial`)}
  function openChecklist(g:Group){setEditing(g);setDraft(checklist(g))}
  async function saveChecklist(){if(!editing)return;if(draft.settlementStatus==='paid'&&!draft.paymentMethod.trim())return;if(draft.settlementStatus==='debtor'&&!draft.debtorName.trim())return;await saveGroup(editing,{departureChecklist:draft},'Checklist de départ mise à jour par la Réception');setEditing(null)}
  function task(done:boolean,label:string){return <span className={`reception-op-task ${done?'done':'missing'}`}>{done?<CheckCircle2 size={14}/>:<CircleAlert size={14}/>}<b>{label}</b></span>}
- function editableTime(group:Group,kind:'arrival'|'departure'){const value=kind==='arrival'?group.arrivalTime||'':group.departureTime||'';return <label className="reception-op-time-edit" title={`Modifier l’heure de ${kind==='arrival'?'l’arrivée':'départ'}`}><span>{kind==='arrival'?'Arrivée':'Départ'}</span><input key={`${group.id}-${kind}-${value}`} type="time" defaultValue={value} onBlur={e=>void updateTime(group,kind,e.currentTarget.value)} onKeyDown={e=>{if(e.key==='Enter')e.currentTarget.blur()}}/></label>}
+ function editableTime(group:Group,kind:'arrival'|'departure'){
+  const value=kind==='arrival'?group.arrivalTime||'':group.departureTime||'';
+  const locked=kind==='arrival'?arrivalTimeLocked(group):departureTimeLocked(group);
+  return <label className={`reception-op-time-edit${locked?' locked':''}`} title={locked?`Heure de ${kind==='arrival'?'l’arrivée':'départ'} verrouillée après confirmation`:`Modifier l’heure de ${kind==='arrival'?'l’arrivée':'départ'}`}><span>{kind==='arrival'?'Arrivée':'Départ'}{locked&&<LockKeyhole size={12}/>}</span><input key={`${group.id}-${kind}-${value}-${locked?'locked':'open'}`} type="time" defaultValue={value} disabled={locked} onBlur={e=>void updateTime(group,kind,e.currentTarget.value)} onKeyDown={e=>{if(e.key==='Enter')e.currentTarget.blur()}}/></label>
+ }
  function departureInfo(g:Group){const service=lastService(g),alarms=groupWakeups(g);return <div className="reception-op-departure-info"><span><BellRing size={14}/><b>Réveil</b> {alarms.length?alarms.map(w=>`${fmtDate(w.date)} ${w.time}${w.note?` · ${w.note}`:''}`).join(' / '):'Aucun'}</span><span><Luggage size={14}/><b>Bagagerie</b> {g.luggageDeparture||'Aucune'}</span><span><UtensilsCrossed size={14}/><b>Dernier service</b> {service?`${service.label}${service.time?` · ${service.time}`:''}`:'Aucun'}</span></div>}
  function arrivalCard(g:Group,j1=false){return <div className={`reception-op-card${j1?' j1':''}`} key={g.id}><div><strong>{g.name||'Groupe sans nom'}</strong><span><UsersRound size={14}/>{g.pax||0} pers. · {g.rooms||0} chambres</span>{j1&&<small>Arrivée prévue {fmtDate(String(g.arrival))}</small>}</div>{editableTime(g,'arrival')}{j1?<em>J+1 · à anticiper</em>:['Arrivé','En séjour'].includes(g.status||'')?<em>✓ Arrivée confirmée {g.arrivalConfirmedAt||''}</em>:<button onClick={()=>void arrive(g)}><LogIn size={15}/>Mettre en arrivée</button>}</div>}
  function departureCard(g:Group,j1=false){const c=checklist(g),isReady=ready(g);return <div className={`reception-op-card departure${j1?' j1':''}`} key={g.id}><div><strong>{g.name||'Groupe sans nom'}</strong><span><UsersRound size={14}/>{g.pax||0} pers. · {g.rooms||0} chambres</span>{departureInfo(g)}{!j1&&<div className="reception-op-tasks">{task(c.settlementStatus!=='pending','Solde / débiteur')}{task(c.keysRecovered,'Clés récupérées')}{task(Boolean(g.groupControl?.validatedAt),'Contrôle Groupe')}</div>}</div>{editableTime(g,'departure')}{j1?<em>J+1 · préparer le départ</em>:<div className="reception-op-actions"><button className="secondary" onClick={()=>openChecklist(g)}>Compléter les étapes</button>{g.status==='Parti'?<em>✓ Départ confirmé {g.departureConfirmedAt||''}</em>:<button disabled={!isReady} title={isReady?'Confirmer le départ':'Trois étapes obligatoires à compléter'} onClick={()=>void depart(g)}><LogOut size={15}/>{isReady?'Mettre en départ':'Départ bloqué'}</button>}</div>}</div>}
