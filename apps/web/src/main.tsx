@@ -18,6 +18,8 @@ import { MealTransmissionDashboard } from './MealTransmissionDashboard';
 import { Group360PendingInfoHelper } from './Group360PendingInfoHelper';
 import { Group360DeleteAction } from './Group360DeleteAction';
 import { GroupCreateExperience } from './GroupCreateExperience';
+import { IndividualRequestsCommandDashboard } from './IndividualRequestsCommandDashboard';
+import { OperationalArchiveAdditions } from './OperationalArchiveAdditions';
 import { cleanupLegacyLocalData } from './legacy-cleanup';
 import './styles.css';
 import './executive-dashboard.css';
@@ -64,6 +66,8 @@ import './user-account-menu.css';
 import './command-center-button.css';
 import './hospicore-consistency.css';
 import './unified-notifications.css';
+import './individual-requests-command.css';
+import './operational-archive-additions.css';
 
 cleanupLegacyLocalData();
 
@@ -75,6 +79,8 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <MealOrderAutoSync />
     <PdjBoxMealRow />
     <MealTransmissionDashboard />
+    <IndividualRequestsCommandDashboard />
+    <OperationalArchiveAdditions />
     <Group360PendingInfoHelper />
     <Group360DeleteAction />
     <GroupCreateExperience />
