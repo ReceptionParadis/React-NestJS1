@@ -7,6 +7,7 @@ import { ComplaintsPage } from './ComplaintsPage';
 import { DiagnosticPage } from './DiagnosticPage';
 import { DirectionReportsPage } from './DirectionReportsPage';
 import { GeneralInstructionsPage } from './GeneralInstructionsPage';
+import { GroupContractsPage } from './GroupContractsPage';
 import { GroupsPage } from './GroupsPage';
 import { IndividualRequestsPage } from './IndividualRequestsPage';
 import { MealOrdersPage } from './MealOrdersPage';
@@ -39,6 +40,7 @@ function CurrentPage(){
  if(path.startsWith('/journal-exploitation')||path.startsWith('/activite'))return <ActivityJournalPage/>;
  if(path.startsWith('/consignes-generales'))return <GeneralInstructionsPage/>;
  if(path.startsWith('/centre-operations')||path.startsWith('/cahier-consignes')||path.startsWith('/prets')||path.startsWith('/inventaire'))return <OperationsCenterV2Page/>;
+ if(path.startsWith('/commercial/contrats'))return <GroupContractsPage/>;
  if(path.startsWith('/commercial/groupes'))return <GroupsPage/>;
  if(path.startsWith('/commercial/planning-hebdomadaire'))return <WeeklyPlanningPage/>;
  if(path==='/commercial'||path==='/commercial/')return <CommercialHubPage/>;
