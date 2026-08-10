@@ -12,6 +12,7 @@ import { CommandCenterButton } from './CommandCenterButton';
 import { NightAuditorNav } from './NightAuditorNav';
 import { NightRouteGroupRequestsBridge } from './NightRouteGroupRequestsBridge';
 import { GroupControlPrintRecovery } from './GroupControlPrintRecovery';
+import { AdministrationRoleProfileBridge } from './AdministrationRoleProfileBridge';
 import { FunctionSheetPrintCleanup } from './FunctionSheetPrintCleanup';
 import { FunctionSheetSourceSync } from './FunctionSheetSourceSync';
 import { MealOrderAutoSync } from './MealOrderAutoSync';
@@ -99,5 +100,6 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <NightAuditorNav />
     <NightRouteGroupRequestsBridge />
     <GroupControlPrintRecovery />
+    <AdministrationRoleProfileBridge />
   </React.StrictMode>,
 );
