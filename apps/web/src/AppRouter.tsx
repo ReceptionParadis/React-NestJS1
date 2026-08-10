@@ -8,6 +8,7 @@ import { DiagnosticPage } from './DiagnosticPage';
 import { DirectionReportsPage } from './DirectionReportsPage';
 import { GeneralInstructionsPage } from './GeneralInstructionsPage';
 import { GroupContractsPage } from './GroupContractsPage';
+import { GroupRequestsPage } from './GroupRequestsPage';
 import { GroupsPage } from './GroupsPage';
 import { IndividualRequestsPage } from './IndividualRequestsPage';
 import { MealOrdersPage } from './MealOrdersPage';
@@ -48,6 +49,7 @@ function CurrentPage(){
  if(path==='/reception'||path==='/reception/')return <ReceptionHubPage/>;
  if(path.startsWith('/reception/archives'))return <ReceptionArchivesPage/>;
  if(path.startsWith('/reception/plaintes'))return <ComplaintsPage/>;
+ if(path.startsWith('/reception/demandes-groupe'))return <GroupRequestsPage/>;
  if(path.startsWith('/reception/demandes-individuelles'))return <IndividualRequestsPage/>;
  if(path.startsWith('/reception/paniers-repas-pdj'))return <MealOrdersPage/>;
  if(path.startsWith('/reception/feuille-route-veilleur'))return <NightWatchRoutePage/>;
