@@ -1,4 +1,4 @@
-import { AlertTriangle, ArrowLeft, BellRing, CalendarDays, CheckCircle2, ChevronRight, ClipboardCheck, FileCheck2, ReceiptText, Send, UsersRound } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, BellRing, CalendarDays, CheckCircle2, ChevronRight, ClipboardCheck, FileCheck2, FileSignature, ReceiptText, Send, UsersRound } from 'lucide-react';
 import { OperationalGroupBuckets, type OperationalBooking, type OperationalGroup } from './OperationalGroupBuckets';
 import { can, currentRole } from './permissions';
 import { useOperationalStore } from './useOperationalStore';
@@ -7,7 +7,7 @@ import './operational-group-buckets.css';
 
 type Audit={id:string;action:string;actor:string;role:string;at:string};
 type Group=OperationalGroup&{audit?:Audit[];vegaInvoiceSentAt?:string;vegaInvoiceSentBy?:string;roomingPending?:boolean;arrivalTimePending?:boolean;departureTimePending?:boolean};
-const items=[{title:'Fiches Groupe 360°',description:'Créer, compléter et valider les dossiers groupes, les prestations, les repas et les informations financières.',href:'/commercial/groupes',icon:UsersRound},{title:'Fiche de fonction hebdomadaire',description:'Importer les groupes validés, relire chaque ligne, valider l’impression et diffuser la fiche aux services.',href:'/commercial/planning-hebdomadaire',icon:CalendarDays}];
+const items=[{title:'Fiches Groupe 360°',description:'Créer, compléter et valider les dossiers groupes, les prestations, les repas et les informations financières.',href:'/commercial/groupes',icon:UsersRound},{title:'Contrats groupes',description:'Créer les contrats à partir des Fiches Groupe 360°, saisir les conditions commerciales, enregistrer et imprimer le document A4.',href:'/commercial/contrats',icon:FileSignature},{title:'Fiche de fonction hebdomadaire',description:'Consulter et imprimer à volonté la synthèse opérationnelle issue des groupes validés.',href:'/commercial/planning-hebdomadaire',icon:CalendarDays}];
 function sessionUser(){try{const s=JSON.parse(localStorage.getItem('hospicore.session')||'{}');const u=s.user||{};return{name:`${u.firstName||'Utilisateur'} ${u.lastName||'HospiCore'}`.trim(),role:String(u.role?.name||u.role||'Commercial')}}catch{return{name:'Utilisateur HospiCore',role:'Commercial'}}}
 function stamp(){return new Date().toLocaleString('fr-FR')}
 function todayIso(){const d=new Date();return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}
