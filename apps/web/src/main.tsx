@@ -14,6 +14,7 @@ import { NightRouteGroupRequestsBridge } from './NightRouteGroupRequestsBridge';
 import { GroupControlPrintRecovery } from './GroupControlPrintRecovery';
 import { AdministrationRoleProfileBridge } from './AdministrationRoleProfileBridge';
 import { MaintenanceExperienceBridge } from './MaintenanceExperienceBridge';
+import { RoleAwareCommandCenter } from './RoleAwareCommandCenter';
 import { FunctionSheetPrintCleanup } from './FunctionSheetPrintCleanup';
 import { FunctionSheetSourceSync } from './FunctionSheetSourceSync';
 import { MealOrderAutoSync } from './MealOrderAutoSync';
@@ -52,6 +53,7 @@ import './command-journal-readability.css';
 import './dashboard-journal-sync.css';
 import './command-role-filter.css';
 import './command-maintenance-widget.css';
+import './role-aware-command-center.css';
 import './commercial-hub.css';
 import './function-sheet-notice.css';
 import './daily-group-board.css';
@@ -80,6 +82,7 @@ cleanupLegacyLocalData();
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <AppRouter />
+    <RoleAwareCommandCenter />
     <FunctionSheetSourceSync />
     <FunctionSheetPrintCleanup />
     <MealOrderAutoSync />
