@@ -22,7 +22,7 @@ type Group = {
   arrivalTime: string; departureTime: string; leaderFirstName: string; leaderLastName: string;
   leaderPhone: string; leaderEmail: string; language: string; buses: number; parking: boolean;
   stayType: StayType; breakfastType: BreakfastType; housekeepingType: RoomServiceType; dietary: string;
-  luggageArrival: LuggageRoom; luggageDeparture: LuggageRoom; mealDays: MealDay[];
+  luggageArrival: LuggageRoom; luggageDeparture: LuggageRoom; wakeupDate: string; wakeupTime: string; mealDays: MealDay[];
   commercialValidated: boolean; validatedAt: string; validatedBy: string; audit: Audit[];
 };
 
@@ -83,7 +83,7 @@ function normalize(value: Partial<Group> & { id: string }): Group {
     status: value.status || 'Préparation', paymentStatus: value.paymentStatus || 'Reste à payer', amountDue: Number(value.amountDue || 0), debtor: value.debtor || '',
     rooming: Boolean(value.rooming), roomingReceivedAt: value.roomingReceivedAt || '', roomingReceivedBy: value.roomingReceivedBy || '',
     arrivalTime: value.arrivalTime || '', departureTime: value.departureTime || '', leaderFirstName: value.leaderFirstName || legacyName.shift() || '', leaderLastName: value.leaderLastName || legacyName.join(' '), leaderPhone: value.leaderPhone || legacy.phone || '', leaderEmail: value.leaderEmail || '', language: value.language || '', buses: Number(value.buses || 0), parking: Boolean(value.parking),
-    stayType, breakfastType: value.breakfastType || 'Standard', housekeepingType: value.housekeepingType || 'Standard', dietary: value.dietary || '', luggageArrival: value.luggageArrival || '', luggageDeparture: value.luggageDeparture || '',
+    stayType, breakfastType: value.breakfastType || 'Standard', housekeepingType: value.housekeepingType || 'Standard', dietary: value.dietary || '', luggageArrival: value.luggageArrival || '', luggageDeparture: value.luggageDeparture || '', wakeupDate: value.wakeupDate || '', wakeupTime: value.wakeupTime || '',
     mealDays: Array.isArray(value.mealDays) && value.mealDays.length ? value.mealDays : buildMealDays(value.arrival || '', value.departure || '', Number(value.pax || 0), stayType),
     commercialValidated: Boolean(value.commercialValidated), validatedAt: value.validatedAt || '', validatedBy: value.validatedBy || '', audit: Array.isArray(value.audit) ? value.audit : [],
   };
