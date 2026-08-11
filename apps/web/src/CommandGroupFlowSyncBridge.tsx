@@ -1,22 +1,25 @@
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { CheckCircle2, LogIn, LogOut, UsersRound } from 'lucide-react';
+import { BellRing, CheckCircle2, ChevronDown, ChevronUp, LogIn, LogOut, Plus, Trash2, UsersRound } from 'lucide-react';
 import { useOperationalStore } from './useOperationalStore';
 
 type DepartureChecklist={settlementStatus?:'pending'|'paid'|'debtor';paymentMethod?:string;debtorName?:string;keysRecovered?:boolean};
 type GroupControl={validatedAt?:string};
 type Group={id:string;name?:string;pax?:number;arrival?:string;departure?:string;arrivalTime?:string;departureTime?:string;status?:string;departureChecklist?:DepartureChecklist;groupControl?:GroupControl};
+type GroupWakeup={id:string;groupId:string;groupName:string;date:string;time:string;notes?:string;createdBy?:string;createdAt?:string;completedAt?:string;completedBy?:string};
 
 function iso(d:Date){return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}
 function addDay(value:string,n:number){const d=new Date(`${value}T12:00:00`);d.setDate(d.getDate()+n);return iso(d)}
 function shortDate(value:string){return new Date(`${value}T12:00:00`).toLocaleDateString('fr-FR',{weekday:'short',day:'2-digit',month:'2-digit'})}
+function longDate(value:string){return new Date(`${value}T12:00:00`).toLocaleDateString('fr-FR',{weekday:'short',day:'2-digit',month:'2-digit'})}
 function arrived(g:Group){return ['Arrivé','En séjour'].includes(g.status||'')}
 function departed(g:Group){return g.status==='Parti'}
 function departureReady(g:Group){const c=g.departureChecklist;const paid=c?.settlementStatus==='paid'?Boolean(c.paymentMethod):c?.settlementStatus==='debtor'?Boolean(c.debtorName):false;return paid&&Boolean(c?.keysRecovered)&&Boolean(g.groupControl?.validatedAt)}
+function actor(){try{const s=JSON.parse(localStorage.getItem('hospicore.session')||'{}'),u=s.user||{};return `${u.firstName||'Utilisateur'} ${u.lastName||'HospiCore'}`.trim()}catch{return'Utilisateur HospiCore'}}
 
 export function CommandGroupFlowSyncBridge(){
- const store=useOperationalStore<Group[]>('group-360',[]);
- const [mount,setMount]=useState<HTMLElement|null>(null);
+ const store=useOperationalStore<Group[]>('group-360',[]),wakeups=useOperationalStore<GroupWakeup[]>('group-wakeups',[]);
+ const [mount,setMount]=useState<HTMLElement|null>(null),[expanded,setExpanded]=useState(''),[wakeDate,setWakeDate]=useState(''),[wakeTime,setWakeTime]=useState(''),[wakeNotes,setWakeNotes]=useState('');
  const today=iso(new Date()),tomorrow=addDay(today,1);
  const groups=Array.isArray(store.data)?store.data:[];
  const arrivals=useMemo(()=>groups.filter(g=>g.arrival===today&&!arrived(g)&&!departed(g)).sort((a,b)=>(a.arrivalTime||'99:99').localeCompare(b.arrivalTime||'99:99')),[groups,today]);
@@ -28,50 +31,24 @@ export function CommandGroupFlowSyncBridge(){
  useEffect(()=>{
   if(location.pathname!=='/'&&location.pathname!=='')return;
   let cancelled=false;
-  const attach=()=>{
-   if(cancelled)return;
-   const original=document.querySelector<HTMLElement>('.command-flow-columns');
-   if(!original){window.setTimeout(attach,120);return}
-   original.style.display='none';
-   let node=original.parentElement?.querySelector<HTMLElement>(':scope > .command-flow-sync-mount')||null;
-   if(!node&&original.parentElement){node=document.createElement('div');node.className='command-flow-sync-mount';original.after(node)}
-   setMount(node);
-  };
-  attach();
-  return()=>{cancelled=true;document.querySelectorAll<HTMLElement>('.command-flow-columns').forEach(n=>n.style.display='');document.querySelectorAll('.command-flow-sync-mount').forEach(n=>n.remove())};
+  const attach=()=>{if(cancelled)return;const original=document.querySelector<HTMLElement>('.command-flow-columns');if(!original){window.setTimeout(attach,120);return}original.style.display='none';let node=original.parentElement?.querySelector<HTMLElement>(':scope > .command-flow-sync-mount')||null;if(!node&&original.parentElement){node=document.createElement('div');node.className='command-flow-sync-mount';original.after(node)}setMount(node)};
+  attach();return()=>{cancelled=true;document.querySelectorAll<HTMLElement>('.command-flow-columns').forEach(n=>n.style.display='');document.querySelectorAll('.command-flow-sync-mount').forEach(n=>n.remove())};
  },[]);
 
  useEffect(()=>{
   const kpis=Array.from(document.querySelectorAll<HTMLElement>('.command-kpis > article'));
-  const values=[
-   {count:present.length,sub:`${present.reduce((n,g)=>n+Number(g.pax||0),0)} personnes`},
-   {count:arrivals.length,sub:`${arrivals.reduce((n,g)=>n+Number(g.pax||0),0)} personnes`},
-   {count:departures.length,sub:'à effectuer'},
-  ];
-  values.forEach((value,index)=>{const card=kpis[index];if(!card)return;const strong=card.querySelector('strong'),small=card.querySelector('small');if(strong)strong.textContent=String(value.count);if(small)small.textContent=value.sub});
+  [{count:present.length,sub:`${present.reduce((n,g)=>n+Number(g.pax||0),0)} personnes`},{count:arrivals.length,sub:`${arrivals.reduce((n,g)=>n+Number(g.pax||0),0)} personnes`},{count:departures.length,sub:'à effectuer'}].forEach((value,index)=>{const card=kpis[index];if(!card)return;const strong=card.querySelector('strong'),small=card.querySelector('small');if(strong)strong.textContent=String(value.count);if(small)small.textContent=value.sub});
  },[present.length,arrivals.length,departures.length,groups]);
 
+ function groupWakeups(groupId:string){return wakeups.data.filter(w=>w.groupId===groupId&&!w.completedAt).sort((a,b)=>`${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`))}
+ function togglePresent(g:Group){if(expanded===g.id){setExpanded('');return}setExpanded(g.id);setWakeDate(g.arrival&&g.arrival>today?g.arrival:today);setWakeTime('');setWakeNotes('')}
+ async function addWakeup(g:Group){if(!wakeDate||!wakeTime||wakeDate<String(g.arrival||'')||wakeDate>String(g.departure||'9999'))return;const item:GroupWakeup={id:crypto.randomUUID(),groupId:g.id,groupName:g.name||'Groupe sans nom',date:wakeDate,time:wakeTime,notes:wakeNotes.trim(),createdBy:actor(),createdAt:new Date().toISOString()};if(await wakeups.save([...wakeups.data,item])){setWakeTime('');setWakeNotes('')}}
+ async function removeWakeup(id:string){await wakeups.save(wakeups.data.filter(w=>w.id!==id))}
+
  if(!mount)return null;
- const item=(g:Group,kind:'arrival'|'present'|'departure'|'j1-arrival'|'j1-departure')=>{
-  const isJ1=kind.startsWith('j1-'),time=kind.includes('arrival')?g.arrivalTime:g.departureTime;
-  const subtitle=kind==='present'?`Présent · départ ${g.departureTime||'à confirmer'}`:kind.includes('departure')?(departureReady(g)?'Prêt au départ':'Préparation du départ'):(isJ1?'J+1':'À accueillir');
-  return <button key={`${kind}-${g.id}`} className={`flow-sync-item ${kind}`} onClick={()=>location.href='/reception/arrivees-departs'}><time>{time||'—'}</time><div><strong>{g.name||'Groupe sans nom'}</strong><span>{g.pax||0} pax · {subtitle}</span></div></button>;
- };
- return createPortal(<>
-  <style>{`
-   .command-flow-sync{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border-top:1px solid #eee5df;background:#fff}
-   .command-flow-sync>section{min-width:0;padding:16px;border-right:1px solid #eee5df}.command-flow-sync>section:last-child{border-right:0}
-   .command-flow-sync h3{display:flex;align-items:center;gap:8px;margin:0 0 12px;font-size:15px;color:#2b1d21}.command-flow-sync h3 b{margin-left:auto;min-width:24px;height:24px;border-radius:999px;display:grid;place-items:center;background:#f3e8eb;color:#7b1931;font-size:12px}
-   .command-flow-sync h4{margin:14px 0 8px;font-size:12px;color:#7b1931}.command-flow-sync h4 b{float:right}.command-flow-sync .present-title{color:#287143}
-   .flow-sync-item{width:100%;display:grid;grid-template-columns:58px minmax(0,1fr);gap:10px;align-items:center;text-align:left;padding:10px 11px;margin:0 0 7px;border:1px solid #eaded7;border-radius:11px;background:#fffaf7;color:#2b1d21;cursor:pointer}
-   .flow-sync-item.present{background:#f0f8f2;border-color:#c8e2cf}.flow-sync-item.departure,.flow-sync-item.j1-departure{background:#f7fbf8;border-color:#d6e8db}.flow-sync-item:hover{transform:translateY(-1px);box-shadow:0 5px 14px rgba(72,42,48,.08)}
-   .flow-sync-item time{font-size:14px;font-weight:850;color:#7b1931}.flow-sync-item strong{display:block;font-size:13px;overflow-wrap:anywhere}.flow-sync-item span{display:block;margin-top:2px;font-size:10.5px;color:#8d747a}.flow-sync-empty{margin:8px 0 14px;color:#9a858a;font-size:12px}
-   @media(max-width:1250px){.command-flow-sync{grid-template-columns:1fr}.command-flow-sync>section{border-right:0;border-bottom:1px solid #eee5df}.command-flow-sync>section:last-child{border-bottom:0}}
-  `}</style>
-  <div className="command-flow-sync">
-   <section><h3><LogIn size={17}/>Arrivées à faire <b>{arrivals.length}</b></h3>{arrivals.length?arrivals.map(g=>item(g,'arrival')):<p className="flow-sync-empty">Aucune arrivée à effectuer aujourd’hui.</p>}<h4>Demain · {shortDate(tomorrow)} <b>{tomorrowArrivals.length}</b></h4>{tomorrowArrivals.length?tomorrowArrivals.map(g=>item(g,'j1-arrival')):<p className="flow-sync-empty">Aucune arrivée demain.</p>}</section>
-   <section><h3 className="present-title"><UsersRound size={17}/>Présents <b>{present.length}</b></h3>{present.length?present.map(g=>item(g,'present')):<p className="flow-sync-empty"><CheckCircle2 size={15}/> Aucun groupe actuellement présent.</p>}</section>
-   <section><h3><LogOut size={17}/>Départs à faire <b>{departures.length}</b></h3>{departures.length?departures.map(g=>item(g,'departure')):<p className="flow-sync-empty">Aucun départ à effectuer aujourd’hui.</p>}<h4>Demain · {shortDate(tomorrow)} <b>{tomorrowDepartures.length}</b></h4>{tomorrowDepartures.length?tomorrowDepartures.map(g=>item(g,'j1-departure')):<p className="flow-sync-empty">Aucun départ demain.</p>}</section>
-  </div>
- </>,mount);
+ const item=(g:Group,kind:'arrival'|'departure'|'j1-arrival'|'j1-departure')=>{const isJ1=kind.startsWith('j1-'),time=kind.includes('arrival')?g.arrivalTime:g.departureTime,subtitle=kind.includes('departure')?(departureReady(g)?'Prêt au départ':'Préparation du départ'):(isJ1?'J+1':'À accueillir');return <button key={`${kind}-${g.id}`} className={`flow-sync-item ${kind}`} onClick={()=>location.href='/reception/arrivees-departs'}><time>{time||'—'}</time><div><strong>{g.name||'Groupe sans nom'}</strong><span>{g.pax||0} pax · {subtitle}</span></div></button>};
+ const presentItem=(g:Group)=>{const open=expanded===g.id,list=groupWakeups(g.id);return <article className={`flow-present-card${open?' open':''}`} key={`present-${g.id}`}><button className="flow-present-head" onClick={()=>togglePresent(g)}><div><strong>{g.name||'Groupe sans nom'}</strong><span>{g.pax||0} pax · départ {g.departureTime||'à confirmer'} · {list.length} réveil(s)</span></div>{open?<ChevronUp size={17}/>:<ChevronDown size={17}/>}</button>{open&&<div className="flow-present-body"><div className="flow-present-link"><span>Fiche 360° en séjour · réveils synchronisés</span><button onClick={()=>location.href='/reception/groupes'}>Ouvrir la fiche 360°</button></div>{list.length?<div className="flow-wakeup-list">{list.map(w=><div key={w.id}><BellRing size={15}/><b>{longDate(w.date)}</b><time>{w.time}</time><span>{w.notes||'Réveil groupe'}</span><button aria-label="Supprimer" onClick={()=>void removeWakeup(w.id)}><Trash2 size={14}/></button></div>)}</div>:<p className="flow-sync-empty">Aucun réveil programmé pour ce groupe.</p>}<div className="flow-wakeup-form"><label>Date<input type="date" min={g.arrival} max={g.departure} value={wakeDate} onChange={e=>setWakeDate(e.target.value)}/></label><label>Heure<input type="time" value={wakeTime} onChange={e=>setWakeTime(e.target.value)}/></label><label>Consigne<input value={wakeNotes} onChange={e=>setWakeNotes(e.target.value)} placeholder="Ex. réveil général"/></label><button disabled={!wakeDate||!wakeTime} onClick={()=>void addWakeup(g)}><Plus size={15}/>Ajouter</button></div><small className="flow-wakeup-help">Chaque réveil est enregistré dans la Fiche Groupe et apparaît automatiquement sur la Feuille de route du veilleur pour la nuit concernée.</small></div>}</article>};
+ return createPortal(<><style>{`
+ .command-flow-sync{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border-top:1px solid #eee5df;background:#fff}.command-flow-sync>section{min-width:0;padding:16px;border-right:1px solid #eee5df}.command-flow-sync>section:last-child{border-right:0}.command-flow-sync h3{display:flex;align-items:center;gap:8px;margin:0 0 12px;font-size:15px;color:#2b1d21}.command-flow-sync h3 b{margin-left:auto;min-width:24px;height:24px;border-radius:999px;display:grid;place-items:center;background:#f3e8eb;color:#7b1931;font-size:12px}.command-flow-sync h4{margin:14px 0 8px;font-size:12px;color:#7b1931}.command-flow-sync h4 b{float:right}.command-flow-sync .present-title{color:#287143}.flow-sync-item{width:100%;display:grid;grid-template-columns:58px minmax(0,1fr);gap:10px;align-items:center;text-align:left;padding:10px 11px;margin:0 0 7px;border:1px solid #eaded7;border-radius:11px;background:#fffaf7;color:#2b1d21;cursor:pointer}.flow-sync-item.departure,.flow-sync-item.j1-departure{background:#f7fbf8;border-color:#d6e8db}.flow-sync-item:hover,.flow-present-head:hover{box-shadow:0 5px 14px rgba(72,42,48,.08)}.flow-sync-item time{font-size:14px;font-weight:850;color:#7b1931}.flow-sync-item strong,.flow-present-head strong{display:block;font-size:13px;overflow-wrap:anywhere}.flow-sync-item span,.flow-present-head span{display:block;margin-top:2px;font-size:10.5px;color:#8d747a}.flow-sync-empty{margin:8px 0 14px;color:#9a858a;font-size:12px}.flow-present-card{margin:0 0 8px;border:1px solid #c8e2cf;border-radius:12px;background:#f0f8f2;overflow:hidden}.flow-present-head{width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px;border:0;background:transparent;text-align:left;color:#2b1d21;cursor:pointer}.flow-present-body{padding:0 11px 12px;border-top:1px solid #d7e8dc;background:#fbfefc}.flow-present-link{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 0;font-size:10.5px;color:#61766a}.flow-present-link button,.flow-wakeup-form>button{border:0;border-radius:8px;background:#7b1931;color:white;font-weight:750;padding:7px 9px;cursor:pointer}.flow-wakeup-list{display:grid;gap:6px;margin-bottom:9px}.flow-wakeup-list>div{display:grid;grid-template-columns:18px 88px 48px minmax(0,1fr) 28px;gap:5px;align-items:center;padding:7px;border-radius:8px;background:#fff;border:1px solid #e1ece4;font-size:10.5px}.flow-wakeup-list time{font-weight:850;color:#7b1931}.flow-wakeup-list button{border:0;background:transparent;color:#9a2c42;cursor:pointer}.flow-wakeup-form{display:grid;grid-template-columns:1fr 86px 1.4fr auto;gap:6px;align-items:end}.flow-wakeup-form label{display:grid;gap:3px;font-size:9px;font-weight:800;text-transform:uppercase;color:#92777e}.flow-wakeup-form input{min-width:0;height:32px;border:1px solid #ddcec6;border-radius:7px;padding:0 7px;background:#fff}.flow-wakeup-form>button{height:32px;display:flex;align-items:center;gap:4px}.flow-wakeup-form>button:disabled{opacity:.45}.flow-wakeup-help{display:block;margin-top:8px;color:#708078;font-size:9.5px;line-height:1.35}@media(max-width:1250px){.command-flow-sync{grid-template-columns:1fr}.command-flow-sync>section{border-right:0;border-bottom:1px solid #eee5df}.command-flow-sync>section:last-child{border-bottom:0}}@media(max-width:760px){.flow-wakeup-form{grid-template-columns:1fr 1fr}.flow-wakeup-list>div{grid-template-columns:18px 1fr 48px 28px}.flow-wakeup-list span{grid-column:2/5}}
+ `}</style><div className="command-flow-sync"><section><h3><LogIn size={17}/>Arrivées à faire <b>{arrivals.length}</b></h3>{arrivals.length?arrivals.map(g=>item(g,'arrival')):<p className="flow-sync-empty">Aucune arrivée à effectuer aujourd’hui.</p>}<h4>Demain · {shortDate(tomorrow)} <b>{tomorrowArrivals.length}</b></h4>{tomorrowArrivals.length?tomorrowArrivals.map(g=>item(g,'j1-arrival')):<p className="flow-sync-empty">Aucune arrivée demain.</p>}</section><section><h3 className="present-title"><UsersRound size={17}/>Présents <b>{present.length}</b></h3>{present.length?present.map(presentItem):<p className="flow-sync-empty"><CheckCircle2 size={15}/> Aucun groupe actuellement présent.</p>}</section><section><h3><LogOut size={17}/>Départs à faire <b>{departures.length}</b></h3>{departures.length?departures.map(g=>item(g,'departure')):<p className="flow-sync-empty">Aucun départ à effectuer aujourd’hui.</p>}<h4>Demain · {shortDate(tomorrow)} <b>{tomorrowDepartures.length}</b></h4>{tomorrowDepartures.length?tomorrowDepartures.map(g=>item(g,'j1-departure')):<p className="flow-sync-empty">Aucun départ demain.</p>}</section></div></>,mount);
 }
