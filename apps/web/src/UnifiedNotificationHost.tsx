@@ -22,10 +22,11 @@ function text(e:JournalEntry){return normalized(`${e.namespace||''} ${e.source||
 function serviceForRole(value:string):Service{const r=normalized(value);if(r.includes('direction')||r.includes('directeur')||r.includes('admin'))return'Direction';if(r.includes('commercial')||r.includes('vente'))return'Commercial';if(r.includes('maintenance')||r.includes('tech'))return'Maintenance';return'Réception'}
 function cashDepartmentLabel(value:CashDepartment){return value==='restaurant'?'Restaurant':value==='bar'?'Bar':'Réception'}
 function formatCashDate(value:string){const d=new Date(`${value}T12:00:00`);return Number.isFinite(d.getTime())?d.toLocaleDateString('fr-FR'):value}
-function cashJournalId(cash:CashDay){return`cash-validation-${cash.id}-${String(cash.directionValidatedAt||'').replace(/[^0-9]/g,'')}`}
+function cashNotificationId(cash:CashDay){return`cash-validation-${cash.id}-${String(cash.directionValidatedAt||'').replace(/[^0-9]/g,'')}`}
+function cashNotification(cash:CashDay):ImportantNotification|null{if(!cash.directionValidatedAt)return null;const department=cashDepartmentLabel(cash.department),date=formatCashDate(cash.date);return{id:cashNotificationId(cash),kind:'cash',title:'Caisse validée',action:`Caisse ${department} du ${date} validée`,actor:cash.directionValidatedBy||'Direction',role:'Direction',at:cash.directionValidatedAt,href:`/reception/caisse?department=${cash.department}&date=${cash.date}`,reference:`${department} · ${date}`}}
 function meaningfulAction(raw:string,kind:NotificationKind){
  if(raw.includes('synchronis')||raw.includes('mise a jour')||raw.includes('mis a jour')||raw.includes('enregistr')||raw.includes('actualis'))return false;
- if(kind==='group')return raw.includes('valide')||raw.includes('revalide')||raw.includes('verrouille')||raw.includes('parti');
+ if(kind==='group')return raw.includes('valide')||raw.includes('revalide')||raw.includes('verrouille')||raw.includes('parti')||raw.includes('arrive');
  if(kind==='function')return raw.includes('diffuse')||raw.includes('imprime')||raw.includes('valide')||raw.includes('prete a imprimer')||raw.includes('cloture');
  if(kind==='loan')return raw.includes('cree')||raw.includes('attribue')||raw.includes('remis')||raw.includes('retour')||raw.includes('termine')||raw.includes('en retard');
  if(kind==='cash')return raw.includes('caisse')&&raw.includes('validee');
@@ -34,7 +35,7 @@ function meaningfulAction(raw:string,kind:NotificationKind){
 function classify(e:JournalEntry):ImportantNotification|null{
  const raw=text(e);let kind:NotificationKind|null=null,title='',href='';
  if(raw.includes('cash-validation')||raw.includes('caisse journaliere')||raw.includes('caisse journalière')){kind='cash';title='Caisse validée';href='/reception/caisse';}
- else if(raw.includes('group-360')||raw.includes('groupe 360')||raw.includes('fiche groupe')){kind='group';title=raw.includes('revalide')?'Fiche Groupe 360° revalidée':raw.includes('parti')?'Groupe passé en départ':'Fiche Groupe 360° validée';href='/reception/groupes';}
+ else if(raw.includes('group-360')||raw.includes('groupe 360')||raw.includes('fiche groupe')){kind='group';title=raw.includes('revalide')?'Fiche Groupe 360° revalidée':raw.includes('parti')?'Groupe passé en départ':raw.includes('arrive')?'Groupe passé en arrivée':'Fiche Groupe 360° validée';href='/reception/groupes';}
  else if(raw.includes('weekly-planning')||raw.includes('fiche de fonction')||raw.includes('function-sheet')){kind='function';title='Fiche de fonction';href='/reception/fiche-fonction';}
  else if(raw.includes('operations-center')||raw.includes('loan')||raw.includes('pret')||raw.includes('prêt')){kind='loan';title='Prêt';href='/centre-operations';}
  else if(raw.includes('complaint')||raw.includes('plainte')){kind='complaint';title='Plainte client';href='/reception/plaintes';}
@@ -45,7 +46,7 @@ function Icon({kind}:{kind:NotificationKind}){const C=kind==='group'?UsersRound:
 function timestamp(value:string){const parsed=Date.parse(value);if(Number.isFinite(parsed))return parsed;const m=String(value||'').match(/(\d{2})\/(\d{2})\/(\d{4})[^\d]*(\d{2}):(\d{2})(?::(\d{2}))?/);return m?new Date(Number(m[3]),Number(m[2])-1,Number(m[1]),Number(m[4]),Number(m[5]),Number(m[6]||0)).getTime():0}
 function dayKey(value:number){const d=new Date(value);return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}
 function todayKey(){return dayKey(Date.now())}
-function dedupe(items:ImportantNotification[]){const seen=new Set<string>();return items.filter(item=>{const minute=Math.floor(timestamp(item.at)/60000);const key=[item.kind,item.reference||'',normalized(item.action),normalized(item.actor),minute].join('|');if(seen.has(key))return false;seen.add(key);return true})}
+function dedupe(items:ImportantNotification[]){const seen=new Set<string>();return items.filter(item=>{const explicit=item.id.startsWith('cash-validation-')?item.id:'';const minute=Math.floor(timestamp(item.at)/60000);const key=explicit||[item.kind,item.reference||'',normalized(item.action),normalized(item.actor),minute].join('|');if(seen.has(key))return false;seen.add(key);return true})}
 
 function CashValidatedBanner({cashDays}:{cashDays:CashDay[]}){
  const[pathTarget,setPathTarget]=useState<Element|null>(null);
@@ -60,14 +61,14 @@ function CashValidatedBanner({cashDays}:{cashDays:CashDay[]}){
 export function UnifiedNotificationHost(){
  const journal=useOperationalStore<JournalEntry[]>('activity-journal',[],5000),instructions=useOperationalStore<HandrailEntry[]>('general-instructions',[]),cashStore=useOperationalStore<CashDay[]>('reception-cash-day',[]),s=session(),userId=String(s.user?.id||''),[open,setOpen]=useState(false),[seen,setSeen]=useState<Set<string>>(()=>loadSeen(userId));
  const userName=`${s.user?.firstName||'Utilisateur'} ${s.user?.lastName||'HospiCore'}`.trim(),userRole=String(s.user?.role?.baseRole||s.user?.role?.name||s.user?.role||''),userService=serviceForRole(userRole),today=todayKey();
- const items=useMemo(()=>dedupe(journal.data.map(classify).filter((n):n is ImportantNotification=>Boolean(n)).filter(n=>dayKey(timestamp(n.at))===today).sort((a,b)=>timestamp(b.at)-timestamp(a.at))).slice(0,100),[journal.data,today]);
+ useEffect(()=>{setSeen(loadSeen(userId))},[userId]);
+ const items=useMemo(()=>{const journalItems=journal.data.map(classify).filter((n):n is ImportantNotification=>Boolean(n));const cashItems=(Array.isArray(cashStore.data)?cashStore.data:[]).map(cashNotification).filter((n):n is ImportantNotification=>Boolean(n));return dedupe([...cashItems,...journalItems]).filter(n=>dayKey(timestamp(n.at))===today).sort((a,b)=>timestamp(b.at)-timestamp(a.at)).slice(0,100)},[journal.data,cashStore.data,today]);
  const unread=items.filter(i=>!seen.has(i.id));
  const instructionToday=useMemo(()=>instructions.data
   .filter(i=>(userService==='Direction'||(Array.isArray(i.recipients)&&i.recipients.some(r=>r.userId===userId)))&&dayKey(Date.parse(i.createdAt))===today)
   .sort((a,b)=>Date.parse(b.createdAt)-Date.parse(a.createdAt)),[instructions.data,userId,userService,today]);
  const instructionInbox=instructionToday.filter(i=>!(i.readBy||[]).some(r=>r.userId===userId));
  const totalUnread=unread.length+instructionInbox.length;
- useEffect(()=>{const validated=(Array.isArray(cashStore.data)?cashStore.data:[]).filter(c=>c.directionValidatedAt);if(!validated.length)return;const existing=new Set(journal.data.map(e=>e.id));const missing=validated.filter(c=>!existing.has(cashJournalId(c)));if(!missing.length)return;const additions:JournalEntry[]=missing.map(c=>({id:cashJournalId(c),at:c.directionValidatedAt!,actor:c.directionValidatedBy||'Direction',role:'Direction',service:'Direction',namespace:'cash-validation',source:'Caisse journalière',action:`Caisse ${cashDepartmentLabel(c.department)} du ${formatCashDate(c.date)} validée`,reference:`${cashDepartmentLabel(c.department)} · ${formatCashDate(c.date)}`,priority:'info'}));void journal.save([...journal.data,...additions])},[cashStore.data,journal.data]);
  useEffect(()=>{if(!userId||!instructionInbox.length)return;const key=`hospicore.instructions.inbox.opened.${userId}.${today}`;if(sessionStorage.getItem(key))return;sessionStorage.setItem(key,'1');setOpen(true)},[userId,instructionInbox.length,today]);
  useEffect(()=>{if(!open)return;const previous=document.body.style.overflow;const onKey=(event:KeyboardEvent)=>{if(event.key==='Escape')setOpen(false)};document.body.style.overflow='hidden';document.addEventListener('keydown',onKey);return()=>{document.body.style.overflow=previous;document.removeEventListener('keydown',onKey)}},[open]);
  function mark(id:string){const next=new Set(seen);next.add(id);setSeen(next);saveSeen(userId,next)}
