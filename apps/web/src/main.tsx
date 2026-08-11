@@ -10,6 +10,7 @@ import { UnifiedNotificationHost } from './UnifiedNotificationHost';
 import { DashboardJournalBridge } from './DashboardJournalBridge';
 import { CommandCenterButton } from './CommandCenterButton';
 import { CommandKpiNavigationBridge } from './CommandKpiNavigationBridge';
+import { CommandGroupFlowSyncBridge } from './CommandGroupFlowSyncBridge';
 import { NightAuditorNav } from './NightAuditorNav';
 import { NightRouteGroupRequestsBridge } from './NightRouteGroupRequestsBridge';
 import { GroupControlPrintRecovery } from './GroupControlPrintRecovery';
@@ -88,6 +89,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <AppRouter />
     <RoleAwareCommandCenter />
     <CommandKpiNavigationBridge />
+    <CommandGroupFlowSyncBridge />
     <FunctionSheetSourceSync />
     <FunctionSheetPrintCleanup />
     <MealOrderAutoSync />
