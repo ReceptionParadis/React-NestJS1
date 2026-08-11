@@ -13,6 +13,7 @@ import { CommandKpiNavigationBridge } from './CommandKpiNavigationBridge';
 import { NightAuditorNav } from './NightAuditorNav';
 import { NightRouteGroupRequestsBridge } from './NightRouteGroupRequestsBridge';
 import { GroupControlPrintRecovery } from './GroupControlPrintRecovery';
+import { GroupControlUnlockPermissionBridge } from './GroupControlUnlockPermissionBridge';
 import { AdministrationRoleProfileBridge } from './AdministrationRoleProfileBridge';
 import { MaintenanceExperienceBridge } from './MaintenanceExperienceBridge';
 import { RoleAwareCommandCenter } from './RoleAwareCommandCenter';
@@ -28,6 +29,7 @@ import { Group360ArchiveFilter } from './Group360ArchiveFilter';
 import { IndividualRequestsCommandDashboard } from './IndividualRequestsCommandDashboard';
 import { OperationalArchiveAdditions } from './OperationalArchiveAdditions';
 import { DirectionCashUnlockBridge } from './DirectionCashUnlockBridge';
+import { CashValidatedBannerScopeBridge } from './CashValidatedBannerScopeBridge';
 import { cleanupLegacyLocalData } from './legacy-cleanup';
 import './styles.css';
 import './executive-dashboard.css';
@@ -98,6 +100,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <GroupCreateExperience />
     <Group360ArchiveFilter />
     <DirectionCashUnlockBridge />
+    <CashValidatedBannerScopeBridge />
     <OperationalToastHost />
     <ReceptionMealNav />
     <ReceptionComplaintsNav />
@@ -109,6 +112,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <NightAuditorNav />
     <NightRouteGroupRequestsBridge />
     <GroupControlPrintRecovery />
+    <GroupControlUnlockPermissionBridge />
     <AdministrationRoleProfileBridge />
     <MaintenanceExperienceBridge />
   </React.StrictMode>,
