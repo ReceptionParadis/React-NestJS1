@@ -27,6 +27,7 @@ import { GroupCreateExperience } from './GroupCreateExperience';
 import { Group360ArchiveFilter } from './Group360ArchiveFilter';
 import { IndividualRequestsCommandDashboard } from './IndividualRequestsCommandDashboard';
 import { OperationalArchiveAdditions } from './OperationalArchiveAdditions';
+import { DirectionCashUnlockBridge } from './DirectionCashUnlockBridge';
 import { cleanupLegacyLocalData } from './legacy-cleanup';
 import './styles.css';
 import './executive-dashboard.css';
@@ -96,6 +97,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <Group360DeleteAction />
     <GroupCreateExperience />
     <Group360ArchiveFilter />
+    <DirectionCashUnlockBridge />
     <OperationalToastHost />
     <ReceptionMealNav />
     <ReceptionComplaintsNav />
