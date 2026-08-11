@@ -1,15 +1,17 @@
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Bell, Check, ChevronRight, ClipboardList, FileText, Package, ShieldAlert, UsersRound, X } from 'lucide-react';
+import { Bell, Check, CheckCircle2, ChevronRight, ClipboardList, FileText, Package, ShieldAlert, UsersRound, X } from 'lucide-react';
 import { useOperationalStore } from './useOperationalStore';
 
 type JournalEntry={id:string;at:string;actorId?:string;actor:string;role:string;service:string;namespace:string;source:string;action:string;reference?:string;priority?:string};
-type NotificationKind='group'|'function'|'loan'|'complaint';
+type NotificationKind='group'|'function'|'loan'|'complaint'|'cash';
 type ImportantNotification={id:string;kind:NotificationKind;title:string;action:string;actor:string;role:string;at:string;href:string;reference?:string};
 type Service='Réception'|'Commercial'|'Maintenance'|'Direction';
 type Recipient={userId:string;name:string;service:Service};
 type ReadReceipt={userId:string;name:string;service:Service;readAt:string};
 type HandrailEntry={id:string;reference:string;message:string;targetServices:Service[];createdAt:string;authorId:string;authorName:string;authorRole:string;authorService:Service;directionPriority:boolean;recipients:Recipient[];readBy:ReadReceipt[]};
+type CashDepartment='reception'|'restaurant'|'bar';
+type CashDay={id:string;date:string;department:CashDepartment;directionValidatedAt?:string;directionValidatedBy?:string};
 
 function session(){try{return JSON.parse(localStorage.getItem('hospicore.session')||'{}')}catch{return{}}}
 function storageKey(userId:string){return`hospicore.notifications.important.seen.${userId}`}
@@ -18,30 +20,45 @@ function saveSeen(userId:string,value:Set<string>){try{localStorage.setItem(stor
 function normalized(value:string){return String(value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase()}
 function text(e:JournalEntry){return normalized(`${e.namespace||''} ${e.source||''} ${e.action||''}`)}
 function serviceForRole(value:string):Service{const r=normalized(value);if(r.includes('direction')||r.includes('directeur')||r.includes('admin'))return'Direction';if(r.includes('commercial')||r.includes('vente'))return'Commercial';if(r.includes('maintenance')||r.includes('tech'))return'Maintenance';return'Réception'}
+function cashDepartmentLabel(value:CashDepartment){return value==='restaurant'?'Restaurant':value==='bar'?'Bar':'Réception'}
+function formatCashDate(value:string){const d=new Date(`${value}T12:00:00`);return Number.isFinite(d.getTime())?d.toLocaleDateString('fr-FR'):value}
+function cashJournalId(cash:CashDay){return`cash-validation-${cash.id}-${String(cash.directionValidatedAt||'').replace(/[^0-9]/g,'')}`}
 function meaningfulAction(raw:string,kind:NotificationKind){
  if(raw.includes('synchronis')||raw.includes('mise a jour')||raw.includes('mis a jour')||raw.includes('enregistr')||raw.includes('actualis'))return false;
  if(kind==='group')return raw.includes('valide')||raw.includes('revalide')||raw.includes('verrouille')||raw.includes('parti');
  if(kind==='function')return raw.includes('diffuse')||raw.includes('imprime')||raw.includes('valide')||raw.includes('prete a imprimer')||raw.includes('cloture');
  if(kind==='loan')return raw.includes('cree')||raw.includes('attribue')||raw.includes('remis')||raw.includes('retour')||raw.includes('termine')||raw.includes('en retard');
+ if(kind==='cash')return raw.includes('caisse')&&raw.includes('validee');
  return raw.includes('cree')||raw.includes('ouverte')||raw.includes('traitee')||raw.includes('resolue')||raw.includes('cloturee')||raw.includes('prioritaire');
 }
 function classify(e:JournalEntry):ImportantNotification|null{
  const raw=text(e);let kind:NotificationKind|null=null,title='',href='';
- if(raw.includes('group-360')||raw.includes('groupe 360')||raw.includes('fiche groupe')){kind='group';title=raw.includes('revalide')?'Fiche Groupe 360° revalidée':raw.includes('parti')?'Groupe passé en départ':'Fiche Groupe 360° validée';href='/reception/groupes';}
+ if(raw.includes('cash-validation')||raw.includes('caisse journaliere')||raw.includes('caisse journalière')){kind='cash';title='Caisse validée';href='/reception/caisse';}
+ else if(raw.includes('group-360')||raw.includes('groupe 360')||raw.includes('fiche groupe')){kind='group';title=raw.includes('revalide')?'Fiche Groupe 360° revalidée':raw.includes('parti')?'Groupe passé en départ':'Fiche Groupe 360° validée';href='/reception/groupes';}
  else if(raw.includes('weekly-planning')||raw.includes('fiche de fonction')||raw.includes('function-sheet')){kind='function';title='Fiche de fonction';href='/reception/fiche-fonction';}
  else if(raw.includes('operations-center')||raw.includes('loan')||raw.includes('pret')||raw.includes('prêt')){kind='loan';title='Prêt';href='/centre-operations';}
  else if(raw.includes('complaint')||raw.includes('plainte')){kind='complaint';title='Plainte client';href='/reception/plaintes';}
  if(!kind||!meaningfulAction(raw,kind))return null;
  return{id:e.id,kind,title,action:e.action||'Information importante',actor:e.actor||'Utilisateur HospiCore',role:e.role||e.service||'Collaborateur',at:e.at,href,reference:e.reference};
 }
-function Icon({kind}:{kind:NotificationKind}){const C=kind==='group'?UsersRound:kind==='function'?FileText:kind==='loan'?Package:ShieldAlert;return <C size={18}/>}
+function Icon({kind}:{kind:NotificationKind}){const C=kind==='group'?UsersRound:kind==='function'?FileText:kind==='loan'?Package:kind==='cash'?CheckCircle2:ShieldAlert;return <C size={18}/>}
 function timestamp(value:string){const parsed=Date.parse(value);if(Number.isFinite(parsed))return parsed;const m=String(value||'').match(/(\d{2})\/(\d{2})\/(\d{4})[^\d]*(\d{2}):(\d{2})(?::(\d{2}))?/);return m?new Date(Number(m[3]),Number(m[2])-1,Number(m[1]),Number(m[4]),Number(m[5]),Number(m[6]||0)).getTime():0}
 function dayKey(value:number){const d=new Date(value);return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}
 function todayKey(){return dayKey(Date.now())}
 function dedupe(items:ImportantNotification[]){const seen=new Set<string>();return items.filter(item=>{const minute=Math.floor(timestamp(item.at)/60000);const key=[item.kind,item.reference||'',normalized(item.action),normalized(item.actor),minute].join('|');if(seen.has(key))return false;seen.add(key);return true})}
 
+function CashValidatedBanner({cashDays}:{cashDays:CashDay[]}){
+ const[pathTarget,setPathTarget]=useState<Element|null>(null);
+ useEffect(()=>{if(!location.pathname.startsWith('/reception/caisse')){setPathTarget(null);return}let cancelled=false;const resolve=()=>{if(cancelled)return;const target=document.querySelector('.cash-sheet');if(target)setPathTarget(target);else window.setTimeout(resolve,120)};resolve();return()=>{cancelled=true}},[]);
+ if(!pathTarget)return null;
+ const params=new URLSearchParams(location.search),department=(params.get('department')||'reception') as CashDepartment,date=params.get('date')||'';
+ const current=cashDays.find(c=>c.department===department&&(!date||c.date===date));
+ if(!current?.directionValidatedAt)return null;
+ return createPortal(<div style={{margin:'0 0 14px',padding:'12px 16px',border:'1px solid #a8d5b5',borderRadius:'12px',background:'#edf8f0',color:'#176b36',display:'flex',alignItems:'center',gap:'10px',fontWeight:800}}><CheckCircle2 size={19}/><span>Caisse validée · {cashDepartmentLabel(current.department)} · {formatCashDate(current.date)}</span><small style={{marginLeft:'auto',fontWeight:600,opacity:.8}}>par {current.directionValidatedBy||'Direction'} · {new Date(current.directionValidatedAt).toLocaleString('fr-FR')}</small></div>,pathTarget);
+}
+
 export function UnifiedNotificationHost(){
- const journal=useOperationalStore<JournalEntry[]>('activity-journal',[],5000),instructions=useOperationalStore<HandrailEntry[]>('general-instructions',[]),s=session(),userId=String(s.user?.id||''),[open,setOpen]=useState(false),[seen,setSeen]=useState<Set<string>>(()=>loadSeen(userId));
+ const journal=useOperationalStore<JournalEntry[]>('activity-journal',[],5000),instructions=useOperationalStore<HandrailEntry[]>('general-instructions',[]),cashStore=useOperationalStore<CashDay[]>('reception-cash-day',[]),s=session(),userId=String(s.user?.id||''),[open,setOpen]=useState(false),[seen,setSeen]=useState<Set<string>>(()=>loadSeen(userId));
  const userName=`${s.user?.firstName||'Utilisateur'} ${s.user?.lastName||'HospiCore'}`.trim(),userRole=String(s.user?.role?.baseRole||s.user?.role?.name||s.user?.role||''),userService=serviceForRole(userRole),today=todayKey();
  const items=useMemo(()=>dedupe(journal.data.map(classify).filter((n):n is ImportantNotification=>Boolean(n)).filter(n=>dayKey(timestamp(n.at))===today).sort((a,b)=>timestamp(b.at)-timestamp(a.at))).slice(0,100),[journal.data,today]);
  const unread=items.filter(i=>!seen.has(i.id));
@@ -50,6 +67,7 @@ export function UnifiedNotificationHost(){
   .sort((a,b)=>Date.parse(b.createdAt)-Date.parse(a.createdAt)),[instructions.data,userId,userService,today]);
  const instructionInbox=instructionToday.filter(i=>!(i.readBy||[]).some(r=>r.userId===userId));
  const totalUnread=unread.length+instructionInbox.length;
+ useEffect(()=>{const validated=(Array.isArray(cashStore.data)?cashStore.data:[]).filter(c=>c.directionValidatedAt);if(!validated.length)return;const existing=new Set(journal.data.map(e=>e.id));const missing=validated.filter(c=>!existing.has(cashJournalId(c)));if(!missing.length)return;const additions:JournalEntry[]=missing.map(c=>({id:cashJournalId(c),at:c.directionValidatedAt!,actor:c.directionValidatedBy||'Direction',role:'Direction',service:'Direction',namespace:'cash-validation',source:'Caisse journalière',action:`Caisse ${cashDepartmentLabel(c.department)} du ${formatCashDate(c.date)} validée`,reference:`${cashDepartmentLabel(c.department)} · ${formatCashDate(c.date)}`,priority:'info'}));void journal.save([...journal.data,...additions])},[cashStore.data,journal.data]);
  useEffect(()=>{if(!userId||!instructionInbox.length)return;const key=`hospicore.instructions.inbox.opened.${userId}.${today}`;if(sessionStorage.getItem(key))return;sessionStorage.setItem(key,'1');setOpen(true)},[userId,instructionInbox.length,today]);
  useEffect(()=>{if(!open)return;const previous=document.body.style.overflow;const onKey=(event:KeyboardEvent)=>{if(event.key==='Escape')setOpen(false)};document.body.style.overflow='hidden';document.addEventListener('keydown',onKey);return()=>{document.body.style.overflow=previous;document.removeEventListener('keydown',onKey)}},[open]);
  function mark(id:string){const next=new Set(seen);next.add(id);setSeen(next);saveSeen(userId,next)}
@@ -60,10 +78,10 @@ export function UnifiedNotificationHost(){
  <header><div><strong>Boîte de réception</strong><small>Actions importantes de la journée · les éléments lus restent visibles</small></div><button onClick={()=>setOpen(false)} aria-label="Fermer"><X size={18}/></button></header>
  <div className="unified-notification-scroll">
  {instructionToday.length>0&&<div className="instruction-inbox-block"><div className="instruction-inbox-heading"><ClipboardList size={18}/><div><strong>Consignes du jour</strong><small>{instructionInbox.length} non lue(s) · {instructionToday.length} au total aujourd’hui</small></div></div>{instructionToday.map(entry=>{const read=(entry.readBy||[]).some(r=>r.userId===userId);return <article className={`instruction-inbox-item${entry.directionPriority?' priority':''}${read?' read':''}`} key={entry.id}><div className="instruction-inbox-copy"><div><strong>{entry.reference}</strong>{entry.directionPriority&&<span>Direction</span>}{read&&<span className="read-state">Lu</span>}</div><p>{entry.message}</p><small>Par <b>{entry.authorName}</b> · {entry.authorRole}</small><time>{new Date(entry.createdAt).toLocaleString('fr-FR')}</time></div>{!read&&<button onClick={()=>void markInstructionRead(entry)}><Check size={15}/>Lu</button>}</article>})}</div>}
- <div className="unified-notification-filters"><span>Fiches Groupe</span><span>Fiches de fonction</span><span>Prêts</span><span>Plaintes</span><span>Consignes nominatives</span></div>
+ <div className="unified-notification-filters"><span>Fiches Groupe</span><span>Fiches de fonction</span><span>Prêts</span><span>Plaintes</span><span>Caisses</span><span>Consignes nominatives</span></div>
  <section>{items.length?items.map(item=>{const read=seen.has(item.id);return <button key={item.id} className={`unified-notification-item ${read?'seen':'unread'}`} onClick={()=>{mark(item.id);location.href=item.href}}><div className={`unified-notification-icon ${item.kind}`}><Icon kind={item.kind}/></div><div className="unified-notification-copy"><div><strong>{item.title}</strong>{item.reference&&<em>{item.reference}</em>}{read&&<em className="notification-read-state">Lu</em>}</div><p>{item.action}</p><small>Par <b>{item.actor}</b> · {item.role}</small><time>{new Date(timestamp(item.at)).toLocaleString('fr-FR')}</time></div><ChevronRight size={17}/></button>}):<p className="unified-notification-empty"><Check size={18}/>Aucune action importante enregistrée aujourd’hui.</p>}</section>
  </div>
  <footer>{unread.length>0&&<button onClick={markAll}><Check size={15}/>Marquer les notifications comme lues</button>}<button onClick={()=>location.href='/consignes-generales'}>Voir les consignes</button></footer>
  </aside></div>,document.body):null;
- return <><div className="unified-notification-host"><button className={`unified-notification-bell${totalUnread?' has-unread':''}`} onClick={()=>setOpen(v=>!v)} aria-label="Boîte de réception" title="Boîte de réception"><Bell size={21}/>{totalUnread>0&&<b>{totalUnread>99?'99+':totalUnread}</b>}</button></div>{panel}</>;
+ return <><CashValidatedBanner cashDays={Array.isArray(cashStore.data)?cashStore.data:[]}/><div className="unified-notification-host"><button className={`unified-notification-bell${totalUnread?' has-unread':''}`} onClick={()=>setOpen(v=>!v)} aria-label="Boîte de réception" title="Boîte de réception"><Bell size={21}/>{totalUnread>0&&<b>{totalUnread>99?'99+':totalUnread}</b>}</button></div>{panel}</>;
 }
