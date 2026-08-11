@@ -9,6 +9,7 @@ import { UserAccountMenu } from './UserAccountMenu';
 import { UnifiedNotificationHost } from './UnifiedNotificationHost';
 import { DashboardJournalBridge } from './DashboardJournalBridge';
 import { CommandCenterButton } from './CommandCenterButton';
+import { CommandKpiNavigationBridge } from './CommandKpiNavigationBridge';
 import { NightAuditorNav } from './NightAuditorNav';
 import { NightRouteGroupRequestsBridge } from './NightRouteGroupRequestsBridge';
 import { GroupControlPrintRecovery } from './GroupControlPrintRecovery';
@@ -83,6 +84,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <AppRouter />
     <RoleAwareCommandCenter />
+    <CommandKpiNavigationBridge />
     <FunctionSheetSourceSync />
     <FunctionSheetPrintCleanup />
     <MealOrderAutoSync />
