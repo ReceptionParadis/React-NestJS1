@@ -2,8 +2,10 @@ import { useEffect } from 'react';
 import { can } from './permissions';
 import { useOperationalStore } from './useOperationalStore';
 
-type GroupControl={locked?:boolean;validatedAt?:string;validatedBy?:string;commercialValidation?:'À valider'|'Validé';[key:string]:unknown};
-type Group={id:string;name?:string;groupControl?:GroupControl;audit?:Array<{id:string;action:string;actor:string;role:string;at:string}>};
+type CommercialValidation='À valider'|'Validé';
+type GroupControl={locked?:boolean;validatedAt?:string;validatedBy?:string;commercialValidation?:CommercialValidation;[key:string]:unknown};
+type AuditEntry={id:string;action:string;actor:string;role:string;at:string};
+type Group={id:string;name?:string;groupControl?:GroupControl;audit?:AuditEntry[]};
 function session(){try{return JSON.parse(localStorage.getItem('hospicore.session')||'{}')?.user||{}}catch{return{}}}
 function actor(){const u=session();return{name:`${u.firstName||'Utilisateur'} ${u.lastName||'HospiCore'}`.trim(),role:String(u.role?.name||u.role||'Collaborateur')}}
 function normalize(v:string){return v.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim()}
@@ -25,7 +27,12 @@ export function GroupControlUnlockPermissionBridge(){
     if(busy)return;busy=true;button.disabled=true;
     try{
      const who=actor(),now=new Date().toLocaleString('fr-FR');
-     const next=store.data.map(g=>g.id===group.id?{...g,groupControl:{...(g.groupControl||{}),locked:false,commercialValidation:'À valider'},audit:[...(g.audit||[]),{id:crypto.randomUUID(),action:'Contrôle Groupe déverrouillé pour modification',actor:who.name,role:who.role,at:now}]}:g);
+     const auditEntry:AuditEntry={id:crypto.randomUUID(),action:'Contrôle Groupe déverrouillé pour modification',actor:who.name,role:who.role,at:now};
+     const next:Group[]=store.data.map(g=>{
+      if(g.id!==group.id)return g;
+      const groupControl:GroupControl={...(g.groupControl||{}),locked:false,commercialValidation:'À valider'};
+      return{...g,groupControl,audit:[...(g.audit||[]),auditEntry]};
+     });
      await store.save(next);
     }finally{busy=false;button.disabled=false}
    });
