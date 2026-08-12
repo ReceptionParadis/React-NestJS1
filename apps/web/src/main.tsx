@@ -11,6 +11,7 @@ import { DashboardJournalBridge } from './DashboardJournalBridge';
 import { CommandCenterButton } from './CommandCenterButton';
 import { CommandKpiNavigationBridge } from './CommandKpiNavigationBridge';
 import { CommandGroupFlowSyncBridge } from './CommandGroupFlowSyncBridge';
+import { CommandCenterTimeExpiryBridge } from './CommandCenterTimeExpiryBridge';
 import { HousekeepingTypeDisplayBridge } from './HousekeepingTypeDisplayBridge';
 import { StaleOperationalDataCleanup } from './StaleOperationalDataCleanup';
 import { NightAuditorNav } from './NightAuditorNav';
@@ -94,6 +95,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <RoleAwareCommandCenter />
     <CommandKpiNavigationBridge />
     <CommandGroupFlowSyncBridge />
+    <CommandCenterTimeExpiryBridge />
     <HousekeepingTypeDisplayBridge />
     <FunctionSheetSourceSync />
     <FunctionSheetPrintCleanup />
