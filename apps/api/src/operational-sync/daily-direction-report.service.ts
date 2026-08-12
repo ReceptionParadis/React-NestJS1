@@ -9,6 +9,7 @@ type Complaint={id?:string;client?:string;room?:string;category?:string;descript
 type Report={id:string;date:string;generatedAt:string;recipientIds:string[];recipientNames:string[];metrics:Record<string,number>;important:string[];tomorrow:string[];complaints:Array<{client:string;room?:string;category:string;description:string;status:string}>};
 
 const REPORT_NAMESPACE='direction-daily-reports';
+const REPORT_HOUR=20;
 function parisParts(date=new Date()){const parts=new Intl.DateTimeFormat('fr-FR',{timeZone:'Europe/Paris',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).formatToParts(date);const get=(type:string)=>parts.find(p=>p.type===type)?.value||'';return{date:`${get('year')}-${get('month')}-${get('day')}`,hour:Number(get('hour')),minute:Number(get('minute'))}}
 function addDays(value:string,n:number){const d=new Date(`${value}T12:00:00Z`);d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10)}
 function dayOf(value?:string){if(!value)return'';const t=Date.parse(value);if(!Number.isFinite(t))return String(value).slice(0,10);return parisParts(new Date(t)).date}
@@ -21,7 +22,7 @@ export class DailyDirectionReportService implements OnModuleInit,OnModuleDestroy
  async onModuleInit(){await this.checkAndGenerate();this.timer=setInterval(()=>void this.checkAndGenerate(),60_000)}
  onModuleDestroy(){if(this.timer)clearInterval(this.timer)}
  private async store<T>(hotelId:string,namespace:string,fallback:T):Promise<T>{const row=await this.prisma.operationalStore.findUnique({where:{hotelId_namespace:{hotelId,namespace}}});return (row?.payload??fallback) as T}
- private async checkAndGenerate(){try{const now=parisParts(),target=now.hour>23||(now.hour===23&&now.minute>=45)?now.date:addDays(now.date,-1);const hotels=await this.prisma.hotel.findMany({select:{id:true}});for(const hotel of hotels)await this.generateIfMissing(hotel.id,target)}catch(error){console.error('[HospiCore] Rapport Direction:',error)}}
+ private async checkAndGenerate(){try{const now=parisParts();const target=now.hour>=REPORT_HOUR?now.date:addDays(now.date,-1);const hotels=await this.prisma.hotel.findMany({select:{id:true}});for(const hotel of hotels)await this.generateIfMissing(hotel.id,target)}catch(error){console.error('[HospiCore] Rapport Direction:',error)}}
  private async generateIfMissing(hotelId:string,date:string){const reportStore=await this.prisma.operationalStore.findUnique({where:{hotelId_namespace:{hotelId,namespace:REPORT_NAMESPACE}}});const reports:Array<Report>=Array.isArray(reportStore?.payload)?reportStore!.payload as unknown as Report[]:[];if(reports.some(r=>r.date===date))return;
   const tomorrow=addDays(date,1);
   const [journal,groups,maintenance,tasks,complaints,directionUsers]=await Promise.all([
