@@ -35,6 +35,7 @@ import { OperationalArchiveAdditions } from './OperationalArchiveAdditions';
 import { DirectionCashUnlockBridge } from './DirectionCashUnlockBridge';
 import { CashValidatedBannerScopeBridge } from './CashValidatedBannerScopeBridge';
 import { ComplaintsPrintBridge } from './ComplaintsPrintBridge';
+import { OperationalPrintRecovery } from './OperationalPrintRecovery';
 import { cleanupLegacyLocalData } from './legacy-cleanup';
 import './styles.css';
 import './executive-dashboard.css';
@@ -112,6 +113,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <DirectionCashUnlockBridge />
     <CashValidatedBannerScopeBridge />
     <ComplaintsPrintBridge />
+    <OperationalPrintRecovery />
     <OperationalToastHost />
     <ReceptionMealNav />
     <ReceptionComplaintsNav />
