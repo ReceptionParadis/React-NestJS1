@@ -1,5 +1,5 @@
 import { FormEvent, useMemo, useState } from 'react';
-import { AlertTriangle, ArrowLeft, Camera, CheckCircle2, Clock3, Filter, LockKeyhole, MapPin, Plus, Search, Send, UserRound, Wrench, X } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Camera, CheckCircle2, Clock3, Filter, LockKeyhole, MapPin, Plus, Search, Send, Trash2, UserRound, Wrench, X } from 'lucide-react';
 import { useOperationalStore } from './useOperationalStore';
 
 type MaintenanceStatus='À traiter'|'En cours'|'En attente de pièce'|'Terminée';
@@ -22,6 +22,7 @@ const initial:Intervention[]=[];
 function user():SessionUser{try{const s=JSON.parse(localStorage.getItem('hospicore.session')||'{}');const u=s.user||{};return{name:`${u.firstName||'Utilisateur'} ${u.lastName||'HospiCore'}`.trim(),role:String(u.role?.name||u.role||'Collaborateur')}}catch{return{name:'Utilisateur HospiCore',role:'Collaborateur'}}}
 function normalizedRole(value:string){return value.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase()}
 function canManageMaintenance(role:string){const value=normalizedRole(role);return value.includes('maintenance')||value.includes('technique')||value.includes('technicien')||value.includes('direction')||value.includes('directeur')||value.includes('admin')}
+function isDirectionRole(role:string){const value=normalizedRole(role);return value.includes('direction')||value.includes('directeur')||value.includes('admin')}
 function now(){return new Date().toLocaleString('fr-FR')}
 function ref(){const d=new Date();return`MT-${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}-${String(d.getTime()).slice(-5)}`}
 function priorityClass(value:MaintenancePriority){return value==='Urgente'?'critical':value==='Haute'?'high':value==='Normale'?'normal':'low'}
@@ -31,6 +32,7 @@ export function TicketsPage(){
  const store=useOperationalStore<Intervention[]>('maintenance-interventions',initial);
  const current=user();
  const canManage=canManageMaintenance(current.role);
+ const canDelete=isDirectionRole(current.role);
  const [selectedId,setSelectedId]=useState('');
  const [search,setSearch]=useState('');
  const [priority,setPriority]=useState<'Toutes'|MaintenancePriority>('Toutes');
@@ -61,6 +63,13 @@ export function TicketsPage(){
   await patch(update,`Statut passé à « ${status} »`);
  }
  async function returnToService(){if(!canManage||!selected||selected.status!=='Terminée'||!selected.resolution.trim())return;await save({...selected,blocked:false,roomState:'Libre',returnedToServiceAt:now(),returnedToServiceBy:current.name},'Chambre / zone remise en service')}
+ async function deleteSelected(){
+  if(!canDelete||!selected)return;
+  const confirmed=window.confirm(`Supprimer définitivement le ticket ${selected.reference} — ${selected.title} ?\n\nCette suppression sera répercutée sur tous les comptes HospiCore.`);
+  if(!confirmed)return;
+  const next=interventions.filter(item=>item.id!==selected.id);
+  if(await store.saveImmediate(next)){setSelectedId('');setComment('')}
+ }
 
  return <div className="tickets-page maintenance-page">
   <header className="tickets-header"><div><a className="back-link" href="/"><ArrowLeft size={18}/>Centre de Commandement</a><p className="eyebrow">GMAO opérationnelle</p><h1>Maintenance</h1><p className="tickets-subtitle">Suivi des pannes, chambres bloquées et remises en service.</p></div><button className="primary-button" onClick={()=>setCreateOpen(true)}><Plus size={17}/>Nouvelle intervention</button></header>
@@ -68,7 +77,7 @@ export function TicketsPage(){
   {store.state==='error'&&<div className="daily-closed">Synchronisation indisponible : {store.message}</div>}
   <section className="maintenance-kpis"><article><AlertTriangle/><div><span>Urgentes</span><strong>{interventions.filter(i=>i.priority==='Urgente'&&i.status!=='Terminée').length}</strong></div></article><article><Wrench/><div><span>Ouvertes</span><strong>{interventions.filter(i=>i.status!=='Terminée').length}</strong></div></article><article><LockKeyhole/><div><span>Chambres bloquées</span><strong>{interventions.filter(i=>i.blocked).length}</strong></div></article><article><CheckCircle2/><div><span>Terminées</span><strong>{interventions.filter(i=>i.status==='Terminée').length}</strong></div></article></section>
   <section className="tickets-toolbar"><label className="tickets-search"><Search size={18}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Référence, chambre, panne, technicien…"/></label><label className="tickets-service"><Filter size={17}/><select value={priority} onChange={e=>setPriority(e.target.value as typeof priority)}><option>Toutes</option>{priorities.map(p=><option key={p}>{p}</option>)}</select></label></section>
-  <section className="ticket-workspace"><div className="ticket-board maintenance-board">{statuses.map(status=>{const list=filtered.filter(i=>i.status===status);return <section className="ticket-column" key={status}><div className="ticket-column-header"><h2>{status}</h2><span>{list.length}</span></div><div className="ticket-stack">{list.map(item=><button className={`ticket-card${selected?.id===item.id?' selected':''}${item.blocked?' blocked':''}`} key={item.id} onClick={()=>setSelectedId(item.id)}><div className="ticket-card-top"><span className={`ticket-priority ${priorityClass(item.priority)}`}>{item.priority}</span><small>{item.reference}</small></div><strong>{item.title}</strong><p>{item.description}</p><div className="ticket-card-meta"><span><MapPin size={14}/>{locationLabel(item)}</span><span><UserRound size={14}/>{item.assignee||'Non assigné'}</span></div>{item.blocked&&<div className="maintenance-blocked"><LockKeyhole size={14}/>Chambre / zone bloquée</div>}<div className="ticket-due"><Clock3 size={14}/>{item.dueAt||'Sans échéance'}</div></button>)}{!list.length&&<p className="ticket-empty">Aucune intervention</p>}</div></section>})}</div>
+  <section className={`ticket-workspace${selected?' has-detail':''}`}><div className="ticket-board maintenance-board">{statuses.map(status=>{const list=filtered.filter(i=>i.status===status);return <section className="ticket-column" key={status}><div className="ticket-column-header"><h2>{status}</h2><span>{list.length}</span></div><div className="ticket-stack">{list.map(item=><button className={`ticket-card${selected?.id===item.id?' selected':''}${item.blocked?' blocked':''}`} key={item.id} onClick={()=>setSelectedId(item.id)}><div className="ticket-card-top"><span className={`ticket-priority ${priorityClass(item.priority)}`}>{item.priority}</span><small>{item.reference}</small></div><strong>{item.title}</strong><p>{item.description}</p><div className="ticket-card-meta"><span><MapPin size={14}/>{locationLabel(item)}</span><span><UserRound size={14}/>{item.assignee||'Non assigné'}</span></div>{item.blocked&&<div className="maintenance-blocked"><LockKeyhole size={14}/>Chambre / zone bloquée</div>}<div className="ticket-due"><Clock3 size={14}/>{item.dueAt||'Sans échéance'}</div></button>)}{!list.length&&<p className="ticket-empty">Aucune intervention</p>}</div></section>})}</div>
    {selected&&<aside className="ticket-detail"><div className="ticket-detail-head"><div><span className={`ticket-priority ${priorityClass(selected.priority)}`}>{selected.priority}</span><small>{selected.reference}</small><h2>{selected.title}</h2></div><button className="detail-close" onClick={()=>setSelectedId('')}><X size={18}/></button></div><p className="ticket-description">{selected.description}</p><div className="ticket-properties"><div><span>Localisation</span><strong>{locationLabel(selected)}</strong></div><div><span>État chambre</span><strong>{selected.roomState}</strong></div><div><span>Demandeur</span><strong>{selected.requester}</strong></div><div><span>Responsable</span><strong>{selected.assignee||'Non assigné'}</strong></div><div><span>Créée</span><strong>{selected.createdAt}</strong></div><div><span>Échéance</span><strong>{selected.dueAt||'—'}</strong></div></div>
     <label className="field-label">Statut<select disabled={!canManage} value={selected.status} onChange={e=>void changeStatus(e.target.value as MaintenanceStatus)}>{statuses.map(s=><option key={s}>{s}</option>)}</select></label>
     <label className="field-label">Technicien / responsable<input disabled={!canManage} value={selected.assignee} onChange={e=>void patch({assignee:e.target.value},'Responsable modifié')}/></label>
@@ -77,6 +86,7 @@ export function TicketsPage(){
     <div className="maintenance-photos"><div><span><Camera size={15}/>Photo avant</span>{selected.beforePhoto?<a href={selected.beforePhoto} target="_blank" rel="noreferrer">Ouvrir</a>:<em>Non renseignée</em>}</div><div><span><Camera size={15}/>Photo après</span><input disabled={!canManage} value={selected.afterPhoto} onChange={e=>void patch({afterPhoto:e.target.value},'Photo après ajoutée')} placeholder="URL de la photo"/></div></div>
     {selected.blocked&&canManage&&<button className="maintenance-return" disabled={selected.status!=='Terminée'||!selected.resolution.trim()} onClick={()=>void returnToService()}><CheckCircle2 size={17}/>Valider la remise en service</button>}
     {selected.returnedToServiceAt&&<div className="maintenance-returned"><CheckCircle2 size={17}/>Remise en service le {selected.returnedToServiceAt} par {selected.returnedToServiceBy}</div>}
+    {canDelete&&<button className="maintenance-delete-ticket" onClick={()=>void deleteSelected()}><Trash2 size={17}/>Supprimer définitivement ce ticket</button>}
     <div className="ticket-comments-title"><h3>Historique horodaté</h3><span>{selected.history.length}</span></div><div className="ticket-comments">{[...selected.history].reverse().map(entry=><div className="ticket-comment" key={entry.id}><div className="comment-avatar">{entry.actor.slice(0,2).toUpperCase()}</div><div><strong>{entry.actor}</strong><time>{entry.at}</time><p>{entry.action}{entry.note?` · ${entry.note}`:''}</p></div></div>)}</div><div className="ticket-comment-compose"><input value={comment} onChange={e=>setComment(e.target.value)} onKeyDown={e=>e.key==='Enter'&&void addComment()} placeholder="Ajouter une note…"/><button onClick={()=>void addComment()}><Send size={17}/></button></div>
    </aside>}
   </section>
