@@ -6,6 +6,7 @@ const JOURNAL_NAMESPACE = 'activity-journal';
 const DIRECTION_REPORT_NAMESPACE='direction-daily-reports';
 type JournalEntry={id:string;at:string;actorId?:string;actor:string;role:string;service:string;namespace:string;source:string;action:string};
 type Group360Like={id?:string;name?:string;commercialValidated?:boolean;validatedAt?:string;audit?:Array<{action?:string}>};
+type JsonRecord=Record<string,unknown>;
 
 const DEFAULT_STORES: Record<string, Prisma.InputJsonValue> = {
   tasks: [],
@@ -15,6 +16,7 @@ const DEFAULT_STORES: Record<string, Prisma.InputJsonValue> = {
   'function-sheets': [],
   'meeting-rooms': [],
   'group-360': [],
+  'group-wakeups': [],
   'maintenance-interventions': [],
   'individual-requests': [],
   'client-complaints': [],
@@ -29,6 +31,7 @@ const DEFAULT_STORES: Record<string, Prisma.InputJsonValue> = {
 const PRODUCTION_RESET_MARKER = '_system-production-baseline-1.0.0';
 const PRODUCTION_RESET_PAYLOADS: Record<string, Prisma.InputJsonValue> = {
   'group-360': [],
+  'group-wakeups': [],
   'meeting-rooms': [],
   'function-sheets': [],
   'individual-requests': [],
@@ -42,6 +45,7 @@ const PRODUCTION_RESET_PAYLOADS: Record<string, Prisma.InputJsonValue> = {
 
 const JOURNAL_META:Record<string,{service:string;source:string}>={
   'group-360':{service:'Réception',source:'Groupe 360°'},
+  'group-wakeups':{service:'Réception',source:'Réveils groupes'},
   'individual-requests':{service:'Réception',source:'Demandes clients'},
   'client-complaints':{service:'Réception',source:'Plaintes clients'},
   'night-route-notes':{service:'Réception',source:'Feuille de route veilleur'},
@@ -83,6 +87,12 @@ export class OperationalSyncService implements OnModuleInit {
       if(input.namespace==='group-360'){
         const previous=Array.isArray(current?.payload)?current?.payload as unknown as Group360Like[]:[];
         const next=Array.isArray(input.payload)?input.payload as unknown as Group360Like[]:[];
+        const nextIds=new Set(next.map(group=>String(group.id||'')).filter(Boolean));
+        const removed=previous.filter(group=>group.id&&!nextIds.has(String(group.id)));
+        if(removed.length){
+          await this.cascadeDeletedGroups(hotelId,removed.map(group=>String(group.id)),input.updatedById);
+          for(const group of removed)await this.appendJournal(hotelId,input.namespace,input.updatedById,`Fiche Groupe 360° supprimée · ${group.name||'Groupe'}`);
+        }
         const previousById=new Map(previous.map(group=>[String(group.id||''),group]));
         for(const group of next){
           const before=previousById.get(String(group.id||''));
@@ -99,6 +109,43 @@ export class OperationalSyncService implements OnModuleInit {
   async list(hotelId?:string,userId?:string){const resolvedHotelId=await this.resolveHotelId(hotelId,userId);await this.ensureDefaultStores(resolvedHotelId,userId);return this.prisma.operationalStore.findMany({where:{hotelId:resolvedHotelId,namespace:{not:DIRECTION_REPORT_NAMESPACE}},select:{namespace:true,version:true,updatedAt:true,updatedById:true},orderBy:{updatedAt:'desc'}})}
 
   async diagnostic(hotelId?:string,userId?:string){const startedAt=Date.now(),resolvedHotelId=await this.resolveHotelId(hotelId,userId);await this.ensureDefaultStores(resolvedHotelId,userId);const[hotel,user,stores,databaseProbe]=await Promise.all([this.prisma.hotel.findUnique({where:{id:resolvedHotelId},select:{id:true,name:true,slug:true}}),userId?this.prisma.user.findUnique({where:{id:userId},select:{id:true,firstName:true,lastName:true,email:true,hotelId:true,role:{select:{name:true}}}}):null,this.prisma.operationalStore.findMany({where:{hotelId:resolvedHotelId,namespace:{not:{startsWith:'_system-'}}},select:{namespace:true,version:true,updatedAt:true,updatedById:true},orderBy:{namespace:'asc'}}),this.prisma.$queryRaw<Array<{now:Date}>>`SELECT NOW() as now`]);return{status:'ok',checkedAt:new Date().toISOString(),responseTimeMs:Date.now()-startedAt,database:{connected:true,serverTime:databaseProbe[0]?.now??null},hotel,user,operationalStore:{available:true,namespaces:stores}}}
+
+  private asRecord(value:unknown):JsonRecord|null{return value&&typeof value==='object'&&!Array.isArray(value)?value as JsonRecord:null}
+
+  private async cascadeDeletedGroups(hotelId:string,groupIds:string[],userId?:string){
+    const removed=new Set(groupIds);
+    const filterArray=(payload:unknown,keys:string[])=>Array.isArray(payload)?payload.filter(item=>{const record=this.asRecord(item);if(!record)return true;return !keys.some(key=>removed.has(String(record[key]||'')))}):payload;
+    await this.mutateLinkedStore(hotelId,'group-wakeups',payload=>filterArray(payload,['groupId']),userId);
+    await this.mutateLinkedStore(hotelId,'meeting-rooms',payload=>filterArray(payload,['groupId']),userId);
+    await this.mutateLinkedStore(hotelId,'meal-orders',payload=>filterArray(payload,['sourceGroupId','groupId']),userId);
+    await this.mutateLinkedStore(hotelId,'night-route-notes',payload=>filterArray(payload,['groupId']),userId);
+    await this.mutateLinkedStore(hotelId,'function-sheets',payload=>{
+      if(!Array.isArray(payload))return payload;
+      let changed=false;
+      const now=new Date().toISOString();
+      const next=payload.map(value=>{
+        const sheet=this.asRecord(value);if(!sheet)return value;
+        const lines=Array.isArray(sheet.lines)?sheet.lines:[];
+        const cleaned=lines.filter(line=>{const record=this.asRecord(line);return !record||!removed.has(String(record.groupId||''))});
+        if(cleaned.length===lines.length)return value;
+        changed=true;
+        return{...sheet,lines:cleaned,status:'Prête à imprimer',lockedBy:'',lockedAt:'',validatedForPrintBy:'HospiCore · synchronisation',validatedForPrintAt:new Date().toLocaleString('fr-FR'),sourceFingerprint:'',lastSourceSyncAt:now};
+      });
+      return changed?next:payload;
+    },userId);
+  }
+
+  private async mutateLinkedStore(hotelId:string,namespace:string,transform:(payload:unknown)=>unknown,userId?:string){
+    for(let attempt=0;attempt<6;attempt++){
+      const store=await this.prisma.operationalStore.findUnique({where:{hotelId_namespace:{hotelId,namespace}}});
+      if(!store)return;
+      const next=transform(store.payload);
+      if(JSON.stringify(next)===JSON.stringify(store.payload))return;
+      const updated=await this.prisma.operationalStore.updateMany({where:{id:store.id,version:store.version},data:{payload:next as Prisma.InputJsonValue,updatedById:userId,version:{increment:1}}});
+      if(updated.count===1)return;
+    }
+    console.error(`[HospiCore] Synchronisation liée impossible pour ${namespace} après plusieurs écritures concurrentes.`);
+  }
 
   private async appendJournal(hotelId:string,namespace:string,userId?:string,customAction?:string){
     const meta=JOURNAL_META[namespace]||{service:'Direction',source:namespace};
