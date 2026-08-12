@@ -66,10 +66,9 @@ export function OperationalPlanningPage(){
   const rows:string[]=[];
   const byTime=new Map<string,PlanningEvent[]>();events.filter(e=>e.time!=='À confirmer').forEach(e=>byTime.set(e.time,[...(byTime.get(e.time)||[]),e]));
   byTime.forEach((items,time)=>{const arrivalsAt=items.filter(e=>e.kind==='arrival');if(arrivalsAt.length>=2)rows.push(`${arrivalsAt.length} groupes arrivent à ${time}.`);const mealPax=items.filter(e=>e.kind==='meal').reduce((s,e)=>s+(e.pax||0),0);if(mealPax>=350)rows.push(`${mealPax} personnes prévues sur les prestations repas à ${time}.`);});
-  arrivals.forEach(e=>{const g=groups.find(item=>item.id===e.groupId);if(g?.arrivalTime&&g.arrivalTime<'16:00'&&g.housekeepingArrivalStatus!=='Chambres prêtes à donner')rows.push(`Arrivée anticipée ${g.name||'groupe'} sans confirmation de chambres prêtes.`)});
   if(meetings.length>=3)rows.push(`${meetings.length} salles à préparer sur la journée.`);
   return rows.slice(0,6);
- },[events,arrivals,groups,meetings.length]);
+ },[events,meetings.length]);
  const timeline=useMemo(()=>groups.flatMap(group=>(group.audit||[]).map((item,index)=>({id:`${group.id}-${index}`,group:group.name||'Groupe',at:item.at||'',text:item.action||'Mise à jour',service:item.role||'Opérations',actor:item.actor||''}))).filter(item=>item.at.includes(date.split('-').reverse().join('/'))||item.at.startsWith(date)).sort((a,b)=>b.at.localeCompare(a.at,'fr')).slice(0,10),[groups,date]);
  const loading=[groupsStore,roomsStore].some(store=>store.state==='loading'||store.state==='saving');
  const refresh=()=>{void groupsStore.refresh();void roomsStore.refresh()};
