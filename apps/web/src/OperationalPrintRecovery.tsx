@@ -1,5 +1,8 @@
 import { useEffect } from 'react';
 
+const PRINT_ROOT_ID = 'hospicore-operational-print-root';
+const PRINT_STYLE_ID = 'hospicore-operational-print-style';
+
 function syncFormState(source: HTMLElement, clone: HTMLElement) {
   const sourceFields = source.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>('input,textarea,select');
   const cloneFields = clone.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>('input,textarea,select');
@@ -26,113 +29,97 @@ function syncFormState(source: HTMLElement, clone: HTMLElement) {
   });
 }
 
-function waitForStyles(doc: Document) {
-  const links = Array.from(doc.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"]'));
-  const waits = links.map(link => new Promise<void>(resolve => {
-    if (link.sheet) {
-      resolve();
-      return;
-    }
-    const done = () => resolve();
-    link.addEventListener('load', done, { once: true });
-    link.addEventListener('error', done, { once: true });
-    window.setTimeout(done, 1600);
-  }));
-  return Promise.all(waits);
+function cleanupPrintRoot() {
+  document.getElementById(PRINT_ROOT_ID)?.remove();
+  document.getElementById(PRINT_STYLE_ID)?.remove();
+  document.documentElement.classList.remove('hospicore-operational-printing');
+  document.body.classList.remove('hospicore-operational-printing');
 }
 
-function nextPaint(win: Window) {
-  return new Promise<void>(resolve => win.requestAnimationFrame(() => win.requestAnimationFrame(() => resolve())));
-}
-
-function isolatedPrint(selector: string, title: string, bodyClass: string) {
+function preparePrintRoot(selector: string, bodyClass: string) {
+  cleanupPrintRoot();
   const source = document.querySelector<HTMLElement>(selector);
   if (!source) return false;
 
-  const iframe = document.createElement('iframe');
-  iframe.setAttribute('aria-hidden', 'true');
-  Object.assign(iframe.style, {
-    position: 'fixed',
-    right: '0',
-    bottom: '0',
-    width: '1px',
-    height: '1px',
-    border: '0',
-    opacity: '0',
-    pointerEvents: 'none',
-  });
-  document.body.appendChild(iframe);
-
-  const doc = iframe.contentDocument;
-  if (!doc) {
-    iframe.remove();
-    return false;
-  }
-
-  doc.open();
-  doc.write(`<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title}</title></head><body class="${bodyClass}"></body></html>`);
-  doc.close();
-
-  document.head.querySelectorAll('style,link[rel="stylesheet"]').forEach(node => {
-    doc.head.appendChild(doc.importNode(node, true));
-  });
-
-  const printOverrides = doc.createElement('style');
-  printOverrides.textContent = `
-    @page{size:A4 portrait;margin:8mm}
-    html,body{margin:0!important;padding:0!important;background:#fff!important;width:auto!important;min-height:0!important;overflow:visible!important;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
-    body{font-family:inherit!important}
-    body>*{margin-left:auto!important;margin-right:auto!important}
-    .cash-sheet{width:194mm!important;max-width:none!important;min-height:auto!important;margin:0 auto!important;padding:7mm 8mm!important;box-shadow:none!important;overflow:visible!important}
-    .night-route-sheet{width:194mm!important;max-width:none!important;min-height:auto!important;margin:0 auto!important;padding:0!important;box-shadow:none!important;overflow:visible!important}
-    .night-route-sheet section,.night-block,.cash-sheet section,.cash-core-grid,.cash-attachment,.cash-signatures{break-inside:avoid;page-break-inside:avoid}
-    .night-note-footer button,.no-print{display:none!important}
-    svg{display:inline-block!important;vertical-align:middle}
-  `;
-  doc.head.appendChild(printOverrides);
-
   const clone = source.cloneNode(true) as HTMLElement;
   syncFormState(source, clone);
-  doc.body.appendChild(doc.importNode(clone, true));
 
-  const run = async () => {
-    const win = iframe.contentWindow;
-    if (!win) {
-      iframe.remove();
-      return;
-    }
-    await waitForStyles(doc);
-    try {
-      if ('fonts' in doc) await (doc as Document & { fonts: FontFaceSet }).fonts.ready;
-    } catch {
-      // Impression possible même si une police web échoue.
-    }
-    await nextPaint(win);
-    win.focus();
-    win.print();
-    window.setTimeout(() => iframe.remove(), 2200);
-  };
+  const root = document.createElement('div');
+  root.id = PRINT_ROOT_ID;
+  root.className = `${bodyClass} hospicore-print-document`;
+  root.setAttribute('aria-hidden', 'true');
+  root.appendChild(clone);
+  document.body.appendChild(root);
 
-  void run();
+  const style = document.createElement('style');
+  style.id = PRINT_STYLE_ID;
+  style.textContent = `
+    #${PRINT_ROOT_ID}{display:none}
+    @media print{
+      @page{size:A4 portrait;margin:8mm}
+      html.hospicore-operational-printing,
+      html.hospicore-operational-printing body{margin:0!important;padding:0!important;background:#fff!important;width:auto!important;min-height:0!important;overflow:visible!important;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
+      body.hospicore-operational-printing > *:not(#${PRINT_ROOT_ID}){display:none!important}
+      body.hospicore-operational-printing #${PRINT_ROOT_ID}{display:block!important;position:static!important;width:100%!important;min-height:0!important;margin:0!important;padding:0!important;background:#fff!important;visibility:visible!important;opacity:1!important;overflow:visible!important}
+      body.hospicore-operational-printing #${PRINT_ROOT_ID},
+      body.hospicore-operational-printing #${PRINT_ROOT_ID} *{visibility:visible!important}
+      body.hospicore-operational-printing #${PRINT_ROOT_ID}.cash-page,
+      body.hospicore-operational-printing #${PRINT_ROOT_ID}.night-route-page{padding:0!important;background:#fff!important;min-height:0!important}
+      body.hospicore-operational-printing #${PRINT_ROOT_ID} .cash-sheet{display:block!important;width:100%!important;max-width:none!important;min-height:auto!important;margin:0!important;padding:7mm 8mm!important;box-shadow:none!important;overflow:visible!important}
+      body.hospicore-operational-printing #${PRINT_ROOT_ID} .night-route-sheet{display:block!important;width:100%!important;max-width:none!important;min-height:auto!important;margin:0!important;padding:0!important;box-shadow:none!important;overflow:visible!important}
+      body.hospicore-operational-printing #${PRINT_ROOT_ID} .night-route-sheet section,
+      body.hospicore-operational-printing #${PRINT_ROOT_ID} .night-block,
+      body.hospicore-operational-printing #${PRINT_ROOT_ID} .cash-sheet section,
+      body.hospicore-operational-printing #${PRINT_ROOT_ID} .cash-core-grid,
+      body.hospicore-operational-printing #${PRINT_ROOT_ID} .cash-attachment,
+      body.hospicore-operational-printing #${PRINT_ROOT_ID} .cash-signatures{break-inside:avoid;page-break-inside:avoid}
+      body.hospicore-operational-printing #${PRINT_ROOT_ID} .night-note-footer button,
+      body.hospicore-operational-printing #${PRINT_ROOT_ID} .no-print{display:none!important}
+      body.hospicore-operational-printing #${PRINT_ROOT_ID} svg{display:inline-block!important;vertical-align:middle}
+    }
+  `;
+  document.head.appendChild(style);
+  document.documentElement.classList.add('hospicore-operational-printing');
+  document.body.classList.add('hospicore-operational-printing');
   return true;
 }
 
 export function OperationalPrintRecovery() {
   useEffect(() => {
     const nativePrint = window.print.bind(window);
-    const wrappedPrint = () => {
-      const path = window.location.pathname;
-      if (path.startsWith('/reception/caisse')) {
-        if (isolatedPrint('.cash-sheet', 'Feuille de caisse', 'cash-page')) return;
-      }
-      if (path.startsWith('/reception/feuille-route-veilleur')) {
-        if (isolatedPrint('.night-route-sheet', 'Feuille de route veilleur', 'night-route-page')) return;
-      }
-      nativePrint();
+    let cleanupTimer: number | null = null;
+
+    const afterPrint = () => {
+      if (cleanupTimer) window.clearTimeout(cleanupTimer);
+      cleanupTimer = null;
+      cleanupPrintRoot();
     };
 
+    const wrappedPrint = () => {
+      const path = window.location.pathname;
+      let prepared = false;
+      if (path.startsWith('/reception/caisse')) prepared = preparePrintRoot('.cash-sheet', 'cash-page');
+      else if (path.startsWith('/reception/feuille-route-veilleur')) prepared = preparePrintRoot('.night-route-sheet', 'night-route-page');
+
+      if (!prepared) {
+        nativePrint();
+        return;
+      }
+
+      window.requestAnimationFrame(() => {
+        window.requestAnimationFrame(() => {
+          nativePrint();
+          cleanupTimer = window.setTimeout(cleanupPrintRoot, 8000);
+        });
+      });
+    };
+
+    window.addEventListener('afterprint', afterPrint);
     window.print = wrappedPrint;
     return () => {
+      window.removeEventListener('afterprint', afterPrint);
+      if (cleanupTimer) window.clearTimeout(cleanupTimer);
+      cleanupPrintRoot();
       if (window.print === wrappedPrint) window.print = nativePrint;
     };
   }, []);
