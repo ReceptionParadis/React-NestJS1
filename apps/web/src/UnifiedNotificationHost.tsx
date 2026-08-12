@@ -6,6 +6,7 @@ import { useOperationalStore } from './useOperationalStore';
 type JournalEntry={id:string;at:string;actorId?:string;actor:string;role:string;service:string;namespace:string;source:string;action:string;reference?:string;priority?:string};
 type NotificationKind='group'|'function'|'loan'|'complaint'|'cash'|'task';
 type ImportantNotification={id:string;kind:NotificationKind;title:string;action:string;actor:string;role:string;at:string;href:string;reference?:string;pending?:boolean};
+type NotificationReadReceipt={id:string;userId:string;notificationId:string;readAt:string};
 type Service='Réception'|'Commercial'|'Maintenance'|'Direction';
 type Recipient={userId:string;name:string;service:Service};
 type ReadReceipt={userId:string;name:string;service:Service;readAt:string};
@@ -76,9 +77,13 @@ export function UnifiedNotificationHost(){
  const groups=useOperationalStore<OperationalGroup[]>('group-360',[]);
  const complaints=useOperationalStore<Complaint[]>('client-complaints',[]);
  const tasks=useOperationalStore<Task[]>('tasks',[]);
+ const readStore=useOperationalStore<NotificationReadReceipt[]>('_system-notification-reads',[],5000);
  const s=session(),userId=String(s.user?.id||''),[open,setOpen]=useState(false),[seen,setSeen]=useState<Set<string>>(()=>loadSeen(userId));
  const userName=`${s.user?.firstName||'Utilisateur'} ${s.user?.lastName||'HospiCore'}`.trim(),userRole=String(s.user?.role?.baseRole||s.user?.role?.name||s.user?.role||''),userService=serviceForRole(userRole),today=todayKey();
  useEffect(()=>{setSeen(loadSeen(userId))},[userId]);
+ const persistedSeen=useMemo(()=>new Set(readStore.data.filter(r=>r.userId===userId).map(r=>r.notificationId)),[readStore.data,userId]);
+ const effectiveSeen=useMemo(()=>new Set([...seen,...persistedSeen]),[seen,persistedSeen]);
+ useEffect(()=>{if(!userId||!readStore.data.length)return;const merged=new Set([...loadSeen(userId),...persistedSeen]);saveSeen(userId,merged);setSeen(current=>{const next=new Set([...current,...persistedSeen]);return next.size===current.size&&[...next].every(id=>current.has(id))?current:next})},[persistedSeen,readStore.data.length,userId]);
  const items=useMemo(()=>{
   const journalItems=journal.data.map(classify).filter((n):n is ImportantNotification=>Boolean(n));
   const cashDays=Array.isArray(cashStore.data)?cashStore.data:[];
@@ -89,24 +94,31 @@ export function UnifiedNotificationHost(){
   const taskItems=(tasks.data||[]).filter(t=>taskVisibleToUser(t,userId,userService)).map(taskNotification).filter((n):n is ImportantNotification=>Boolean(n));
   return dedupe([...directionReviewItems,...cashItems,...groupItems,...complaintItems,...taskItems,...journalItems]).filter(n=>n.pending||dayKey(timestamp(n.at))===today).sort((a,b)=>Number(Boolean(b.pending))-Number(Boolean(a.pending))||timestamp(b.at)-timestamp(a.at)).slice(0,150)
  },[journal.data,cashStore.data,groups.data,complaints.data,tasks.data,today,userId,userService]);
- const unread=items.filter(i=>!seen.has(i.id));
+ const unread=items.filter(i=>!effectiveSeen.has(i.id));
  const instructionToday=useMemo(()=>instructions.data.filter(i=>(userService==='Direction'||(Array.isArray(i.recipients)&&i.recipients.some(r=>r.userId===userId)))&&dayKey(Date.parse(i.createdAt))===today).sort((a,b)=>Date.parse(b.createdAt)-Date.parse(a.createdAt)),[instructions.data,userId,userService,today]);
  const instructionInbox=instructionToday.filter(i=>!(i.readBy||[]).some(r=>r.userId===userId));
  const totalUnread=unread.length+instructionInbox.length;
  useEffect(()=>{if(!userId||!instructionInbox.length)return;const key=`hospicore.instructions.inbox.opened.${userId}.${today}`;if(sessionStorage.getItem(key))return;sessionStorage.setItem(key,'1');setOpen(true)},[userId,instructionInbox.length,today]);
  useEffect(()=>{if(!open)return;const previous=document.body.style.overflow;const onKey=(event:KeyboardEvent)=>{if(event.key==='Escape')setOpen(false)};document.body.style.overflow='hidden';document.addEventListener('keydown',onKey);return()=>{document.body.style.overflow=previous;document.removeEventListener('keydown',onKey)}},[open]);
- function mark(id:string){const next=new Set(seen);next.add(id);setSeen(next);saveSeen(userId,next)}
- function markAll(){const next=new Set(seen);items.forEach(i=>next.add(i.id));setSeen(next);saveSeen(userId,next)}
+ async function persistRead(ids:string[]){
+  if(!userId||!ids.length)return;
+  const now=new Date().toISOString(),existing=new Set(readStore.data.filter(r=>r.userId===userId).map(r=>r.notificationId)),fresh=ids.filter(id=>!existing.has(id));
+  if(!fresh.length)return;
+  const receipts=fresh.map(notificationId=>({id:`${userId}:${notificationId}`,userId,notificationId,readAt:now}));
+  await readStore.saveImmediate([...readStore.data,...receipts].slice(-5000));
+ }
+ async function mark(id:string){const next=new Set(effectiveSeen);next.add(id);setSeen(next);saveSeen(userId,next);await persistRead([id])}
+ async function markAll(){const ids=unread.map(i=>i.id);if(!ids.length)return;const next=new Set(effectiveSeen);ids.forEach(id=>next.add(id));setSeen(next);saveSeen(userId,next);await persistRead(ids)}
  async function markInstructionRead(entry:HandrailEntry){if((entry.readBy||[]).some(r=>r.userId===userId))return;const receipt:ReadReceipt={userId,name:userName,service:userService,readAt:new Date().toISOString()};await instructions.save(instructions.data.map(i=>i.id===entry.id?{...i,readBy:[...(i.readBy||[]),receipt]}:i))}
  if(!s.token||!userId)return null;
  const panel=open?createPortal(<div className="unified-notification-overlay" onMouseDown={()=>setOpen(false)}><aside className="unified-notification-panel" onMouseDown={event=>event.stopPropagation()} role="dialog" aria-modal="true" aria-label="Boîte de réception">
- <header><div><strong>Boîte de réception</strong><small>Actions importantes réelles de la journée · les éléments lus restent visibles</small></div><button onClick={()=>setOpen(false)} aria-label="Fermer"><X size={18}/></button></header>
+ <header><div><strong>Boîte de réception</strong><small>Actions importantes non lues · une notification lue disparaît définitivement pour votre compte</small></div><button onClick={()=>setOpen(false)} aria-label="Fermer"><X size={18}/></button></header>
  <div className="unified-notification-scroll">
- {instructionToday.length>0&&<div className="instruction-inbox-block"><div className="instruction-inbox-heading"><ClipboardList size={18}/><div><strong>Nouvelles consignes</strong><small>{instructionInbox.length} non lue(s) · {instructionToday.length} publiée(s) aujourd’hui</small></div></div>{instructionToday.map(entry=>{const read=(entry.readBy||[]).some(r=>r.userId===userId);return <article className={`instruction-inbox-item${entry.directionPriority?' priority':''}${read?' read':''}`} key={entry.id}><div className="instruction-inbox-copy"><div><strong>{entry.reference}</strong>{entry.directionPriority&&<span>Direction</span>}{read&&<span className="read-state">Lu</span>}</div><p>{entry.message}</p><small>Consigne créée par <b>{entry.authorName}</b> · {entry.authorRole}</small><time>{new Date(entry.createdAt).toLocaleString('fr-FR')}</time></div>{!read&&<button onClick={()=>void markInstructionRead(entry)}><Check size={15}/>Lu</button>}</article>})}</div>}
+ {instructionInbox.length>0&&<div className="instruction-inbox-block"><div className="instruction-inbox-heading"><ClipboardList size={18}/><div><strong>Nouvelles consignes</strong><small>{instructionInbox.length} non lue(s)</small></div></div>{instructionInbox.map(entry=><article className={`instruction-inbox-item${entry.directionPriority?' priority':''}`} key={entry.id}><div className="instruction-inbox-copy"><div><strong>{entry.reference}</strong>{entry.directionPriority&&<span>Direction</span>}</div><p>{entry.message}</p><small>Consigne créée par <b>{entry.authorName}</b> · {entry.authorRole}</small><time>{new Date(entry.createdAt).toLocaleString('fr-FR')}</time></div><button onClick={()=>void markInstructionRead(entry)}><Check size={15}/>Lu</button></article>)}</div>}
  <div className="unified-notification-filters"><span>Arrivées / départs</span><span>Tâches</span><span>Plaintes</span><span>Consignes</span><span>Caisses</span><span>Documents</span></div>
- <section>{items.length?items.map(item=>{const read=seen.has(item.id);return <button key={item.id} className={`unified-notification-item ${read?'seen':'unread'}${item.pending?' pending':''}`} onClick={()=>{mark(item.id);location.href=item.href}}><div className={`unified-notification-icon ${item.kind}`}><Icon kind={item.kind}/></div><div className="unified-notification-copy"><div><strong>{item.title}</strong>{item.reference&&<em>{item.reference}</em>}{item.pending&&<em>À traiter</em>}{read&&<em className="notification-read-state">Lu</em>}</div><p>{item.action}</p><small>Par <b>{item.actor}</b> · {item.role}</small><time>{new Date(timestamp(item.at)).toLocaleString('fr-FR')}</time></div><ChevronRight size={17}/></button>}):<p className="unified-notification-empty"><Check size={18}/>Aucune action importante enregistrée aujourd’hui.</p>}</section>
+ <section>{unread.length?unread.map(item=><button key={item.id} className={`unified-notification-item unread${item.pending?' pending':''}`} onClick={async()=>{await mark(item.id);location.href=item.href}}><div className={`unified-notification-icon ${item.kind}`}><Icon kind={item.kind}/></div><div className="unified-notification-copy"><div><strong>{item.title}</strong>{item.reference&&<em>{item.reference}</em>}{item.pending&&<em>À traiter</em>}</div><p>{item.action}</p><small>Par <b>{item.actor}</b> · {item.role}</small><time>{new Date(timestamp(item.at)).toLocaleString('fr-FR')}</time></div><ChevronRight size={17}/></button>):<p className="unified-notification-empty"><Check size={18}/>Aucune notification non lue.</p>}</section>
  </div>
- <footer>{unread.length>0&&<button onClick={markAll}><Check size={15}/>Marquer les notifications comme lues</button>}<button onClick={()=>location.href='/consignes-generales'}>Voir les consignes</button></footer>
+ <footer>{unread.length>0&&<button onClick={()=>void markAll()}><Check size={15}/>Marquer les notifications comme lues</button>}<button onClick={()=>location.href='/consignes-generales'}>Voir les consignes</button></footer>
  </aside></div>,document.body):null;
  return <><CashValidatedBanner cashDays={Array.isArray(cashStore.data)?cashStore.data:[]}/><div className="unified-notification-host"><button className={`unified-notification-bell${totalUnread?' has-unread':''}`} onClick={()=>setOpen(v=>!v)} aria-label="Boîte de réception" title="Boîte de réception"><Bell size={21}/>{totalUnread>0&&<b>{totalUnread>99?'99+':totalUnread}</b>}</button></div>{panel}</>;
 }
