@@ -34,6 +34,7 @@ import { IndividualRequestsCommandDashboard } from './IndividualRequestsCommandD
 import { OperationalArchiveAdditions } from './OperationalArchiveAdditions';
 import { DirectionCashUnlockBridge } from './DirectionCashUnlockBridge';
 import { CashValidatedBannerScopeBridge } from './CashValidatedBannerScopeBridge';
+import { ComplaintsPrintBridge } from './ComplaintsPrintBridge';
 import { cleanupLegacyLocalData } from './legacy-cleanup';
 import './styles.css';
 import './executive-dashboard.css';
@@ -110,6 +111,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <Group360ArchiveFilter />
     <DirectionCashUnlockBridge />
     <CashValidatedBannerScopeBridge />
+    <ComplaintsPrintBridge />
     <OperationalToastHost />
     <ReceptionMealNav />
     <ReceptionComplaintsNav />
