@@ -12,6 +12,7 @@ import { CommandCenterButton } from './CommandCenterButton';
 import { CommandKpiNavigationBridge } from './CommandKpiNavigationBridge';
 import { CommandGroupFlowSyncBridge } from './CommandGroupFlowSyncBridge';
 import { HousekeepingTypeDisplayBridge } from './HousekeepingTypeDisplayBridge';
+import { StaleOperationalDataCleanup } from './StaleOperationalDataCleanup';
 import { NightAuditorNav } from './NightAuditorNav';
 import { NightRouteGroupRequestsBridge } from './NightRouteGroupRequestsBridge';
 import { GroupControlPrintRecovery } from './GroupControlPrintRecovery';
@@ -88,6 +89,7 @@ cleanupLegacyLocalData();
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <AppRouter />
+    <StaleOperationalDataCleanup />
     <RoleAwareCommandCenter />
     <CommandKpiNavigationBridge />
     <CommandGroupFlowSyncBridge />
