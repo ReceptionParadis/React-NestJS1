@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, CalendarDays, ChevronLeft, ChevronRight, Clock3, Filter, RefreshCw, TriangleAlert, UsersRound } from 'lucide-react';
 import { useOperationalStore } from './useOperationalStore';
 
@@ -9,7 +9,7 @@ type Group={id:string;name?:string;pax?:number;rooms?:number;arrival?:string;dep
 type Booking={id:string;groupId?:string;title:string;room:string;date:string;start:string;end:string;attendees:number;status?:string};
 type Service='Tous'|'Réception'|'Commercial'|'Direction';
 type EventKind='arrival'|'departure'|'meal'|'meeting'|'luggage';
-type PlanningEvent={id:string;time:string;sort:string;kind:EventKind;title:string;subtitle:string;meta:string;services:Service[];groupId?:string;pax?:number};
+type PlanningEvent={id:string;time:string;sort:string;kind:EventKind;title:string;subtitle:string;meta:string;services:Service[];groupId?:string;pax?:number;endTime?:string};
 
 const filters:Service[]=['Tous','Réception','Commercial','Direction'];
 function iso(date:Date){return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`}
@@ -18,13 +18,17 @@ function label(value:string){return new Date(`${value}T12:00:00`).toLocaleDateSt
 function mealLabel(key:string){return key==='breakfast'?'Petit-déjeuner':key==='lunch'?'Déjeuner':key==='packedLunch'?'Panier repas midi':key==='dinner'?'Dîner':'Panier repas soir'}
 function safeTime(value?:string){return value&&/^\d{2}:\d{2}/.test(value)?value.slice(0,5):'À confirmer'}
 function scoreLabel(score:number){return score>=80?'Critique':score>=55?'Élevée':score>=30?'Modérée':'Faible'}
+function timeAt(date:string,time?:string){if(!time||!/^\d{1,2}:\d{2}/.test(time))return Number.NaN;const [y,m,d]=date.split('-').map(Number),[hh,mm]=time.split(':').map(Number);return new Date(y,m-1,d,hh,mm,0,0).getTime()}
+function eventExpired(event:PlanningEvent,date:string,now:number){if(date!==iso(new Date(now)))return false;if(event.time==='À confirmer')return false;const expiry=event.kind==='meeting'&&event.endTime?timeAt(date,event.endTime):timeAt(date,event.time)+5*60_000;return Number.isFinite(expiry)&&now>=expiry}
 
 export function OperationalPlanningPage(){
  const [date,setDate]=useState(()=>iso(new Date()));
  const [filter,setFilter]=useState<Service>('Tous');
+ const [now,setNow]=useState(()=>Date.now());
  const groupsStore=useOperationalStore<Group[]>('group-360',[]);
  const roomsStore=useOperationalStore<Booking[]>('meeting-rooms',[]);
  const groups=groupsStore.data;
+ useEffect(()=>{const timer=window.setInterval(()=>setNow(Date.now()),5_000);return()=>window.clearInterval(timer)},[]);
 
  const events=useMemo(()=>{
   const list:PlanningEvent[]=[];
@@ -45,16 +49,17 @@ export function OperationalPlanningPage(){
     list.push({id:`m-${group.id}-${key}`,time,sort:time==='À confirmer'?'99:94':time,kind:'meal',title:`${mealLabel(key)} · ${group.name||'Groupe'}`,subtitle:`${meal.pax} personne(s)`,meta:key.includes('packed')?'Panier repas groupe':'Prestation repas groupe',services:['Réception','Commercial','Direction'],groupId:group.id,pax:meal.pax});
    });
   });
-  roomsStore.data.filter(room=>room.date===date).forEach(room=>list.push({id:`r-${room.id}`,time:safeTime(room.start),sort:safeTime(room.start)==='À confirmer'?'99:95':safeTime(room.start),kind:'meeting',title:`Salle ${room.room}`,subtitle:room.title,meta:`${room.start}–${room.end} · ${room.attendees} pers.`,services:['Commercial','Réception','Direction'],groupId:room.groupId,pax:room.attendees}));
+  roomsStore.data.filter(room=>room.date===date).forEach(room=>list.push({id:`r-${room.id}`,time:safeTime(room.start),endTime:safeTime(room.end),sort:safeTime(room.start)==='À confirmer'?'99:95':safeTime(room.start),kind:'meeting',title:`Salle ${room.room}`,subtitle:room.title,meta:`${room.start}–${room.end} · ${room.attendees} pers.`,services:['Commercial','Réception','Direction'],groupId:room.groupId,pax:room.attendees}));
   return list.sort((a,b)=>a.sort.localeCompare(b.sort)||a.title.localeCompare(b.title,'fr'));
  },[groups,roomsStore.data,date]);
 
- const visible=filter==='Tous'||filter==='Direction'?events:events.filter(event=>event.services.includes(filter));
- const arrivals=events.filter(e=>e.kind==='arrival');
- const departures=events.filter(e=>e.kind==='departure');
- const meals=events.filter(e=>e.kind==='meal');
- const meetings=events.filter(e=>e.kind==='meeting');
- const luggage=events.filter(e=>e.kind==='luggage');
+ const activeEvents=useMemo(()=>events.filter(event=>!eventExpired(event,date,now)),[events,date,now]);
+ const visible=filter==='Tous'||filter==='Direction'?activeEvents:activeEvents.filter(event=>event.services.includes(filter));
+ const arrivals=activeEvents.filter(e=>e.kind==='arrival');
+ const departures=activeEvents.filter(e=>e.kind==='departure');
+ const meals=activeEvents.filter(e=>e.kind==='meal');
+ const meetings=activeEvents.filter(e=>e.kind==='meeting');
+ const luggage=activeEvents.filter(e=>e.kind==='luggage');
  const covers=meals.reduce((sum,e)=>sum+(e.pax||0),0);
  const serviceLoads=useMemo(()=>{
   const reception=Math.min(100,arrivals.length*15+departures.length*12+luggage.length*10);
@@ -64,11 +69,11 @@ export function OperationalPlanningPage(){
  },[arrivals,departures,luggage,covers,meals,meetings]);
  const alerts=useMemo(()=>{
   const rows:string[]=[];
-  const byTime=new Map<string,PlanningEvent[]>();events.filter(e=>e.time!=='À confirmer').forEach(e=>byTime.set(e.time,[...(byTime.get(e.time)||[]),e]));
+  const byTime=new Map<string,PlanningEvent[]>();activeEvents.filter(e=>e.time!=='À confirmer').forEach(e=>byTime.set(e.time,[...(byTime.get(e.time)||[]),e]));
   byTime.forEach((items,time)=>{const arrivalsAt=items.filter(e=>e.kind==='arrival');if(arrivalsAt.length>=2)rows.push(`${arrivalsAt.length} groupes arrivent à ${time}.`);const mealPax=items.filter(e=>e.kind==='meal').reduce((s,e)=>s+(e.pax||0),0);if(mealPax>=350)rows.push(`${mealPax} personnes prévues sur les prestations repas à ${time}.`);});
   if(meetings.length>=3)rows.push(`${meetings.length} salles à préparer sur la journée.`);
   return rows.slice(0,6);
- },[events,meetings.length]);
+ },[activeEvents,meetings.length]);
  const timeline=useMemo(()=>groups.flatMap(group=>(group.audit||[]).map((item,index)=>({id:`${group.id}-${index}`,group:group.name||'Groupe',at:item.at||'',text:item.action||'Mise à jour',service:item.role||'Opérations',actor:item.actor||''}))).filter(item=>item.at.includes(date.split('-').reverse().join('/'))||item.at.startsWith(date)).sort((a,b)=>b.at.localeCompare(a.at,'fr')).slice(0,10),[groups,date]);
  const loading=[groupsStore,roomsStore].some(store=>store.state==='loading'||store.state==='saving');
  const refresh=()=>{void groupsStore.refresh();void roomsStore.refresh()};
@@ -80,7 +85,7 @@ export function OperationalPlanningPage(){
    <section className="op-plan-loads">{serviceLoads.map(item=><article key={item.name} data-level={scoreLabel(item.score)}><span>{item.name}</span><strong>{scoreLabel(item.score)}</strong><div><i style={{width:`${item.score}%`}}/></div><small>{item.score}/100</small></article>)}</section>
    <section className="op-plan-summary"><article><b>{arrivals.length}</b><span>Arrivées</span></article><article><b>{departures.length}</b><span>Départs</span></article><article><b>{covers}</b><span>Personnes repas</span></article><article><b>{luggage.length}</b><span>Bagageries</span></article><article><b>{meetings.length}</b><span>Salles</span></article></section>
    <section className="op-plan-filters"><Filter size={17}/>{filters.map(item=><button className={filter===item?'active':''} onClick={()=>setFilter(item)} key={item}>{item}</button>)}</section>
-   <div className="op-plan-layout"><section className="op-plan-timeline"><header><div><Clock3 size={19}/><h2>Déroulé chronologique</h2></div><span>{visible.length} événement(s)</span></header>{visible.length?visible.map(event=><button key={event.id} className={`op-event ${event.kind}`} onClick={()=>event.groupId&&(location.href=`/commercial/groupes?groupId=${encodeURIComponent(event.groupId)}`)}><time>{event.time}</time><div><strong>{event.title}</strong><span>{event.subtitle}</span><small>{event.meta}</small></div><em>{event.services.filter(s=>s!=='Direction').join(' · ')}</em></button>):<p className="op-empty">Aucun événement pour cette sélection.</p>}</section><aside className="op-plan-side"><section className="op-alerts"><header><TriangleAlert size={19}/><h2>Alertes de charge</h2></header>{alerts.length?alerts.map((alert,index)=><p key={index}>{alert}</p>):<p className="ok">Aucun conflit détecté.</p>}</section><section className="op-live"><header><UsersRound size={19}/><h2>Timeline live</h2></header>{timeline.length?timeline.map(item=><article key={item.id}><time>{item.at||'—'}</time><div><strong>{item.service}</strong><span>{item.group} · {item.text}{item.actor?` · ${item.actor}`:''}</span></div></article>):<p className="op-empty">Aucune action enregistrée pour cette journée.</p>}</section></aside></div>
+   <div className="op-plan-layout"><section className="op-plan-timeline"><header><div><Clock3 size={19}/><h2>Déroulé chronologique</h2></div><span>{visible.length} événement(s)</span></header>{visible.length?visible.map(event=><button key={event.id} className={`op-event ${event.kind}`} onClick={()=>event.groupId&&(location.href=`/commercial/groupes?groupId=${encodeURIComponent(event.groupId)}`)}><time>{event.time}</time><div><strong>{event.title}</strong><span>{event.subtitle}</span><small>{event.meta}</small></div><em>{event.services.filter(s=>s!=='Direction').join(' · ')}</em></button>):<p className="op-empty">Aucun événement en cours ou à venir pour cette sélection.</p>}</section><aside className="op-plan-side"><section className="op-alerts"><header><TriangleAlert size={19}/><h2>Alertes de charge</h2></header>{alerts.length?alerts.map((alert,index)=><p key={index}>{alert}</p>):<p className="ok">Aucun conflit détecté.</p>}</section><section className="op-live"><header><UsersRound size={19}/><h2>Timeline live</h2></header>{timeline.length?timeline.map(item=><article key={item.id}><time>{item.at||'—'}</time><div><strong>{item.service}</strong><span>{item.group} · {item.text}{item.actor?` · ${item.actor}`:''}</span></div></article>):<p className="op-empty">Aucune action enregistrée pour cette journée.</p>}</section></aside></div>
   </main>
  </div>;
 }
