@@ -13,6 +13,11 @@ function norm(value?:string){return String(value||'').replace(/\s+/g,' ').trim()
 function fold(value?:string){return norm(value).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('fr-FR')}
 function currentPlanningLabel(){return fold(new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'}))}
 function extractTimes(value?:string){return Array.from(String(value||'').matchAll(/\b(\d{1,2}:\d{2})\b/g),m=>m[1])}
+function setExpiredVisibility(row:HTMLElement,expired:boolean){
+ row.hidden=expired;
+ row.style.setProperty('display',expired?'none':'','important');
+ row.setAttribute('aria-hidden',expired?'true':'false');
+}
 
 export function CommandCenterTimeExpiryBridge(){
  const rooms=useOperationalStore<Booking[]>('meeting-rooms',[]);
@@ -31,9 +36,9 @@ export function CommandCenterTimeExpiryBridge(){
     actionRows.forEach(row=>{
      const text=fold(row.textContent);
      const booking=bookings.find(r=>text.includes(fold(r.room))&&text.includes(fold(r.title)));
-     if(booking)row.hidden=isExpired(booking);
+     if(booking)setExpiredVisibility(row,isExpired(booking));
     });
-    const visibleActionRows=actionRows.filter(row=>!row.hidden);
+    const visibleActionRows=actionRows.filter(row=>row.style.display!=='none'&&!row.hidden);
     const badge=actions.querySelector<HTMLElement>(':scope > header > b');
     if(badge)badge.textContent=String(visibleActionRows.length);
    }
@@ -46,11 +51,11 @@ export function CommandCenterTimeExpiryBridge(){
      rows.forEach(row=>{
       const text=fold(row.textContent);
       const booking=bookings.find(r=>text.includes(fold(r.room))&&text.includes(fold(r.title)));
-      if(booking)row.hidden=isExpired(booking);
+      if(booking)setExpiredVisibility(row,isExpired(booking));
      });
      let empty=body.querySelector<HTMLElement>('.time-expiry-empty');
-     const visible=rows.some(row=>!row.hidden);
-     if(!visible){if(!empty){empty=document.createElement('p');empty.className='command-empty time-expiry-empty';empty.textContent='Aucune salle réservée en cours ou à venir.';body.appendChild(empty)}empty.hidden=false}else if(empty)empty.hidden=true;
+     const visible=rows.some(row=>row.style.display!=='none'&&!row.hidden);
+     if(!visible){if(!empty){empty=document.createElement('p');empty.className='command-empty time-expiry-empty';empty.textContent='Aucune salle réservée en cours ou à venir.';body.appendChild(empty)}empty.hidden=false;empty.style.removeProperty('display')}else if(empty){empty.hidden=true;empty.style.setProperty('display','none','important')}
     }
    }
   };
@@ -64,12 +69,12 @@ export function CommandCenterTimeExpiryBridge(){
    const now=Date.now(),today=iso(new Date(now));
    const rows=Array.from(timeline.querySelectorAll<HTMLElement>('.op-event'));
    rows.forEach(row=>{
-    if(!isToday){row.hidden=false;return}
+    if(!isToday){setExpiredVisibility(row,false);return}
     const timeText=norm(row.querySelector('time')?.textContent)||extractTimes(row.textContent)[0]||'';
     const scheduled=at(today,timeText);
-    row.hidden=Number.isFinite(scheduled)&&now>=scheduled+5*60_000;
+    setExpiredVisibility(row,Number.isFinite(scheduled)&&now>=scheduled+5*60_000);
    });
-   const count=rows.filter(row=>!row.hidden).length;
+   const count=rows.filter(row=>row.style.display!=='none'&&!row.hidden).length;
    const counter=timeline.querySelector<HTMLElement>(':scope > header > span');if(counter)counter.textContent=`${count} événement(s)`;
   };
 
