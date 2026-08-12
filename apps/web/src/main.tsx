@@ -74,6 +74,7 @@ import './reception-hub.css';
 import './reception-nav.css';
 import './reception-night.css';
 import './reception-workspace.css';
+import './reception-operations-readability.css';
 import './reception-archives-tree.css';
 import './complaints.css';
 import './direction-reports.css';
