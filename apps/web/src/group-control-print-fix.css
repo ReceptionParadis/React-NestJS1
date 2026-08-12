@@ -1,49 +1,50 @@
-@page{size:A4 portrait;margin:8mm}
+@page{size:A4 portrait;margin:10mm}
 
 @media print{
-  html,body,#root{display:block!important;width:auto!important;min-height:0!important;margin:0!important;padding:0!important;background:#fff!important;overflow:visible!important}
-
-  body *{visibility:visible!important}
+  html,body,#root{display:block!important;width:100%!important;min-height:0!important;margin:0!important;padding:0!important;background:#fff!important;overflow:visible!important;color:#111!important;font-family:Arial,Helvetica,sans-serif!important}
+  body{font-size:10.5pt!important;line-height:1.35!important}
+  body *{box-sizing:border-box!important}
 
   .reception-daily-page{display:block!important;width:100%!important;margin:0!important;padding:0!important;background:#fff!important}
   .reception-daily-page> :not(.group-control-backdrop){display:none!important}
 
-  .group-control-backdrop{
-    display:block!important;
-    position:static!important;
-    inset:auto!important;
-    width:100%!important;
-    min-height:0!important;
-    margin:0!important;
-    padding:0!important;
-    background:#fff!important;
-    backdrop-filter:none!important;
-    overflow:visible!important;
-  }
-
-  .group-control-modal{
-    display:block!important;
-    position:static!important;
-    width:100%!important;
-    max-width:none!important;
-    max-height:none!important;
-    margin:0!important;
-    padding:0!important;
-    overflow:visible!important;
-    border:0!important;
-    border-radius:0!important;
-    background:#fff!important;
-    box-shadow:none!important;
-    color:#111!important;
-  }
-
+  .group-control-backdrop{display:block!important;position:static!important;inset:auto!important;width:100%!important;min-height:0!important;margin:0!important;padding:0!important;background:#fff!important;backdrop-filter:none!important;overflow:visible!important}
+  .group-control-modal{display:block!important;position:static!important;width:100%!important;max-width:none!important;max-height:none!important;margin:0!important;padding:0!important;overflow:visible!important;border:0!important;border-radius:0!important;background:#fff!important;box-shadow:none!important;color:#111!important}
   .group-control-modal,.group-control-modal *{visibility:visible!important}
-  .group-control-modal>header>button,.group-control-lock,.group-control-modal>footer{display:none!important}
-  .control-print-summary,.control-room-types,.control-age-groups,.control-results,.control-meal-table,.control-discounts,.control-signature,.control-payment-stamp{display:grid!important}
-  .control-meal-table table{display:table!important;width:100%!important}
-  .control-meal-table thead{display:table-header-group!important}
+  .group-control-modal>header>button,.group-control-lock,.group-control-modal>footer,.control-print,.control-save,.control-delete{display:none!important}
+
+  .group-control-title{display:grid!important;grid-template-columns:1fr auto!important;align-items:start!important;gap:8mm!important;margin:0 0 5mm!important;padding:0 0 4mm!important;border-bottom:2px solid #7b1931!important;break-after:avoid!important}
+  .group-control-title p{margin:0 0 1mm!important;font-size:8pt!important;letter-spacing:.08em!important;text-transform:uppercase!important;color:#7b1931!important;font-weight:700!important}
+  .group-control-title h2{margin:0!important;font-size:19pt!important;line-height:1.1!important;color:#23191c!important}
+
+  .group-control-modal section,.control-print-summary,.control-room-types,.control-age-groups,.control-results,.control-discounts,.control-signature,.control-payment-stamp{display:block!important;margin:0 0 4mm!important;padding:3.5mm!important;border:1px solid #d9d0ca!important;border-radius:3mm!important;background:#fff!important;break-inside:avoid!important;page-break-inside:avoid!important}
+  .group-control-modal section h3,.group-control-modal section h4{margin:0 0 2.5mm!important;color:#7b1931!important;font-size:11pt!important;line-height:1.2!important}
+  .group-control-modal p{margin:1.2mm 0!important}
+  .group-control-modal label{font-size:9pt!important;color:#54454a!important}
+  .group-control-modal strong,.group-control-modal b{color:#20181a!important}
+
+  .control-print-summary,.control-room-types,.control-age-groups,.control-results,.control-discounts{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:2.5mm 4mm!important}
+  .control-print-summary>* ,.control-room-types>* ,.control-age-groups>* ,.control-results>* ,.control-discounts>*{min-width:0!important}
+
+  input,select,textarea{border:0!important;background:transparent!important;color:#111!important;-webkit-text-fill-color:#111!important;opacity:1!important;font:inherit!important;padding:0!important;box-shadow:none!important}
+  input[type="number"],input[type="time"],input[type="text"]{font-weight:700!important}
+  input[type="checkbox"]{appearance:none!important;width:3.5mm!important;height:3.5mm!important;border:1px solid #555!important;margin:0 1.5mm 0 0!important;vertical-align:middle!important}
+  input[type="checkbox"]:checked::after{content:'✓'!important;display:block!important;font-size:9pt!important;line-height:3mm!important;text-align:center!important}
+
+  .control-meal-table{display:block!important;margin:0 0 4mm!important;padding:0!important;border:1px solid #d9d0ca!important;border-radius:2mm!important;overflow:hidden!important;break-inside:auto!important}
+  .control-meal-table table{display:table!important;width:100%!important;border-collapse:collapse!important;table-layout:fixed!important;font-size:8.7pt!important}
+  .control-meal-table thead{display:table-header-group!important;background:#f5efeb!important}
   .control-meal-table tbody{display:table-row-group!important}
-  .control-meal-table tr{display:table-row!important}
-  .control-meal-table th,.control-meal-table td{display:table-cell!important}
-  input{color:#111!important;-webkit-text-fill-color:#111!important;opacity:1!important}
+  .control-meal-table tr{display:table-row!important;break-inside:avoid!important;page-break-inside:avoid!important}
+  .control-meal-table th,.control-meal-table td{display:table-cell!important;padding:2mm 1.7mm!important;border:1px solid #ddd4cf!important;vertical-align:top!important;text-align:left!important;overflow-wrap:anywhere!important}
+  .control-meal-table th{font-size:8pt!important;font-weight:800!important;color:#6f1d2f!important;text-transform:uppercase!important}
+
+  .control-leader,.control-payment,.control-rooms,.control-wakeup,.control-dietary,.control-notes{break-inside:avoid!important;page-break-inside:avoid!important}
+  .control-signature{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:8mm!important;min-height:24mm!important;margin-top:5mm!important}
+  .control-signature>*{border-top:1px solid #777!important;padding-top:2mm!important}
+
+  .group-control-modal a{color:#111!important;text-decoration:none!important}
+  .group-control-modal svg{width:4mm!important;height:4mm!important;stroke-width:1.7!important}
+
+  .group-control-modal::after{content:'HospiCore · Hôtel Paradis Lourdes · Contrôle Groupe';display:block!important;margin-top:4mm!important;padding-top:2mm!important;border-top:1px solid #ddd!important;text-align:center!important;font-size:7.5pt!important;color:#777!important}
 }
