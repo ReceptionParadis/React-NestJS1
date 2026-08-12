@@ -8,7 +8,10 @@ function syncFormState(source: HTMLElement, clone: HTMLElement) {
     if (!target) return;
     if (field instanceof HTMLInputElement && target instanceof HTMLInputElement) {
       target.value = field.value;
+      target.setAttribute('value', field.value);
       target.checked = field.checked;
+      if (field.checked) target.setAttribute('checked', 'checked');
+      else target.removeAttribute('checked');
       return;
     }
     if (field instanceof HTMLTextAreaElement && target instanceof HTMLTextAreaElement) {
@@ -16,11 +19,33 @@ function syncFormState(source: HTMLElement, clone: HTMLElement) {
       target.textContent = field.value;
       return;
     }
-    if (field instanceof HTMLSelectElement && target instanceof HTMLSelectElement) target.value = field.value;
+    if (field instanceof HTMLSelectElement && target instanceof HTMLSelectElement) {
+      target.value = field.value;
+      Array.from(target.options).forEach(option => option.selected = option.value === field.value);
+    }
   });
 }
 
-function isolatedPrint(selector: string, title: string) {
+function waitForStyles(doc: Document) {
+  const links = Array.from(doc.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"]'));
+  const waits = links.map(link => new Promise<void>(resolve => {
+    if (link.sheet) {
+      resolve();
+      return;
+    }
+    const done = () => resolve();
+    link.addEventListener('load', done, { once: true });
+    link.addEventListener('error', done, { once: true });
+    window.setTimeout(done, 1600);
+  }));
+  return Promise.all(waits);
+}
+
+function nextPaint(win: Window) {
+  return new Promise<void>(resolve => win.requestAnimationFrame(() => win.requestAnimationFrame(() => resolve())));
+}
+
+function isolatedPrint(selector: string, title: string, bodyClass: string) {
   const source = document.querySelector<HTMLElement>(selector);
   if (!source) return false;
 
@@ -45,7 +70,7 @@ function isolatedPrint(selector: string, title: string) {
   }
 
   doc.open();
-  doc.write(`<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>${title}</title></head><body></body></html>`);
+  doc.write(`<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title}</title></head><body class="${bodyClass}"></body></html>`);
   doc.close();
 
   document.head.querySelectorAll('style,link[rel="stylesheet"]').forEach(node => {
@@ -56,10 +81,13 @@ function isolatedPrint(selector: string, title: string) {
   printOverrides.textContent = `
     @page{size:A4 portrait;margin:8mm}
     html,body{margin:0!important;padding:0!important;background:#fff!important;width:auto!important;min-height:0!important;overflow:visible!important;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
+    body{font-family:inherit!important}
     body>*{margin-left:auto!important;margin-right:auto!important}
     .cash-sheet{width:194mm!important;max-width:none!important;min-height:auto!important;margin:0 auto!important;padding:7mm 8mm!important;box-shadow:none!important;overflow:visible!important}
     .night-route-sheet{width:194mm!important;max-width:none!important;min-height:auto!important;margin:0 auto!important;padding:0!important;box-shadow:none!important;overflow:visible!important}
+    .night-route-sheet section,.night-block,.cash-sheet section,.cash-core-grid,.cash-attachment,.cash-signatures{break-inside:avoid;page-break-inside:avoid}
     .night-note-footer button,.no-print{display:none!important}
+    svg{display:inline-block!important;vertical-align:middle}
   `;
   doc.head.appendChild(printOverrides);
 
@@ -67,18 +95,25 @@ function isolatedPrint(selector: string, title: string) {
   syncFormState(source, clone);
   doc.body.appendChild(doc.importNode(clone, true));
 
-  const run = () => {
+  const run = async () => {
     const win = iframe.contentWindow;
     if (!win) {
       iframe.remove();
       return;
     }
+    await waitForStyles(doc);
+    try {
+      if ('fonts' in doc) await (doc as Document & { fonts: FontFaceSet }).fonts.ready;
+    } catch {
+      // Impression possible même si une police web échoue.
+    }
+    await nextPaint(win);
     win.focus();
     win.print();
-    window.setTimeout(() => iframe.remove(), 1800);
+    window.setTimeout(() => iframe.remove(), 2200);
   };
 
-  window.setTimeout(run, 180);
+  void run();
   return true;
 }
 
@@ -88,10 +123,10 @@ export function OperationalPrintRecovery() {
     const wrappedPrint = () => {
       const path = window.location.pathname;
       if (path.startsWith('/reception/caisse')) {
-        if (isolatedPrint('.cash-sheet', 'Feuille de caisse')) return;
+        if (isolatedPrint('.cash-sheet', 'Feuille de caisse', 'cash-page')) return;
       }
       if (path.startsWith('/reception/feuille-route-veilleur')) {
-        if (isolatedPrint('.night-route-sheet', 'Feuille de route veilleur')) return;
+        if (isolatedPrint('.night-route-sheet', 'Feuille de route veilleur', 'night-route-page')) return;
       }
       nativePrint();
     };
