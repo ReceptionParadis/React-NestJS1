@@ -1,11 +1,35 @@
 import { useEffect } from 'react';
 
+function fold(value?: string) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLocaleLowerCase('fr-FR');
+}
+
 function cloneForPrint(source: HTMLElement) {
   const clone = source.cloneNode(true) as HTMLElement;
 
-  // Le réveil groupe est une information opérationnelle vivante : il ne doit pas
-  // faire partie du document imprimé de contrôle groupe.
+  // Les réveils sont une donnée d'exploitation temps réel et ne font pas partie
+  // du document comptable/opérationnel imprimé "Contrôle Groupe".
   clone.querySelectorAll('.control-wakeup').forEach((node) => node.remove());
+
+  // Le bloc Réveils est historiquement rendu avec la même classe que Tour leader
+  // (.control-leader). On le retire donc aussi par son libellé, indépendamment
+  // de la classe CSS utilisée par l'écran.
+  clone.querySelectorAll<HTMLElement>('section').forEach((section) => {
+    const heading = section.querySelector<HTMLElement>('h2,h3,h4');
+    if (fold(heading?.textContent).includes('reveils groupe')) section.remove();
+  });
+
+  // Le résumé supérieur contient également une tuile "Réveils groupe".
+  // Elle ne doit pas apparaître sur le contrôle imprimé.
+  clone.querySelectorAll<HTMLElement>('.control-print-summary > div').forEach((item) => {
+    const label = item.querySelector<HTMLElement>('span,label');
+    if (fold(label?.textContent).includes('reveils groupe')) item.remove();
+  });
 
   clone.querySelectorAll('button,input,textarea,select').forEach((node) => {
     if (node instanceof HTMLInputElement) {
