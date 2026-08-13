@@ -21,47 +21,58 @@ export function DashboardGroupControlCompletionBridge(){
   groups.data.filter(completedFromGroup).forEach(g=>{ids.add(g.id);names.add(fold(g.name))});
   return{ids,names};
  },[groups.data,ledger.data]);
- const pending=useMemo(()=>groups.data.filter(g=>['Arrivé','En séjour'].includes(g.status||'')&&!completed.ids.has(g.id)&&!completed.names.has(fold(g.name))),[groups.data,completed]);
+ const activeGroups=useMemo(()=>groups.data.filter(g=>['Arrivé','En séjour'].includes(g.status||'')),[groups.data]);
+ const pending=useMemo(()=>activeGroups.filter(g=>!completed.ids.has(g.id)&&!completed.names.has(fold(g.name))),[activeGroups,completed]);
+ const completedActive=useMemo(()=>activeGroups.filter(g=>completed.ids.has(g.id)||completed.names.has(fold(g.name))),[activeGroups,completed]);
 
  useEffect(()=>{
   if(location.pathname!=='/'&&location.pathname!=='')return;
   const apply=()=>{
-   // Remove stale "Contrôle Groupe" actions that refer to a completed control.
-   document.querySelectorAll<HTMLElement>('.command-actions article, .command-actions li, .command-actions a, .command-actions button').forEach(row=>{
+   document.querySelectorAll<HTMLElement>('.command-actions > div > button').forEach(row=>{
     const text=fold(row.textContent);
     if(!text.includes('controle groupe'))return;
     const isCompleted=[...completed.names].some(name=>name&&text.includes(name));
-    if(isCompleted)row.style.display='none';
+    row.style.display=isCompleted?'none':'';
    });
-   // The dashboard KPI is the fourth card: its main value and subtitle must use the same source of truth.
-   const cards=Array.from(document.querySelectorAll<HTMLElement>('.command-kpis > article'));
-   const controlCard=cards[3];
+
+   const controlCard=Array.from(document.querySelectorAll<HTMLElement>('.command-kpis > article')).find(card=>fold(card.querySelector('span')?.textContent)==='controles');
    if(controlCard){
     const strong=controlCard.querySelector('strong');
     const small=controlCard.querySelector('small');
-    if(strong)strong.textContent=String(pending.length);
+    if(strong)strong.textContent=String(completedActive.length);
     if(small)small.textContent=`${pending.length} à réaliser`;
    }
-   // Top alert banner: replace stale count with the same pending count.
-   document.querySelectorAll<HTMLElement>('.command-alerts article, .command-status article, .command-health article').forEach(card=>{
+
+   document.querySelectorAll<HTMLElement>('.command-alerts > button').forEach(card=>{
     const text=fold(card.textContent);
     if(!text.includes('controle')||!text.includes('realiser'))return;
-    const strong=card.querySelector('strong,b');
+    const strong=card.querySelector('strong');
+    if(strong)strong.textContent=String(pending.length);
+    card.classList.toggle('warning',pending.length>0);
+    card.classList.toggle('ok',pending.length===0);
+   });
+
+   document.querySelectorAll<HTMLElement>('.command-controls button').forEach(button=>{
+    const label=fold(button.querySelector('span')?.textContent);
+    if(label!=='a realiser')return;
+    const strong=button.querySelector('strong');
     if(strong)strong.textContent=String(pending.length);
    });
-   // Recompute visible action counter after stale rows are hidden.
-   const actionBox=Array.from(document.querySelectorAll<HTMLElement>('section,article')).find(el=>fold(el.textContent).includes('actions prioritaires'));
-   if(actionBox){
-    const visible=Array.from(actionBox.querySelectorAll<HTMLElement>('a,button')).filter(el=>el.style.display!=='none'&&fold(el.textContent).length>2);
-    const badge=actionBox.querySelector<HTMLElement>('.badge, header b, header strong');
-    if(badge&&/^\d+$/.test((badge.textContent||'').trim()))badge.textContent=String(visible.length);
+
+   const actionPanel=document.querySelector<HTMLElement>('.command-actions');
+   if(actionPanel){
+    const visible=Array.from(actionPanel.querySelectorAll<HTMLElement>(':scope > div > button')).filter(el=>el.style.display!=='none');
+    const badge=actionPanel.querySelector<HTMLElement>('header > b');
+    if(badge)badge.textContent=String(visible.length);
+    const empty=actionPanel.querySelector<HTMLElement>('.command-empty');
+    if(empty)empty.style.display=visible.length===0?'flex':'none';
    }
   };
   apply();
   const observer=new MutationObserver(()=>requestAnimationFrame(apply));
   observer.observe(document.body,{childList:true,subtree:true,characterData:true});
-  const timer=window.setInterval(apply,1500);
+  const timer=window.setInterval(apply,1000);
   return()=>{observer.disconnect();window.clearInterval(timer)};
- },[completed,pending.length]);
+ },[completed,pending.length,completedActive.length]);
  return null;
 }
