@@ -29,6 +29,20 @@ function syncFormState(source: HTMLElement, clone: HTMLElement) {
   });
 }
 
+function ensureCashierName(source: HTMLElement, clone: HTMLElement) {
+  if (!source.classList.contains('cash-sheet')) return;
+  const sourceInput = source.querySelector<HTMLInputElement>('.cash-meta label:first-child input');
+  const cloneInput = clone.querySelector<HTMLInputElement>('.cash-meta label:first-child input');
+  if (!cloneInput) return;
+
+  const signatureName = source.querySelector<HTMLElement>('.cash-signatures > div:nth-child(2) strong')?.textContent?.trim() || '';
+  const cashierName = sourceInput?.value?.trim() || sourceInput?.getAttribute('value')?.trim() || signatureName || 'Caissier non renseigné';
+  cloneInput.value = cashierName;
+  cloneInput.setAttribute('value', cashierName);
+  cloneInput.defaultValue = cashierName;
+  cloneInput.setAttribute('aria-label', `Caissier : ${cashierName}`);
+}
+
 function cleanupPrintRoot() {
   document.getElementById(PRINT_ROOT_ID)?.remove();
   document.getElementById(PRINT_STYLE_ID)?.remove();
@@ -43,6 +57,7 @@ function preparePrintRoot(selector: string, bodyClass: string) {
 
   const clone = source.cloneNode(true) as HTMLElement;
   syncFormState(source, clone);
+  ensureCashierName(source, clone);
 
   const root = document.createElement('div');
   root.id = PRINT_ROOT_ID;
