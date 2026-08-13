@@ -19,6 +19,7 @@ import { NightRouteGroupRequestsBridge } from './NightRouteGroupRequestsBridge';
 import { GroupControlPrintRecovery } from './GroupControlPrintRecovery';
 import { GroupControlUnlockPermissionBridge } from './GroupControlUnlockPermissionBridge';
 import { GroupControlCompletionRecovery } from './GroupControlCompletionRecovery';
+import { DashboardGroupControlCompletionBridge } from './DashboardGroupControlCompletionBridge';
 import { AdministrationRoleProfileBridge } from './AdministrationRoleProfileBridge';
 import { MaintenanceExperienceBridge } from './MaintenanceExperienceBridge';
 import { RoleAwareCommandCenter } from './RoleAwareCommandCenter';
@@ -111,6 +112,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         <RoleAwareCommandCenter />
         <CommandKpiNavigationBridge />
         <CommandGroupFlowSyncBridge />
+        <DashboardGroupControlCompletionBridge />
         <CommandCenterTimeExpiryBridge />
         <HousekeepingTypeDisplayBridge />
         <FunctionSheetSourceSync />
