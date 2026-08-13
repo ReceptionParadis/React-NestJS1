@@ -73,6 +73,24 @@ export function DashboardNativeConsistencyBridge(){
     const empty=actionPanel.querySelector<HTMLElement>('.command-empty');if(empty)empty.style.display=visible.length===0?'flex':'none';
    }
 
+   const kpiRoutes:Record<string,string>={
+    'groupes presents':'/reception/groupes',
+    'arrivees':'/reception/arrivees-departs',
+    'departs':'/reception/arrivees-departs',
+    'controles':'/reception/controles',
+    'maintenance ouverte':'/tickets',
+   };
+   document.querySelectorAll<HTMLElement>('.command-kpis > article').forEach(card=>{
+    const label=fold(card.querySelector('span')?.textContent),href=kpiRoutes[label];
+    if(!href)return;
+    card.setAttribute('role','link');
+    card.setAttribute('aria-label',`${card.querySelector('span')?.textContent||'Indicateur'} — ouvrir le détail`);
+    card.tabIndex=0;
+    card.style.cursor='pointer';
+    card.onclick=()=>location.assign(href);
+    card.onkeydown=(event)=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();location.assign(href)}};
+   });
+
    const controlCard=Array.from(document.querySelectorAll<HTMLElement>('.command-kpis > article')).find(card=>fold(card.querySelector('span')?.textContent)==='controles');
    if(controlCard){const strong=controlCard.querySelector('strong'),small=controlCard.querySelector('small');if(strong)strong.textContent=String(state.completedActive.length);if(small)small.textContent=`${state.pending.length} à réaliser`;}
    document.querySelectorAll<HTMLElement>('.command-alerts > button').forEach(card=>{const text=fold(card.textContent);if(!text.includes('controle')||!text.includes('realiser'))return;const strong=card.querySelector('strong');if(strong)strong.textContent=String(state.pending.length);card.classList.toggle('warning',state.pending.length>0);card.classList.toggle('ok',state.pending.length===0)});
