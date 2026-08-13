@@ -21,6 +21,7 @@ import { OperationsCenterV2Page } from './OperationsCenterV2Page';
 import { ReceptionArchivesPage } from './ReceptionArchivesPage';
 import { ReceptionCashPage } from './ReceptionCashPage';
 import { ReceptionControlsPage } from './ReceptionControlsPage';
+import { ReceptionExpiredItemsFilter } from './ReceptionExpiredItemsFilter';
 import { ReceptionGroupsPage } from './ReceptionGroupsPage';
 import { ReceptionHubPage } from './ReceptionHubPage';
 import { ReceptionOperationsPage } from './ReceptionOperationsPage';
@@ -59,7 +60,7 @@ function CurrentPage(){
  if(path.startsWith('/reception/feuille-route-veilleur'))return <NightWatchRoutePage/>;
  if(path.startsWith('/reception/fiche-fonction'))return <WeeklyPlanningPage/>;
  if(path.startsWith('/reception/caisse'))return <ReceptionCashPage/>;
- if(path.startsWith('/reception/arrivees-departs'))return <ReceptionOperationsPage/>;
+ if(path.startsWith('/reception/arrivees-departs'))return <><ReceptionOperationsPage/><ReceptionExpiredItemsFilter/></>;
  if(path.startsWith('/reception/controles'))return <ReceptionControlsPage/>;
  if(path.startsWith('/reception/groupes'))return <ReceptionGroupsPage/>;
  if(path.startsWith('/salles-reunion'))return <MeetingRoomsPage/>;
