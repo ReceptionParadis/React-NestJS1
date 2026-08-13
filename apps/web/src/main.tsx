@@ -18,6 +18,7 @@ import { NightAuditorNav } from './NightAuditorNav';
 import { NightRouteGroupRequestsBridge } from './NightRouteGroupRequestsBridge';
 import { GroupControlPrintRecovery } from './GroupControlPrintRecovery';
 import { GroupControlUnlockPermissionBridge } from './GroupControlUnlockPermissionBridge';
+import { GroupControlCompletionRecovery } from './GroupControlCompletionRecovery';
 import { AdministrationRoleProfileBridge } from './AdministrationRoleProfileBridge';
 import { MaintenanceExperienceBridge } from './MaintenanceExperienceBridge';
 import { RoleAwareCommandCenter } from './RoleAwareCommandCenter';
@@ -125,6 +126,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         <Group360DeleteAction />
         <GroupCreateExperience />
         <Group360ArchiveFilter />
+        <GroupControlCompletionRecovery />
         <DirectionCashUnlockBridge />
         <CashValidatedBannerScopeBridge />
         <ComplaintsPrintBridge />
