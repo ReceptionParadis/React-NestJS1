@@ -25,6 +25,7 @@ import { FunctionSheetPrintCleanup } from './FunctionSheetPrintCleanup';
 import { FunctionSheetPrintBridge } from './FunctionSheetPrintBridge';
 import { FunctionSheetSourceSync } from './FunctionSheetSourceSync';
 import { MealOrderAutoSync } from './MealOrderAutoSync';
+import { MealOrdersPrintBridge } from './MealOrdersPrintBridge';
 import { PdjBoxMealRow } from './PdjBoxMealRow';
 import { MealTransmissionDashboard } from './MealTransmissionDashboard';
 import { Group360PendingInfoHelper } from './Group360PendingInfoHelper';
@@ -115,6 +116,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         <FunctionSheetPrintCleanup />
         <FunctionSheetPrintBridge />
         <MealOrderAutoSync />
+        <MealOrdersPrintBridge />
         <PdjBoxMealRow />
         <MealTransmissionDashboard />
         <IndividualRequestsCommandDashboard />
