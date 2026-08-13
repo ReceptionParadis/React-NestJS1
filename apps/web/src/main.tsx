@@ -7,34 +7,24 @@ import { ReceptionComplaintsNav } from './ReceptionComplaintsNav';
 import { DirectionReportsNav } from './DirectionReportsNav';
 import { UserAccountMenu } from './UserAccountMenu';
 import { UnifiedNotificationHost } from './UnifiedNotificationHost';
-import { DashboardJournalBridge } from './DashboardJournalBridge';
 import { CommandCenterButton } from './CommandCenterButton';
-import { CommandKpiNavigationBridge } from './CommandKpiNavigationBridge';
-import { CommandGroupFlowSyncBridge } from './CommandGroupFlowSyncBridge';
-import { CommandCenterTimeExpiryBridge } from './CommandCenterTimeExpiryBridge';
 import { HousekeepingTypeDisplayBridge } from './HousekeepingTypeDisplayBridge';
-import { StaleOperationalDataCleanup } from './StaleOperationalDataCleanup';
-import { NightAuditorNav } from './NightAuditorNav';
 import { NightRouteGroupRequestsBridge } from './NightRouteGroupRequestsBridge';
 import { GroupControlPrintRecovery } from './GroupControlPrintRecovery';
 import { GroupControlUnlockPermissionBridge } from './GroupControlUnlockPermissionBridge';
 import { GroupControlCompletionRecovery } from './GroupControlCompletionRecovery';
-import { DashboardGroupControlCompletionBridge } from './DashboardGroupControlCompletionBridge';
 import { AdministrationRoleProfileBridge } from './AdministrationRoleProfileBridge';
 import { MaintenanceExperienceBridge } from './MaintenanceExperienceBridge';
-import { RoleAwareCommandCenter } from './RoleAwareCommandCenter';
 import { FunctionSheetPrintCleanup } from './FunctionSheetPrintCleanup';
 import { FunctionSheetPrintBridge } from './FunctionSheetPrintBridge';
 import { FunctionSheetSourceSync } from './FunctionSheetSourceSync';
 import { MealOrderAutoSync } from './MealOrderAutoSync';
 import { MealOrdersPrintBridge } from './MealOrdersPrintBridge';
 import { PdjBoxMealRow } from './PdjBoxMealRow';
-import { MealTransmissionDashboard } from './MealTransmissionDashboard';
 import { Group360PendingInfoHelper } from './Group360PendingInfoHelper';
 import { Group360DeleteAction } from './Group360DeleteAction';
 import { GroupCreateExperience } from './GroupCreateExperience';
 import { Group360ArchiveFilter } from './Group360ArchiveFilter';
-import { IndividualRequestsCommandDashboard } from './IndividualRequestsCommandDashboard';
 import { OperationalArchiveAdditions } from './OperationalArchiveAdditions';
 import { DirectionCashUnlockBridge } from './DirectionCashUnlockBridge';
 import { CashValidatedBannerScopeBridge } from './CashValidatedBannerScopeBridge';
@@ -109,6 +99,12 @@ const adminRoute = path.startsWith('/administration');
 const maintenanceRoute = path.startsWith('/tickets') || path.startsWith('/maintenance');
 
 function RouteScopedBridges() {
+  if (dashboardRoute) {
+    return <>
+      <OperationalToastHost />
+      <UserAccountMenu />
+    </>;
+  }
   if (cashRoute) {
     return <>
       <DirectionCashUnlockBridge />
@@ -118,72 +114,23 @@ function RouteScopedBridges() {
       <UserAccountMenu />
     </>;
   }
-
   return <>
-    {/* Services globaux légers uniquement. Aucun store métier massif ici. */}
     <OperationalToastHost />
     <UserAccountMenu />
     <UnifiedNotificationHost />
     <CommandCenterButton />
-
-    {dashboardRoute && <>
-      <StaleOperationalDataCleanup />
-      <RoleAwareCommandCenter />
-      <CommandKpiNavigationBridge />
-      <CommandGroupFlowSyncBridge />
-      <DashboardGroupControlCompletionBridge />
-      <CommandCenterTimeExpiryBridge />
-      <MealTransmissionDashboard />
-      <IndividualRequestsCommandDashboard />
-      <DashboardJournalBridge />
-      <NightAuditorNav />
-    </>}
-
-    {receptionRoute && <>
-      <ReceptionMealNav />
-      <ReceptionComplaintsNav />
-    </>}
-
-    {controlsRoute && <>
-      <GroupControlCompletionRecovery />
-      <GroupControlPrintRecovery />
-      <GroupControlUnlockPermissionBridge />
-    </>}
-
-    {groupsRoute && <>
-      <Group360PendingInfoHelper />
-      <Group360DeleteAction />
-      <GroupCreateExperience />
-    </>}
-
-    {archivesRoute && <>
-      <Group360ArchiveFilter />
-      <OperationalArchiveAdditions />
-    </>}
-
-    {functionSheetRoute && <>
-      <FunctionSheetSourceSync />
-      <FunctionSheetPrintCleanup />
-      <FunctionSheetPrintBridge />
-    </>}
-
+    {receptionRoute && <><ReceptionMealNav /><ReceptionComplaintsNav /></>}
+    {controlsRoute && <><GroupControlCompletionRecovery /><GroupControlPrintRecovery /><GroupControlUnlockPermissionBridge /></>}
+    {groupsRoute && <><Group360PendingInfoHelper /><Group360DeleteAction /><GroupCreateExperience /></>}
+    {archivesRoute && <><Group360ArchiveFilter /><OperationalArchiveAdditions /></>}
+    {functionSheetRoute && <><FunctionSheetSourceSync /><FunctionSheetPrintCleanup /><FunctionSheetPrintBridge /></>}
     {nightRoute && <NightRouteGroupRequestsBridge />}
-
     {complaintsRoute && <ComplaintsPrintBridge />}
-
-    {mealRoute && <>
-      <MealOrderAutoSync />
-      <MealOrdersPrintBridge />
-      <PdjBoxMealRow />
-    </>}
-
+    {mealRoute && <><MealOrderAutoSync /><MealOrdersPrintBridge /><PdjBoxMealRow /></>}
     {adminRoute && <AdministrationRoleProfileBridge />}
     {maintenanceRoute && <MaintenanceExperienceBridge />}
-
     {path.startsWith('/rapports-direction') && <DirectionReportsNav />}
     {path.startsWith('/menage') && <HousekeepingTypeDisplayBridge />}
-
-    {/* Impression opérationnelle seulement sur les routes qui l'utilisent. */}
     {(nightRoute || complaintsRoute) && <OperationalPrintRecovery />}
   </>;
 }
