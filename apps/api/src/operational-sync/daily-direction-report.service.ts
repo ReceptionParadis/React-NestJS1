@@ -21,6 +21,7 @@ export class DailyDirectionReportService implements OnModuleInit,OnModuleDestroy
  constructor(private readonly prisma:PrismaService){}
  async onModuleInit(){await this.checkAndGenerate();this.timer=setInterval(()=>void this.checkAndGenerate(),60_000)}
  onModuleDestroy(){if(this.timer)clearInterval(this.timer)}
+ async ensureDueReports(){await this.checkAndGenerate();const now=parisParts();return{ok:true,date:now.date,due:now.hour>=REPORT_HOUR,hour:now.hour,minute:now.minute}}
  private async store<T>(hotelId:string,namespace:string,fallback:T):Promise<T>{const row=await this.prisma.operationalStore.findUnique({where:{hotelId_namespace:{hotelId,namespace}}});return (row?.payload??fallback) as T}
  private async checkAndGenerate(){try{const now=parisParts();const target=now.hour>=REPORT_HOUR?now.date:addDays(now.date,-1);const hotels=await this.prisma.hotel.findMany({select:{id:true}});for(const hotel of hotels)await this.generateIfMissing(hotel.id,target)}catch(error){console.error('[HospiCore] Rapport Direction:',error)}}
  private async generateIfMissing(hotelId:string,date:string){const reportStore=await this.prisma.operationalStore.findUnique({where:{hotelId_namespace:{hotelId,namespace:REPORT_NAMESPACE}}});const reports:Array<Report>=Array.isArray(reportStore?.payload)?reportStore!.payload as unknown as Report[]:[];if(reports.some(r=>r.date===date))return;
