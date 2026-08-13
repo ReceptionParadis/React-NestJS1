@@ -13,6 +13,7 @@ type StoreEnvelope<T> = {
 
 type ReadCacheEntry = { at: number; value: StoreEnvelope<unknown> };
 const READ_DEDUPE_MS = 1_200;
+const REQUEST_TIMEOUT_MS = 8_000;
 const readInflight = new Map<string, Promise<StoreEnvelope<unknown>>>();
 const readCache = new Map<string, ReadCacheEntry>();
 
@@ -47,6 +48,16 @@ function invalidateNamespace(namespace: string, current: Session) {
   readInflight.delete(key);
 }
 
+async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit = {}) {
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } finally {
+    window.clearTimeout(timer);
+  }
+}
+
 async function fetchSharedData<T>(namespace: string, fallback: T, current: Session): Promise<StoreEnvelope<T>> {
   const hotelId = hotelIdFromSession(current);
   const userId = current.user?.id || '';
@@ -56,7 +67,7 @@ async function fetchSharedData<T>(namespace: string, fallback: T, current: Sessi
     const params = new URLSearchParams();
     if (hotelId) params.set('hotelId', hotelId);
     if (userId) params.set('userId', userId);
-    const response = await fetch(`/api/operational-sync/${encodeURIComponent(namespace)}?${params.toString()}`, { headers: headers(), cache: 'no-store' });
+    const response = await fetchWithTimeout(`/api/operational-sync/${encodeURIComponent(namespace)}?${params.toString()}`, { headers: headers(), cache: 'no-store' });
     if (!response.ok) {
       const body = await response.text();
       throw new Error(body || `Erreur API ${response.status}`);
@@ -68,7 +79,8 @@ async function fetchSharedData<T>(namespace: string, fallback: T, current: Sessi
     }
     return { payload: cleanOperationalPayload(namespace, data.payload as T), version: Number(data.version || 0), updatedAt: data.updatedAt || '', connected: true };
   } catch (error) {
-    return { payload: cleanOperationalPayload(namespace, fallback), version: 0, updatedAt: '', connected: false, error: error instanceof Error ? error.message : 'Synchronisation indisponible' };
+    const timedOut = error instanceof DOMException && error.name === 'AbortError';
+    return { payload: cleanOperationalPayload(namespace, fallback), version: 0, updatedAt: '', connected: false, error: timedOut ? 'PostgreSQL répond trop lentement. Les écrans restent utilisables.' : error instanceof Error ? error.message : 'Synchronisation indisponible' };
   }
 }
 
@@ -104,11 +116,17 @@ export async function saveSharedData<T>(namespace: string, payload: T, expectedV
 
   invalidateNamespace(namespace, current);
   const cleanedPayload = cleanOperationalPayload(namespace, payload);
-  const response = await fetch(`/api/operational-sync/${encodeURIComponent(namespace)}`, {
-    method: 'PUT',
-    headers: headers(),
-    body: JSON.stringify({ hotelId: hotelId || undefined, payload: cleanedPayload, updatedById: userId || undefined, expectedVersion }),
-  });
+  let response: Response;
+  try {
+    response = await fetchWithTimeout(`/api/operational-sync/${encodeURIComponent(namespace)}`, {
+      method: 'PUT',
+      headers: headers(),
+      body: JSON.stringify({ hotelId: hotelId || undefined, payload: cleanedPayload, updatedById: userId || undefined, expectedVersion }),
+    });
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') throw new Error('Enregistrement trop lent. Réessayez sans recharger la page.');
+    throw error;
+  }
 
   const data = await response.json().catch(() => ({}));
   if (response.status === 409) throw new Error('Une autre personne a modifié ces données. Rechargez la page avant de recommencer.');
