@@ -9,6 +9,7 @@ import { DirectionReportsPage } from './DirectionReportsPage';
 import { GeneralInstructionsPage } from './GeneralInstructionsPage';
 import { GroupBucketsBridge } from './GroupBucketsBridge';
 import { GroupContractsPage } from './GroupContractsPage';
+import { GroupPaymentDepartureSync } from './GroupPaymentDepartureSync';
 import { GroupRequestsPage } from './GroupRequestsPage';
 import { GroupsPage } from './GroupsPage';
 import { IndividualRequestsPage } from './IndividualRequestsPage';
@@ -68,4 +69,4 @@ function CurrentPage(){
  if(path.startsWith('/groupes')){window.history.replaceState({},'','/commercial/groupes');return <><GroupsPage/><GroupBucketsBridge/></>}
  return <App/>;
 }
-export function AppRouter(){return <AuthGate><CurrentPage/></AuthGate>}
+export function AppRouter(){return <AuthGate><><GroupPaymentDepartureSync/><CurrentPage/></></AuthGate>}
