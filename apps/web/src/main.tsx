@@ -106,6 +106,7 @@ function RouteScopedBridges() {
     return <>
       <OperationalToastHost />
       <UserAccountMenu />
+      <DirectionReportsNav />
       <DashboardNativeConsistencyBridge />
     </>;
   }
@@ -116,11 +117,13 @@ function RouteScopedBridges() {
       <OperationalPrintRecovery />
       <OperationalToastHost />
       <UserAccountMenu />
+      <DirectionReportsNav />
     </>;
   }
   return <>
     <OperationalToastHost />
     <UserAccountMenu />
+    <DirectionReportsNav />
     <UnifiedNotificationHost />
     <CommandCenterButton />
     {receptionRoute && <><ReceptionMealNav /><ReceptionComplaintsNav /></>}
@@ -133,7 +136,6 @@ function RouteScopedBridges() {
     {mealRoute && <><MealOrderAutoSync /><MealOrdersPrintBridge /><PdjBoxMealRow /></>}
     {adminRoute && <AdministrationRoleProfileBridge />}
     {maintenanceRoute && <MaintenanceExperienceBridge />}
-    {path.startsWith('/rapports-direction') && <DirectionReportsNav />}
     {path.startsWith('/menage') && <HousekeepingTypeDisplayBridge />}
     {(nightRoute || complaintsRoute) && <OperationalPrintRecovery />}
   </>;
