@@ -90,43 +90,56 @@ import './operational-archive-additions.css';
 
 cleanupLegacyLocalData();
 
+const cashFocusedRoute = window.location.pathname.startsWith('/reception/caisse');
+
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <AppRouter />
-    <StaleOperationalDataCleanup />
-    <RoleAwareCommandCenter />
-    <CommandKpiNavigationBridge />
-    <CommandGroupFlowSyncBridge />
-    <CommandCenterTimeExpiryBridge />
-    <HousekeepingTypeDisplayBridge />
-    <FunctionSheetSourceSync />
-    <FunctionSheetPrintCleanup />
-    <MealOrderAutoSync />
-    <PdjBoxMealRow />
-    <MealTransmissionDashboard />
-    <IndividualRequestsCommandDashboard />
-    <OperationalArchiveAdditions />
-    <Group360PendingInfoHelper />
-    <Group360DeleteAction />
-    <GroupCreateExperience />
-    <Group360ArchiveFilter />
-    <DirectionCashUnlockBridge />
-    <CashValidatedBannerScopeBridge />
-    <ComplaintsPrintBridge />
-    <OperationalPrintRecovery />
-    <OperationalToastHost />
-    <ReceptionMealNav />
-    <ReceptionComplaintsNav />
-    <DirectionReportsNav />
-    <UserAccountMenu />
-    <UnifiedNotificationHost />
-    <DashboardJournalBridge />
-    <CommandCenterButton />
-    <NightAuditorNav />
-    <NightRouteGroupRequestsBridge />
-    <GroupControlPrintRecovery />
-    <GroupControlUnlockPermissionBridge />
-    <AdministrationRoleProfileBridge />
-    <MaintenanceExperienceBridge />
+    {cashFocusedRoute ? (
+      <>
+        <DirectionCashUnlockBridge />
+        <CashValidatedBannerScopeBridge />
+        <OperationalPrintRecovery />
+        <OperationalToastHost />
+      </>
+    ) : (
+      <>
+        <StaleOperationalDataCleanup />
+        <RoleAwareCommandCenter />
+        <CommandKpiNavigationBridge />
+        <CommandGroupFlowSyncBridge />
+        <CommandCenterTimeExpiryBridge />
+        <HousekeepingTypeDisplayBridge />
+        <FunctionSheetSourceSync />
+        <FunctionSheetPrintCleanup />
+        <MealOrderAutoSync />
+        <PdjBoxMealRow />
+        <MealTransmissionDashboard />
+        <IndividualRequestsCommandDashboard />
+        <OperationalArchiveAdditions />
+        <Group360PendingInfoHelper />
+        <Group360DeleteAction />
+        <GroupCreateExperience />
+        <Group360ArchiveFilter />
+        <DirectionCashUnlockBridge />
+        <CashValidatedBannerScopeBridge />
+        <ComplaintsPrintBridge />
+        <OperationalPrintRecovery />
+        <OperationalToastHost />
+        <ReceptionMealNav />
+        <ReceptionComplaintsNav />
+        <DirectionReportsNav />
+        <UserAccountMenu />
+        <UnifiedNotificationHost />
+        <DashboardJournalBridge />
+        <CommandCenterButton />
+        <NightAuditorNav />
+        <NightRouteGroupRequestsBridge />
+        <GroupControlPrintRecovery />
+        <GroupControlUnlockPermissionBridge />
+        <AdministrationRoleProfileBridge />
+        <MaintenanceExperienceBridge />
+      </>
+    )}
   </React.StrictMode>,
 );
