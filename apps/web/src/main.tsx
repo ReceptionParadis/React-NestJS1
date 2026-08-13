@@ -22,6 +22,7 @@ import { AdministrationRoleProfileBridge } from './AdministrationRoleProfileBrid
 import { MaintenanceExperienceBridge } from './MaintenanceExperienceBridge';
 import { RoleAwareCommandCenter } from './RoleAwareCommandCenter';
 import { FunctionSheetPrintCleanup } from './FunctionSheetPrintCleanup';
+import { FunctionSheetPrintBridge } from './FunctionSheetPrintBridge';
 import { FunctionSheetSourceSync } from './FunctionSheetSourceSync';
 import { MealOrderAutoSync } from './MealOrderAutoSync';
 import { PdjBoxMealRow } from './PdjBoxMealRow';
@@ -112,6 +113,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         <HousekeepingTypeDisplayBridge />
         <FunctionSheetSourceSync />
         <FunctionSheetPrintCleanup />
+        <FunctionSheetPrintBridge />
         <MealOrderAutoSync />
         <PdjBoxMealRow />
         <MealTransmissionDashboard />
