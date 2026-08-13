@@ -94,60 +94,103 @@ import './operational-archive-additions.css';
 
 cleanupLegacyLocalData();
 
-const cashFocusedRoute = window.location.pathname.startsWith('/reception/caisse');
+const path = window.location.pathname;
+const dashboardRoute = path === '/' || path === '';
+const receptionRoute = path.startsWith('/reception');
+const cashRoute = path.startsWith('/reception/caisse');
+const controlsRoute = path.startsWith('/reception/controles');
+const groupsRoute = path.startsWith('/reception/groupes');
+const archivesRoute = path.startsWith('/reception/archives');
+const functionSheetRoute = path.startsWith('/reception/fiche-fonction');
+const nightRoute = path.startsWith('/reception/feuille-route-veilleur');
+const complaintsRoute = path.startsWith('/reception/plaintes');
+const mealRoute = path.includes('panier') || path.includes('pdj') || path.includes('repas');
+const adminRoute = path.startsWith('/administration');
+const maintenanceRoute = path.startsWith('/tickets') || path.startsWith('/maintenance');
+
+function RouteScopedBridges() {
+  if (cashRoute) {
+    return <>
+      <DirectionCashUnlockBridge />
+      <CashValidatedBannerScopeBridge />
+      <OperationalPrintRecovery />
+      <OperationalToastHost />
+      <UserAccountMenu />
+    </>;
+  }
+
+  return <>
+    {/* Services globaux légers uniquement. Aucun store métier massif ici. */}
+    <OperationalToastHost />
+    <UserAccountMenu />
+    <UnifiedNotificationHost />
+    <CommandCenterButton />
+
+    {dashboardRoute && <>
+      <StaleOperationalDataCleanup />
+      <RoleAwareCommandCenter />
+      <CommandKpiNavigationBridge />
+      <CommandGroupFlowSyncBridge />
+      <DashboardGroupControlCompletionBridge />
+      <CommandCenterTimeExpiryBridge />
+      <MealTransmissionDashboard />
+      <IndividualRequestsCommandDashboard />
+      <DashboardJournalBridge />
+      <NightAuditorNav />
+    </>}
+
+    {receptionRoute && <>
+      <ReceptionMealNav />
+      <ReceptionComplaintsNav />
+    </>}
+
+    {controlsRoute && <>
+      <GroupControlCompletionRecovery />
+      <GroupControlPrintRecovery />
+      <GroupControlUnlockPermissionBridge />
+    </>}
+
+    {groupsRoute && <>
+      <Group360PendingInfoHelper />
+      <Group360DeleteAction />
+      <GroupCreateExperience />
+    </>}
+
+    {archivesRoute && <>
+      <Group360ArchiveFilter />
+      <OperationalArchiveAdditions />
+    </>}
+
+    {functionSheetRoute && <>
+      <FunctionSheetSourceSync />
+      <FunctionSheetPrintCleanup />
+      <FunctionSheetPrintBridge />
+    </>}
+
+    {nightRoute && <NightRouteGroupRequestsBridge />}
+
+    {complaintsRoute && <ComplaintsPrintBridge />}
+
+    {mealRoute && <>
+      <MealOrderAutoSync />
+      <MealOrdersPrintBridge />
+      <PdjBoxMealRow />
+    </>}
+
+    {adminRoute && <AdministrationRoleProfileBridge />}
+    {maintenanceRoute && <MaintenanceExperienceBridge />}
+
+    {path.startsWith('/rapports-direction') && <DirectionReportsNav />}
+    {path.startsWith('/menage') && <HousekeepingTypeDisplayBridge />}
+
+    {/* Impression opérationnelle seulement sur les routes qui l'utilisent. */}
+    {(nightRoute || complaintsRoute) && <OperationalPrintRecovery />}
+  </>;
+}
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <AppRouter />
-    {cashFocusedRoute ? (
-      <>
-        <DirectionCashUnlockBridge />
-        <CashValidatedBannerScopeBridge />
-        <OperationalPrintRecovery />
-        <OperationalToastHost />
-      </>
-    ) : (
-      <>
-        <StaleOperationalDataCleanup />
-        <RoleAwareCommandCenter />
-        <CommandKpiNavigationBridge />
-        <CommandGroupFlowSyncBridge />
-        <DashboardGroupControlCompletionBridge />
-        <CommandCenterTimeExpiryBridge />
-        <HousekeepingTypeDisplayBridge />
-        <FunctionSheetSourceSync />
-        <FunctionSheetPrintCleanup />
-        <FunctionSheetPrintBridge />
-        <MealOrderAutoSync />
-        <MealOrdersPrintBridge />
-        <PdjBoxMealRow />
-        <MealTransmissionDashboard />
-        <IndividualRequestsCommandDashboard />
-        <OperationalArchiveAdditions />
-        <Group360PendingInfoHelper />
-        <Group360DeleteAction />
-        <GroupCreateExperience />
-        <Group360ArchiveFilter />
-        <GroupControlCompletionRecovery />
-        <DirectionCashUnlockBridge />
-        <CashValidatedBannerScopeBridge />
-        <ComplaintsPrintBridge />
-        <OperationalPrintRecovery />
-        <OperationalToastHost />
-        <ReceptionMealNav />
-        <ReceptionComplaintsNav />
-        <DirectionReportsNav />
-        <UserAccountMenu />
-        <UnifiedNotificationHost />
-        <DashboardJournalBridge />
-        <CommandCenterButton />
-        <NightAuditorNav />
-        <NightRouteGroupRequestsBridge />
-        <GroupControlPrintRecovery />
-        <GroupControlUnlockPermissionBridge />
-        <AdministrationRoleProfileBridge />
-        <MaintenanceExperienceBridge />
-      </>
-    )}
+    <RouteScopedBridges />
   </React.StrictMode>,
 );
