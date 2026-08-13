@@ -8,6 +8,7 @@ import { DirectionReportsNav } from './DirectionReportsNav';
 import { UserAccountMenu } from './UserAccountMenu';
 import { UnifiedNotificationHost } from './UnifiedNotificationHost';
 import { CommandCenterButton } from './CommandCenterButton';
+import { DashboardNativeConsistencyBridge } from './DashboardNativeConsistencyBridge';
 import { HousekeepingTypeDisplayBridge } from './HousekeepingTypeDisplayBridge';
 import { NightRouteGroupRequestsBridge } from './NightRouteGroupRequestsBridge';
 import { GroupControlPrintRecovery } from './GroupControlPrintRecovery';
@@ -103,6 +104,7 @@ function RouteScopedBridges() {
     return <>
       <OperationalToastHost />
       <UserAccountMenu />
+      <DashboardNativeConsistencyBridge />
     </>;
   }
   if (cashRoute) {
