@@ -27,6 +27,7 @@ import { TasksPage } from './TasksPage';
 import { TicketsPage } from './TicketsPage';
 import { WeeklyPlanningPage } from './WeeklyPlanningPage';
 import { canAccessPath, currentRole } from './permissions';
+import './groups-readability-v2.css';
 
 function CurrentPage(){
  const path=window.location.pathname;const role=currentRole();
