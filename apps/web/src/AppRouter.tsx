@@ -7,6 +7,7 @@ import { ComplaintsPage } from './ComplaintsPage';
 import { DiagnosticPage } from './DiagnosticPage';
 import { DirectionReportsPage } from './DirectionReportsPage';
 import { GeneralInstructionsPage } from './GeneralInstructionsPage';
+import { GroupArrivalPersistenceBridge } from './GroupArrivalPersistenceBridge';
 import { GroupBucketsBridge } from './GroupBucketsBridge';
 import { GroupContractsPage } from './GroupContractsPage';
 import { GroupRequestsPage } from './GroupRequestsPage';
@@ -59,7 +60,7 @@ function CurrentPage(){
  if(path.startsWith('/reception/feuille-route-veilleur'))return <NightWatchRoutePage/>;
  if(path.startsWith('/reception/fiche-fonction'))return <WeeklyPlanningPage/>;
  if(path.startsWith('/reception/caisse'))return <ReceptionCashPage/>;
- if(path.startsWith('/reception/arrivees-departs'))return <><ReceptionOperationsPage/><ReceptionExpiredItemsFilter/></>;
+ if(path.startsWith('/reception/arrivees-departs'))return <><ReceptionOperationsPage/><GroupArrivalPersistenceBridge/><ReceptionExpiredItemsFilter/></>;
  if(path.startsWith('/reception/controles'))return <ReceptionControlsPage/>;
  if(path.startsWith('/reception/groupes'))return <ReceptionGroupsPage/>;
  if(path.startsWith('/salles-reunion'))return <MeetingRoomsPage/>;
