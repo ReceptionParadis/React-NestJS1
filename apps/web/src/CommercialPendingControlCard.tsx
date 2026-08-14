@@ -1,5 +1,6 @@
 import { CheckCircle2, ChevronRight } from 'lucide-react';
 import type { OperationalGroup } from './OperationalGroupBuckets';
+import './commercial-pending-control.css';
 
 type Props={group:OperationalGroup;canValidate:boolean;onValidate:(group:OperationalGroup)=>void};
 function value(v:unknown,fallback='—'){return v===undefined||v===null||v===''?fallback:String(v)}
