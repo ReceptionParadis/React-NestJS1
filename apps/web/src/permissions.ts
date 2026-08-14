@@ -63,16 +63,17 @@ export function capabilitiesForRole(role: AppRole) { return Array.from(matrix[ro
 export function allCapabilities(): Capability[]{return Array.from(new Set(Object.values(matrix).flatMap(set=>Array.from(set)))) as Capability[]}
 
 function sessionPermissions():ReadonlySet<Capability>|null{const raw=sessionUser().permissions;if(!Array.isArray(raw))return null;return new Set(raw.filter((item:unknown)=>typeof item==='string') as Capability[])}
-function standardManagedRole(value:unknown){const raw=normalize(String(typeof value==='object'&&value&&'name' in value?(value as {name?:string}).name||'':value||''));return['admin','administrateur','directeur general','directeur hebergement','chef de reception','receptionniste','veilleur de nuit','commercial','technicien','technicien maintenance'].includes(raw)}
 
 export function can(capability: Capability, role: AppRole = currentRole()) {
   const current=currentRole();
   if(role!==current)return matrix[role].has(capability);
-  // Les rôles standards suivent toujours la matrice HospiCore courante. Cela évite
-  // qu'une session créée avant l'ajout d'un module conserve des droits obsolètes.
-  if(standardManagedRole(sessionUser().role))return matrix[current].has(capability);
-  const overrides=sessionPermissions();
-  return overrides ? overrides.has(capability) : matrix[current].has(capability);
+  // Les permissions renvoyées par l'API sont les droits effectifs du compte :
+  // elles doivent primer pour TOUS les profils, y compris les profils standards.
+  // Auparavant la matrice locale écrasait les droits personnalisés (ex. accès
+  // Commercial accordé à un compte Réception), créant un écart entre Administration,
+  // "Mes droits" et la navigation réellement disponible.
+  const effective=sessionPermissions();
+  return effective ? effective.has(capability) : matrix[current].has(capability);
 }
 
 export function canAccessPath(path: string, role: AppRole = currentRole()) {
