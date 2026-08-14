@@ -1,10 +1,7 @@
 import { Body, Controller, Delete, Get, Headers, Param, Patch, Post } from '@nestjs/common';
 import { AuthService } from './auth.service';
 
-const NIGHT_AUDITOR_PERMISSIONS=['dashboard.view','tasks.view','tasks.edit','instructions.view'];
 function normalize(value:string){return value.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim()}
-function isNightAuditorRole(role:any){const raw=normalize(String(typeof role==='object'?(role?.baseRole||role?.name||role?.label||''):role||''));return raw==='night_auditor'||raw.includes('veilleur')||raw.includes('night auditor')||raw.includes('night audit')}
-function normalizeNightAuditorSession(session:any){return session?.user&&isNightAuditorRole(session.user.role)?{...session,user:{...session.user,permissions:NIGHT_AUDITOR_PERMISSIONS}}:session}
 
 @Controller('auth')
 export class AuthController {
@@ -12,12 +9,9 @@ export class AuthController {
 
   @Get('status') status(){return this.auth.status()}
   @Post('setup') setup(@Body() body:{firstName?:string;lastName?:string;email?:string;password?:string}){return this.auth.setup(body)}
-  @Post('login') async login(@Body() body:{email?:string;password?:string}){return normalizeNightAuditorSession(await this.auth.login(body))}
+  @Post('login') login(@Body() body:{email?:string;password?:string}){return this.auth.login(body)}
   @Post('change-password') changePassword(@Headers('authorization') authorization:string|undefined,@Body() body:{password?:string}){return this.auth.changeOwnPassword(authorization,body.password)}
-  @Get('admin/users') async adminUsers(@Headers('authorization') authorization?:string){
-    const users=await this.auth.adminUsers(authorization) as any[];
-    return users.map(user=>user.baseRole==='night_auditor'&&!user.permissionsCustomized?{...user,inheritedPermissions:NIGHT_AUDITOR_PERMISSIONS,permissions:NIGHT_AUDITOR_PERMISSIONS}:user);
-  }
+  @Get('admin/users') adminUsers(@Headers('authorization') authorization?:string){return this.auth.adminUsers(authorization)}
   @Get('admin/roles') async adminRoles(@Headers('authorization') authorization?:string){
     const roles=await this.auth.adminRoles(authorization) as any[];
     const canonical=roles.find(role=>role.name==='VEILLEUR DE NUIT');
