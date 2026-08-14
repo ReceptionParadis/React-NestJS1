@@ -2,11 +2,11 @@ import { CheckCircle2, ChevronRight } from 'lucide-react';
 import type { OperationalGroup } from './OperationalGroupBuckets';
 import './commercial-pending-control.css';
 
-type Props={group:OperationalGroup;canValidate:boolean;onValidate:(group:OperationalGroup)=>void};
+type Props<T extends OperationalGroup>={group:T;canValidate:boolean;onValidate:(group:T)=>void};
 function value(v:unknown,fallback='—'){return v===undefined||v===null||v===''?fallback:String(v)}
 function euro(v?:number){return Number(v||0).toLocaleString('fr-FR',{style:'currency',currency:'EUR'})}
 
-export function CommercialPendingControlCard({group,canValidate,onValidate}:Props){
+export function CommercialPendingControlCard<T extends OperationalGroup>({group,canValidate,onValidate}:Props<T>){
  const c=group.groupControl;
  return <article className="commercial-pending-control-card">
   <details>
