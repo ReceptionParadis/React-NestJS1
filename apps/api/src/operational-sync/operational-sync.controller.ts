@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Param, Put, Query } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { DailyDirectionReportService } from './daily-direction-report.service';
+import { GroupStatusService } from './group-status.service';
 import { OperationalSyncService } from './operational-sync.service';
 
 @Controller('operational-sync')
@@ -8,6 +9,7 @@ export class OperationalSyncController {
   constructor(
     private readonly service: OperationalSyncService,
     private readonly directionReports: DailyDirectionReportService,
+    private readonly groupStatus: GroupStatusService,
   ) {}
 
   @Get('diagnostic/status')
@@ -18,6 +20,14 @@ export class OperationalSyncController {
   @Get('direction-report/ensure')
   ensureDirectionReport() {
     return this.directionReports.ensureDueReports();
+  }
+
+  @Put('group-360/:groupId/arrive')
+  arriveGroup(
+    @Param('groupId') groupId: string,
+    @Body() body: { hotelId?: string; userId?: string; actorName?: string; actorRole?: string },
+  ) {
+    return this.groupStatus.arrive({ ...body, groupId });
   }
 
   @Get()
