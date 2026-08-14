@@ -7,10 +7,8 @@ import { ComplaintsPage } from './ComplaintsPage';
 import { DiagnosticPage } from './DiagnosticPage';
 import { DirectionReportsPage } from './DirectionReportsPage';
 import { GeneralInstructionsPage } from './GeneralInstructionsPage';
-import { GroupArrivalPersistenceBridge } from './GroupArrivalPersistenceBridge';
 import { GroupBucketsBridge } from './GroupBucketsBridge';
 import { GroupContractsPage } from './GroupContractsPage';
-import { GroupPaymentDepartureSync } from './GroupPaymentDepartureSync';
 import { GroupRequestsPage } from './GroupRequestsPage';
 import { GroupsPage } from './GroupsPage';
 import { IndividualRequestsPage } from './IndividualRequestsPage';
@@ -61,7 +59,7 @@ function CurrentPage(){
  if(path.startsWith('/reception/feuille-route-veilleur'))return <NightWatchRoutePage/>;
  if(path.startsWith('/reception/fiche-fonction'))return <WeeklyPlanningPage/>;
  if(path.startsWith('/reception/caisse'))return <ReceptionCashPage/>;
- if(path.startsWith('/reception/arrivees-departs'))return <><ReceptionOperationsPage/><GroupArrivalPersistenceBridge/><ReceptionExpiredItemsFilter/></>;
+ if(path.startsWith('/reception/arrivees-departs'))return <><ReceptionOperationsPage/><ReceptionExpiredItemsFilter/></>;
  if(path.startsWith('/reception/controles'))return <ReceptionControlsPage/>;
  if(path.startsWith('/reception/groupes'))return <ReceptionGroupsPage/>;
  if(path.startsWith('/salles-reunion'))return <MeetingRoomsPage/>;
@@ -71,4 +69,4 @@ function CurrentPage(){
  if(path.startsWith('/groupes')){window.history.replaceState({},'','/commercial/groupes');return <><GroupsPage/><GroupBucketsBridge/></>}
  return <App/>;
 }
-export function AppRouter(){return <AuthGate><><GroupPaymentDepartureSync/><CurrentPage/></></AuthGate>}
+export function AppRouter(){return <AuthGate><CurrentPage/></AuthGate>}
