@@ -3,7 +3,7 @@ import { useOperationalStore } from './useOperationalStore';
 
 type Audit={action?:string};
 type GroupControl={validatedAt?:string;printedAt?:string;locked?:boolean};
-type Group={id:string;name?:string;arrival?:string;status?:string;audit?:Audit[];groupControl?:GroupControl};
+type Group={id:string;name?:string;arrival?:string;departure?:string;status?:string;audit?:Audit[];groupControl?:GroupControl};
 type Completion={groupId:string;groupName:string;validatedAt?:string;printedAt?:string;locked?:boolean};
 type Booking={id:string;title:string;room:string;date:string;start:string;end:string;attendees:number;status?:string};
 
@@ -42,6 +42,7 @@ export function DashboardNativeConsistencyBridge(){
   const completedActive=active.filter(isCompleted);
   const pending=active.filter(g=>!isCompleted(g));
   const noLongerArrival=new Set(groups.data.filter(g=>['arrive','en sejour','parti'].includes(fold(g.status))).map(g=>fold(g.name)));
+  const departedNames=new Set(groups.data.filter(g=>fold(g.status)==='parti').map(g=>fold(g.name)));
   const pendingByDate=[0,1,2].map(offset=>{
    const date=addDays(today,offset);
    if(offset===0)return pending.length;
@@ -49,7 +50,7 @@ export function DashboardNativeConsistencyBridge(){
   });
   const todayMeetings=meetings.data.filter(m=>m.date===today);
   const activeMeetingIds=new Set(todayMeetings.filter(m=>!bookingExpired(m)).map(m=>m.id));
-  return{completedNames,completedActive,pending,noLongerArrival,pendingByDate,todayMeetings,activeMeetingIds};
+  return{completedNames,completedActive,pending,noLongerArrival,departedNames,pendingByDate,todayMeetings,activeMeetingIds};
  },[groups.data,ledger.data,meetings.data]);
 
  useEffect(()=>{
@@ -96,7 +97,8 @@ export function DashboardNativeConsistencyBridge(){
    document.querySelectorAll<HTMLElement>('.command-alerts > button').forEach(card=>{const text=fold(card.textContent);if(!text.includes('controle')||!text.includes('realiser'))return;const strong=card.querySelector('strong');if(strong)strong.textContent=String(state.pending.length);card.classList.toggle('warning',state.pending.length>0);card.classList.toggle('ok',state.pending.length===0)});
    document.querySelectorAll<HTMLElement>('.command-controls button').forEach(button=>{if(fold(button.querySelector('span')?.textContent)!=='a realiser')return;const strong=button.querySelector('strong');if(strong)strong.textContent=String(state.pending.length)});
 
-   const arrivalSection=document.querySelector<HTMLElement>('.command-flow-columns > section:first-child');
+   const flowSections=Array.from(document.querySelectorAll<HTMLElement>('.command-flow-columns > section'));
+   const arrivalSection=flowSections[0];
    if(arrivalSection){
     const buttons=Array.from(arrivalSection.querySelectorAll<HTMLElement>('button'));
     buttons.forEach(button=>{const name=fold(button.querySelector('strong')?.textContent);button.style.display=name&&state.noLongerArrival.has(name)?'none':''});
@@ -104,6 +106,16 @@ export function DashboardNativeConsistencyBridge(){
     if(headings[0]){const todayButtons=buttons.filter(b=>!fold(b.querySelector('span')?.textContent).includes('j+1'));const count=todayButtons.filter(b=>b.style.display!=='none').length;const badge=headings[0].querySelector('b');if(badge)badge.textContent=String(count)}
     if(headings[1]){const tomorrowButtons=buttons.filter(b=>fold(b.querySelector('span')?.textContent).includes('j+1'));const count=tomorrowButtons.filter(b=>b.style.display!=='none').length;const badge=headings[1].querySelector('b');if(badge)badge.textContent=String(count)}
     const h3=arrivalSection.querySelector('h3 b');if(h3)h3.textContent=String(buttons.filter(b=>b.style.display!=='none').length);
+   }
+
+   const departureSection=flowSections[1];
+   if(departureSection){
+    const buttons=Array.from(departureSection.querySelectorAll<HTMLElement>('button'));
+    buttons.forEach(button=>{const name=fold(button.querySelector('strong')?.textContent);button.style.display=name&&state.departedNames.has(name)?'none':''});
+    const headings=departureSection.querySelectorAll<HTMLElement>('h4');
+    if(headings[0]){const visibleToday=buttons.filter(b=>!fold(b.textContent).includes('j+1')&&b.style.display!=='none').length;const badge=headings[0].querySelector('b');if(badge)badge.textContent=String(visibleToday)}
+    if(headings[1]){const visibleTomorrow=buttons.filter(b=>fold(b.textContent).includes('j+1')&&b.style.display!=='none').length;const badge=headings[1].querySelector('b');if(badge)badge.textContent=String(visibleTomorrow)}
+    const h3=departureSection.querySelector('h3 b');if(h3)h3.textContent=String(buttons.filter(b=>b.style.display!=='none').length);
    }
 
    const meetingButtons=Array.from(document.querySelectorAll<HTMLElement>('.command-meetings > div > button'));
