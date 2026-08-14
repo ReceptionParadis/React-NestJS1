@@ -38,13 +38,64 @@ function preserveGroupWorkflow(current:unknown,next:unknown){
  });
 }
 function protectGroup360(current:unknown,next:unknown){return preserveGroupWorkflow(current,preserveCompletedGroupControls(current,next));}
+function applyGroup360Delta(base:unknown,intended:unknown,latest:unknown){
+ if(!Array.isArray(base)||!Array.isArray(intended)||!Array.isArray(latest))return intended;
+ const baseById=new Map(base.filter(Boolean).map((item:any)=>[String(item.id),item]));
+ const intendedById=new Map(intended.filter(Boolean).map((item:any)=>[String(item.id),item]));
+ const latestById=new Map(latest.filter(Boolean).map((item:any)=>[String(item.id),item]));
+ const result=latest.map((item:any)=>{
+  if(!item?.id)return item;
+  const id=String(item.id),before:any=baseById.get(id),wanted:any=intendedById.get(id);
+  if(!wanted)return before?null:item;
+  if(!before)return item;
+  const patch:Record<string,unknown>={};
+  const keys=new Set([...Object.keys(before),...Object.keys(wanted)]);
+  for(const key of keys){if(stableSignature(before[key])!==stableSignature(wanted[key]))patch[key]=wanted[key];}
+  return Object.keys(patch).length?{...item,...patch}:item;
+ }).filter(Boolean);
+ for(const wanted of intended){if(!wanted?.id)continue;const id=String(wanted.id);if(!baseById.has(id)&&!latestById.has(id))result.push(wanted);}
+ return protectGroup360(latest,result);
+}
 
 export function useOperationalStore<T>(namespace:string,initialValue:T,refreshMs=DEFAULT_REFRESH_MS):OperationalStore<T>{
  const initialValueRef=useRef(initialValue),[data,setData]=useState<T>(()=>initialValueRef.current),dataRef=useRef<T>(initialValueRef.current),dataSignatureRef=useRef(stableSignature(initialValueRef.current)),[version,setVersion]=useState(0),versionRef=useRef(0),refreshInFlightRef=useRef(false),writeEpochRef=useRef(0),mountedRef=useRef(true),channelRef=useRef<BroadcastChannel|null>(null),[updatedAt,setUpdatedAt]=useState(''),[lastSuccessAt,setLastSuccessAt]=useState(''),[state,setState]=useState<OperationalSyncState>('loading'),[message,setMessage]=useState('Connexion à PostgreSQL…');
  const applyPayload=useCallback((payload:T)=>{dataRef.current=payload;const signature=stableSignature(payload);if(signature===dataSignatureRef.current)return false;dataSignatureRef.current=signature;setData(payload);return true;},[]);
  const markSuccess=useCallback((payload:T,nextVersion:number,successMessage:string)=>{if(!mountedRef.current)return;const successAt=new Date().toISOString();const protectedPayload=(namespace==='group-360'?protectGroup360(dataRef.current,payload):payload) as T;applyPayload(protectedPayload);setVersion(nextVersion);versionRef.current=nextVersion;setUpdatedAt(successAt);setLastSuccessAt(successAt);setState('synced');setMessage(successMessage);},[applyPayload,namespace]);
  const refresh=useCallback(async(silent=false):Promise<boolean>=>{if(namespace==='group-360'&&group360PendingPayload!==null)return true;if(refreshInFlightRef.current)return false;refreshInFlightRef.current=true;const readEpoch=writeEpochRef.current;if(!silent&&mountedRef.current){setState('loading');setMessage('Synchronisation en cours…');}try{const previousVersion=versionRef.current,result=await loadSharedData<T>(namespace,initialValueRef.current);if(!mountedRef.current)return false;if(!result.connected){setState('error');setMessage(result.error||'Synchronisation PostgreSQL indisponible.');return false;}if(readEpoch!==writeEpochRef.current)return true;markSuccess(result.payload,result.version,'Données partagées à jour');if(silent&&previousVersion>0&&result.version>previousVersion)emitOperationalChange({namespace,version:result.version,at:Date.now(),source:'remote'});return true;}catch(error){if(!mountedRef.current)return false;setState('error');setMessage(error instanceof Error?error.message:'Synchronisation PostgreSQL indisponible.');return false;}finally{refreshInFlightRef.current=false;}},[markSuccess,namespace]);
- const persist=useCallback(async(next:T,successMessage:string):Promise<boolean>=>{writeEpochRef.current+=1;const protectedNext=(namespace==='group-360'?protectGroup360(dataRef.current,next):next) as T;if(mountedRef.current){applyPayload(protectedNext);setState('saving');setMessage('Enregistrement partagé…');}emitOperationalDraft({namespace,payload:protectedNext});try{const result=await saveSharedData<T>(namespace,protectedNext,versionRef.current);if(!mountedRef.current)return false;markSuccess(result.payload,result.version,successMessage);const detail:OperationalChangeDetail={namespace,version:result.version,at:Date.now(),source:'local'};emitOperationalChange(detail);channelRef.current?.postMessage(detail);return true;}catch(error){if(!mountedRef.current)return false;const text=error instanceof Error?error.message:'Enregistrement impossible.';const conflict=text.includes('autre personne');setState(conflict?'conflict':'error');setMessage(text);if(conflict)window.setTimeout(()=>void refresh(true),250);return false;}},[applyPayload,markSuccess,namespace,refresh]);
+ const persist=useCallback(async(next:T,successMessage:string):Promise<boolean>=>{
+  writeEpochRef.current+=1;
+  const baseBeforeWrite=dataRef.current;
+  const protectedNext=(namespace==='group-360'?protectGroup360(baseBeforeWrite,next):next) as T;
+  if(mountedRef.current){applyPayload(protectedNext);setState('saving');setMessage('Enregistrement partagé…');}
+  emitOperationalDraft({namespace,payload:protectedNext});
+  try{
+   let result;
+   try{result=await saveSharedData<T>(namespace,protectedNext,versionRef.current);}
+   catch(firstError){
+    const firstText=firstError instanceof Error?firstError.message:String(firstError);
+    if(namespace!=='group-360'||!firstText.includes('autre personne'))throw firstError;
+    // Une autre vue a enregistré entre le clic et le PUT. On recharge la dernière
+    // version et on rejoue uniquement les champs réellement modifiés par ce clic.
+    const latest=await loadSharedData<T>(namespace,initialValueRef.current);
+    if(!latest.connected)throw firstError;
+    const rebased=applyGroup360Delta(baseBeforeWrite,protectedNext,latest.payload) as T;
+    applyPayload(rebased);
+    emitOperationalDraft({namespace,payload:rebased});
+    result=await saveSharedData<T>(namespace,rebased,latest.version);
+   }
+   if(!mountedRef.current)return false;
+   markSuccess(result.payload,result.version,successMessage);
+   const detail:OperationalChangeDetail={namespace,version:result.version,at:Date.now(),source:'local'};
+   emitOperationalChange(detail);channelRef.current?.postMessage(detail);return true;
+  }catch(error){
+   if(!mountedRef.current)return false;
+   const text=error instanceof Error?error.message:'Enregistrement impossible.';
+   const conflict=text.includes('autre personne');
+   setState(conflict?'conflict':'error');setMessage(text);
+   if(conflict)window.setTimeout(()=>void refresh(true),250);
+   return false;
+  }
+ },[applyPayload,markSuccess,namespace,refresh]);
  const saveImmediate=useCallback(async(next:T):Promise<boolean>=>{if(namespace==='group-360'){if(group360SaveTimer!==null){window.clearTimeout(group360SaveTimer);group360SaveTimer=null;}group360PendingPayload=null;}return persist(next,namespace==='group-360'?'Fiche Groupe 360° enregistrée':'Enregistré pour tous les services');},[namespace,persist]);
  const save=useCallback(async(next:T):Promise<boolean>=>{if(namespace==='group-360'){const protectedNext=protectGroup360(dataRef.current,next) as T;if(statusChanged(dataRef.current,protectedNext))return saveImmediate(protectedNext);group360PendingPayload=protectedNext;if(mountedRef.current){applyPayload(protectedNext);setState('synced');setMessage('Saisie enregistrée automatiquement…');}emitOperationalDraft({namespace,payload:protectedNext});if(group360SaveTimer!==null)window.clearTimeout(group360SaveTimer);group360SaveTimer=window.setTimeout(async()=>{const payload=group360PendingPayload as T|null;if(payload===null)return;group360PendingPayload=null;group360SaveTimer=null;await persist(payload,'Fiche Groupe 360° enregistrée');},GROUP_360_SAVE_DELAY);return true;}return persist(next,'Enregistré pour tous les services');},[applyPayload,namespace,persist,saveImmediate]);
  useEffect(()=>{mountedRef.current=true;void refresh();const timer=window.setInterval(()=>{if(document.visibilityState==='visible'&&navigator.onLine)void refresh(true);},Math.max(5_000,refreshMs));const refreshWhenActive=()=>{if(document.visibilityState==='visible'&&navigator.onLine)void refresh(true);};const refreshOnOperationalChange=(event:Event)=>{const detail=(event as CustomEvent<OperationalChangeDetail>).detail;if(detail?.namespace===namespace&&detail.version>versionRef.current)void refresh(true);};const applyOperationalDraft=(event:Event)=>{const detail=(event as CustomEvent<OperationalDraftDetail<T>>).detail;if(detail?.namespace!==namespace)return;if(mountedRef.current){const protectedPayload=(namespace==='group-360'?protectGroup360(dataRef.current,detail.payload):detail.payload) as T;applyPayload(protectedPayload);if(namespace==='group-360'){setState('synced');setMessage('Saisie enregistrée automatiquement…');}}};window.addEventListener('focus',refreshWhenActive);window.addEventListener('online',refreshWhenActive);window.addEventListener('hospicore:operational-change',refreshOnOperationalChange as EventListener);window.addEventListener('hospicore:operational-draft',applyOperationalDraft as EventListener);document.addEventListener('visibilitychange',refreshWhenActive);if('BroadcastChannel'in window){const channel=new BroadcastChannel(`hospicore-sync-${namespace}`);channelRef.current=channel;channel.onmessage=(event:MessageEvent<OperationalChangeDetail>)=>{if(!event.data?.version||event.data.version>versionRef.current)void refresh(true);};}return()=>{mountedRef.current=false;window.clearInterval(timer);window.removeEventListener('focus',refreshWhenActive);window.removeEventListener('online',refreshWhenActive);window.removeEventListener('hospicore:operational-change',refreshOnOperationalChange as EventListener);window.removeEventListener('hospicore:operational-draft',applyOperationalDraft as EventListener);document.removeEventListener('visibilitychange',refreshWhenActive);channelRef.current?.close();channelRef.current=null;};},[applyPayload,namespace,refresh,refreshMs]);
