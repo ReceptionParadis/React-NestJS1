@@ -2,11 +2,11 @@ import { CheckCircle2, ChevronRight } from 'lucide-react';
 import type { OperationalGroup } from './OperationalGroupBuckets';
 import './commercial-pending-control.css';
 
-type Props<T extends OperationalGroup>={group:T;canValidate:boolean;onValidate:(group:T)=>void};
+type Props={group:OperationalGroup;canValidate:boolean;onValidate:()=>void};
 function value(v:unknown,fallback='—'){return v===undefined||v===null||v===''?fallback:String(v)}
 function euro(v?:number){return Number(v||0).toLocaleString('fr-FR',{style:'currency',currency:'EUR'})}
 
-export function CommercialPendingControlCard<T extends OperationalGroup>({group,canValidate,onValidate}:Props<T>){
+export function CommercialPendingControlCard({group,canValidate,onValidate}:Props){
  const c=group.groupControl;
  return <article className="commercial-pending-control-card">
   <details>
@@ -21,7 +21,7 @@ export function CommercialPendingControlCard<T extends OperationalGroup>({group,
      <section><h4>Paiement</h4><p><b>Statut</b><span>{value(group.paymentStatus)}</span></p><p><b>Solde</b><span>{euro(group.amountDue)}</span></p><p><b>Débiteur</b><span>{value(group.debtor)}</span></p><p><b>Validation commerciale</b><span>{c?.commercialValidation||'À valider'}</span></p></section>
      <section><h4>Informations utiles</h4><p><b>Agence</b><span>{value(group.directAgency||group.agency)}</span></p><p><b>Tour Leader</b><span>{[group.leaderFirstName,group.leaderLastName].filter(Boolean).join(' ')||'—'}</span></p><p><b>Téléphone</b><span>{value(group.leaderPhone)}</span></p><p><b>Notes Réception</b><span>{value(group.receptionNotes)}</span></p></section>
     </div>
-    <div className="commercial-control-review-actions"><button type="button" onClick={()=>window.location.href='/reception/controles'}>Ouvrir le contrôle complet</button>{canValidate?<button type="button" className="validate" onClick={()=>onValidate(group)}><CheckCircle2 size={16}/>Valider le contrôle</button>:<span>Validation réservée au Commercial / Direction</span>}</div>
+    <div className="commercial-control-review-actions"><button type="button" onClick={()=>window.location.href='/reception/controles'}>Ouvrir le contrôle complet</button>{canValidate?<button type="button" className="validate" onClick={onValidate}><CheckCircle2 size={16}/>Valider le contrôle</button>:<span>Validation réservée au Commercial / Direction</span>}</div>
    </div>
   </details>
  </article>;
