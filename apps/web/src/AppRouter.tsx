@@ -1,3 +1,4 @@
+import { AdministrationPage } from './AdministrationPage';
 import { App } from './App';
 import { AuthGate } from './AuthGate';
 import { ComplaintsPage } from './ComplaintsPage';
@@ -23,6 +24,7 @@ function CurrentPage(){
  const path=window.location.pathname,role=currentRole();
  if(retiredPrefixes.some(prefix=>path.startsWith(prefix)))return redirectHome();
  if(!canAccessPath(path,role))return redirectHome();
+ if(path.startsWith('/administration'))return <AdministrationPage/>;
  if(path.startsWith('/rapports-direction'))return <DirectionReportsPage/>;
  if(path.startsWith('/taches'))return <TasksPage/>;
  if(path.startsWith('/consignes-generales'))return <GeneralInstructionsPage/>;
