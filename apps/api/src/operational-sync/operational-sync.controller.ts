@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Put, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Put, Query } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { DailyDirectionReportService } from './daily-direction-report.service';
 import { GroupStatusService } from './group-status.service';
@@ -45,6 +45,7 @@ export class OperationalSyncController {
   }
 
   @Put(':namespace')
+  @Post(':namespace')
   save(
     @Param('namespace') namespace: string,
     @Body()
