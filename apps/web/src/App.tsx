@@ -1,4 +1,4 @@
-import { Archive, Calculator, CalendarDays, ClipboardCheck, ClipboardList, FileText, ListTodo, MessageSquareWarning, MoonStar, PackageCheck } from 'lucide-react';
+import { Archive, Calculator, CalendarDays, ClipboardCheck, ClipboardList, FileText, ListTodo, LogOut, MessageSquareWarning, MoonStar, PackageCheck, Settings } from 'lucide-react';
 import { canAccessPath, currentRole } from './permissions';
 
 const coreModules=[
@@ -13,11 +13,13 @@ const coreModules=[
  {title:'Rapport Direction',description:'Consulter les rapports opérationnels journaliers consolidés.',href:'/rapports-direction',icon:FileText},
  {title:'Salles de réunion',description:'Gérer les réservations et occupations des salles.',href:'/salles-reunion',icon:CalendarDays},
  {title:'Feuille de route veilleur',description:'Consulter les mouvements et repas utiles de nuit.',href:'/reception/feuille-route-veilleur',icon:MoonStar},
+ {title:'Administration',description:'Gérer les utilisateurs, profils, droits et accès HospiCore.',href:'/administration',icon:Settings},
 ];
 
 function sessionName(){try{const u=JSON.parse(localStorage.getItem('hospicore.session')||'{}')?.user||{};return `${u.firstName||'Utilisateur'} ${u.lastName||''}`.trim()}catch{return'Utilisateur'}}
+function logout(){localStorage.removeItem('hospicore.session');localStorage.removeItem('hospicore.token');location.assign('/')}
 
 export function App(){
  const role=currentRole(),modules=coreModules.filter(item=>canAccessPath(item.href,role));
- return <main className="core-dashboard"><header className="core-dashboard-header"><div><p>HÔTEL PARADIS · LOURDES</p><h1>HospiCore</h1><span>Base opérationnelle simplifiée · {sessionName()}</span></div></header><section className="core-dashboard-intro"><strong>Outils opérationnels</strong><span>Une seule version, une navigation courte et uniquement les données nécessaires à l’exploitation quotidienne.</span></section><section className="core-dashboard-grid">{modules.map(({title,description,href,icon:Icon})=><button key={href} onClick={()=>location.href=href}><span className="core-module-icon"><Icon size={26}/></span><div><h2>{title}</h2><p>{description}</p><strong>Ouvrir</strong></div></button>)}</section>{modules.length===0&&<section className="core-dashboard-empty"><h2>Aucun module disponible</h2><p>Les droits de ce compte doivent être mis à jour dans l’administration HospiCore.</p></section>}</main>;
+ return <main className="core-dashboard"><header className="core-dashboard-header"><div><p>HÔTEL PARADIS · LOURDES</p><h1>HospiCore</h1><span>Base opérationnelle simplifiée · {sessionName()}</span></div><button className="core-logout" onClick={logout}><LogOut size={18}/>Déconnexion</button></header><section className="core-dashboard-intro"><strong>Outils opérationnels</strong><span>Une seule version, une navigation courte et uniquement les données nécessaires à l’exploitation quotidienne.</span></section><section className="core-dashboard-grid">{modules.map(({title,description,href,icon:Icon})=><button key={href} onClick={()=>location.href=href}><span className="core-module-icon"><Icon size={26}/></span><div><h2>{title}</h2><p>{description}</p><strong>Ouvrir</strong></div></button>)}</section>{modules.length===0&&<section className="core-dashboard-empty"><h2>Aucun module disponible</h2><p>Les droits de ce compte doivent être mis à jour dans l’administration HospiCore.</p></section>}</main>;
 }
