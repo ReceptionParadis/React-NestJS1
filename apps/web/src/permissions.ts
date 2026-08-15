@@ -30,6 +30,8 @@ export function canAccessPath(path:string,role:AppRole=currentRole()){
  if(path.startsWith('/salles-reunion'))return can('meeting-rooms.view',role);
  if(path.startsWith('/reception/caisse'))return can('cash.view',role);
  if(path.startsWith('/reception/controles'))return can('group-control.create',role);
+ if(path.startsWith('/reception/arrivees-departs'))return can('reception.operate',role);
+ if(path.startsWith('/reception/paniers-repas-pdj'))return can('reception.operate',role);
  if(path.startsWith('/reception/plaintes'))return can('reception.operate',role);
  if(path.startsWith('/reception/feuille-route-veilleur'))return role==='night_auditor'||can('reception.view',role);
  if(path.startsWith('/reception/archives'))return can('reception.view',role);
