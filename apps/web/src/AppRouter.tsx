@@ -8,7 +8,6 @@ import { DiagnosticPage } from './DiagnosticPage';
 import { DirectionReportsPage } from './DirectionReportsPage';
 import { GeneralInstructionsPage } from './GeneralInstructionsPage';
 import { GroupArrivalPersistenceBridge } from './GroupArrivalPersistenceBridge';
-import { GroupBucketsBridge } from './GroupBucketsBridge';
 import { GroupContractsPage } from './GroupContractsPage';
 import { GroupRequestsPage } from './GroupRequestsPage';
 import { GroupsPage } from './GroupsPage';
@@ -47,7 +46,7 @@ function CurrentPage(){
  if(path.startsWith('/consignes-generales'))return <GeneralInstructionsPage/>;
  if(path.startsWith('/centre-operations')||path.startsWith('/cahier-consignes')||path.startsWith('/prets')||path.startsWith('/inventaire'))return <OperationsCenterV2Page/>;
  if(path.startsWith('/commercial/contrats'))return <GroupContractsPage/>;
- if(path.startsWith('/commercial/groupes'))return <><GroupsPage/><GroupBucketsBridge/></>;
+ if(path.startsWith('/commercial/groupes'))return <GroupsPage/>;
  if(path.startsWith('/commercial/planning-hebdomadaire'))return <WeeklyPlanningPage/>;
  if(path==='/commercial'||path==='/commercial/')return <CommercialHubPage/>;
  if(path.startsWith('/planning-hebdomadaire'))return <WeeklyPlanningPage/>;
@@ -67,7 +66,7 @@ function CurrentPage(){
  if(path.startsWith('/chambres')||path.startsWith('/groupes/allocation')){window.history.replaceState({},'','/salles-reunion');return <MeetingRoomsPage/>}
  if(path.startsWith('/tickets'))return <TicketsPage/>;
  if(path.startsWith('/groupes/import-rooming-list'))return <RoomingListImportPage/>;
- if(path.startsWith('/groupes')){window.history.replaceState({},'','/commercial/groupes');return <><GroupsPage/><GroupBucketsBridge/></>}
+ if(path.startsWith('/groupes')){window.history.replaceState({},'','/commercial/groupes');return <GroupsPage/>}
  return <App/>;
 }
 export function AppRouter(){return <AuthGate><CurrentPage/></AuthGate>}
