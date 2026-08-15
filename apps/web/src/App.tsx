@@ -1,10 +1,11 @@
-import { Archive, Calculator, CalendarDays, ClipboardCheck, ClipboardList, FileText, ListTodo, MessageSquareWarning, MoonStar } from 'lucide-react';
+import { Archive, Calculator, CalendarDays, ClipboardCheck, ClipboardList, FileText, ListTodo, MessageSquareWarning, MoonStar, PackageCheck } from 'lucide-react';
 import { canAccessPath, currentRole } from './permissions';
 
 const coreModules=[
  {title:'Tâches',description:'Créer, attribuer et suivre les tâches opérationnelles.',href:'/taches',icon:ListTodo},
  {title:'Consignes',description:'Centraliser les consignes actives de l’hôtel.',href:'/consignes-generales',icon:ClipboardList},
  {title:'Arrivées / Départs',description:'Renseigner manuellement les mouvements et transmettre ceux de nuit au veilleur.',href:'/reception/arrivees-departs',icon:CalendarDays},
+ {title:'Paniers repas & PDJ Box',description:'Créer, suivre et imprimer les commandes de paniers repas et petits-déjeuners box.',href:'/reception/paniers-repas-pdj',icon:PackageCheck},
  {title:'Caisse',description:'Saisir, rapprocher, imprimer et verrouiller la caisse.',href:'/reception/caisse',icon:Calculator},
  {title:'Contrôle Groupe',description:'Matrice manuelle unique pour les contrôles groupes et leurs effectifs repas.',href:'/reception/controles',icon:ClipboardCheck},
  {title:'Plaintes',description:'Enregistrer, traiter et archiver les plaintes clients.',href:'/reception/plaintes',icon:MessageSquareWarning},
