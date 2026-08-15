@@ -8,5 +8,6 @@ import { OperationalSyncService } from './operational-sync.service';
 @Module({
   controllers: [OperationalSyncController],
   providers: [OperationalSyncService, DailyDirectionReportService, GroupStatusService, PrismaService],
+  exports: [OperationalSyncService],
 })
 export class OperationalSyncModule {}
