@@ -24,6 +24,7 @@ function sessionPermissions():ReadonlySet<Capability>|null{const raw=sessionUser
 export function can(capability:Capability,role:AppRole=currentRole()){const baseline=matrix[role].has(capability);if(role!==currentRole())return baseline;const custom=sessionPermissions();return baseline||Boolean(custom?.has(capability))}
 export function canAccessPath(path:string,role:AppRole=currentRole()){
  if(path==='/'||path==='')return can('dashboard.view',role);
+ if(path.startsWith('/administration'))return can('administration.view',role);
  if(path.startsWith('/rapports-direction'))return can('direction-reports.view',role);
  if(path.startsWith('/taches'))return can('tasks.view',role);
  if(path.startsWith('/consignes-generales'))return can('instructions.view',role);
