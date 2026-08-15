@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Put } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Put, Query } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { OperationalSyncService } from './operational-sync/operational-sync.service';
 
@@ -15,10 +15,20 @@ export class AppController {
     };
   }
 
-  // Route de secours volontairement déclarée dans le contrôleur racine.
-  // Elle garantit les écritures opérationnelles sur Render même si le
-  // contrôleur dédié n'est pas monté correctement dans une image déployée.
+  // Routes de secours déclarées dans le contrôleur racine.
+  // Elles garantissent la lecture et l'écriture des données opérationnelles
+  // sur Render même si le contrôleur dédié n'est pas monté correctement.
+  @Get('operational-sync/:namespace')
+  getOperationalStore(
+    @Param('namespace') namespace: string,
+    @Query('hotelId') hotelId?: string,
+    @Query('userId') userId?: string,
+  ) {
+    return this.operationalSync.get(hotelId, namespace, userId);
+  }
+
   @Put('operational-sync/:namespace')
+  @Post('operational-sync/:namespace')
   saveOperationalStore(
     @Param('namespace') namespace: string,
     @Body()
