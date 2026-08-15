@@ -47,6 +47,11 @@ function invalidateNamespace(namespace: string, current: Session) {
   readInflight.delete(key);
 }
 
+function signature(value: unknown) {
+  try { return JSON.stringify(value); }
+  catch { return String(value); }
+}
+
 async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit = {}) {
   const controller = new AbortController();
   const timer = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
@@ -64,26 +69,35 @@ async function fetchSharedData<T>(namespace: string, fallback: T, current: Sessi
 
   try {
     const params = new URLSearchParams();
-    // Pour une session authentifiée, le serveur recalcule toujours l'hôtel depuis
-    // l'utilisateur en base. On ne transmet plus le hotelId potentiellement périmé
-    // stocké dans localStorage, afin que tous les comptes partagent le même store.
     if (userId) params.set('userId', userId);
     else if (fallbackHotelId) params.set('hotelId', fallbackHotelId);
-    const response = await fetchWithTimeout(`/api/operational-sync/${encodeURIComponent(namespace)}?${params.toString()}`, { headers: headers(), cache: 'no-store' });
+    // Le timestamp interdit aussi tout cache intermédiaire hors de React.
+    params.set('_fresh', String(Date.now()));
+    const response = await fetchWithTimeout(`/api/operational-sync/${encodeURIComponent(namespace)}?${params.toString()}`, {
+      headers: { ...headers(), 'Cache-Control': 'no-cache' },
+      cache: 'no-store',
+    });
     if (!response.ok) {
       const body = await response.text();
       throw new Error(body || `Erreur API ${response.status}`);
     }
     const data = await response.json();
     if (!data) {
-      const created = await saveSharedData(namespace, fallback, 0);
-      return { ...created, connected: true };
+      return { payload: cleanOperationalPayload(namespace, fallback), version: 0, updatedAt: '', connected: false, error: `Store ${namespace} introuvable côté serveur.` };
     }
     return { payload: cleanOperationalPayload(namespace, data.payload as T), version: Number(data.version || 0), updatedAt: data.updatedAt || '', connected: true };
   } catch (error) {
     const timedOut = error instanceof DOMException && error.name === 'AbortError';
     return { payload: cleanOperationalPayload(namespace, fallback), version: 0, updatedAt: '', connected: false, error: timedOut ? 'PostgreSQL répond trop lentement. Les écrans restent utilisables.' : error instanceof Error ? error.message : 'Synchronisation indisponible' };
   }
+}
+
+export async function loadSharedDataFresh<T>(namespace: string, fallback: T): Promise<StoreEnvelope<T>> {
+  const current = session();
+  invalidateNamespace(namespace, current);
+  const result = await fetchSharedData(namespace, fallback, current);
+  if (result.connected) readCache.set(readKey(namespace, current), { at: Date.now(), value: result as StoreEnvelope<unknown> });
+  return result;
 }
 
 export async function loadSharedData<T>(namespace: string, fallback: T): Promise<StoreEnvelope<T>> {
@@ -122,10 +136,9 @@ export async function saveSharedData<T>(namespace: string, payload: T, expectedV
   try {
     response = await fetchWithTimeout(`/api/operational-sync/${encodeURIComponent(namespace)}`, {
       method: 'POST',
-      headers: headers(),
+      headers: { ...headers(), 'Cache-Control': 'no-cache' },
+      cache: 'no-store',
       body: JSON.stringify({
-        // L'utilisateur authentifié est la source de vérité. Le backend résout son
-        // hotelId courant en PostgreSQL, ce qui évite les stores séparés par session.
         ...(userId ? { updatedById: userId } : { hotelId: fallbackHotelId || undefined }),
         payload: cleanedPayload,
         expectedVersion,
@@ -139,7 +152,25 @@ export async function saveSharedData<T>(namespace: string, payload: T, expectedV
   const data = await response.json().catch(() => ({}));
   if (response.status === 409) throw new Error('Une autre personne a modifié ces données. Rechargez la page avant de recommencer.');
   if (!response.ok) throw new Error(data.message || `Enregistrement impossible (${response.status}).`);
-  const result = { payload: cleanOperationalPayload(namespace, data.payload as T), version: Number(data.version || 0), updatedAt: data.updatedAt || '', connected: true };
+
+  const returnedPayload = cleanOperationalPayload(namespace, data.payload as T);
+  const returnedVersion = Number(data.version || 0);
+  if (signature(returnedPayload) !== signature(cleanedPayload)) {
+    throw new Error('Le serveur n’a pas confirmé exactement les données envoyées. La sauvegarde est refusée pour éviter une perte.');
+  }
+
+  // Vérification durable : un second GET réseau doit retrouver exactement ce qui
+  // vient d'être écrit. Aucun cache React ou HTTP n'est accepté pour cette étape.
+  const verified = await loadSharedDataFresh<T>(namespace, cleanedPayload);
+  if (!verified.connected) throw new Error(verified.error || 'Impossible de vérifier la sauvegarde dans PostgreSQL.');
+  if (signature(verified.payload) !== signature(cleanedPayload)) {
+    throw new Error('Échec de vérification PostgreSQL : les données relues diffèrent de la saisie. Ne rechargez pas la page et réessayez.');
+  }
+  if (returnedVersion > 0 && verified.version < returnedVersion) {
+    throw new Error('Échec de vérification PostgreSQL : version serveur incohérente.');
+  }
+
+  const result = { payload: verified.payload, version: verified.version, updatedAt: verified.updatedAt || data.updatedAt || '', connected: true };
   readCache.set(readKey(namespace, current), { at: Date.now(), value: result as StoreEnvelope<unknown> });
   return result;
 }
