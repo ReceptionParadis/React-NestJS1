@@ -13,7 +13,9 @@ import { TicketsModule } from './tickets/tickets.module';
 @Module({
   imports: [
     ServeStaticModule.forRoot({
-      rootPath: join(process.cwd(), '..', 'web', 'dist'),
+      // Le processus Render est démarré depuis la racine du monorepo (/app).
+      // Le build Vite se trouve donc dans /app/apps/web/dist.
+      rootPath: join(process.cwd(), 'apps', 'web', 'dist'),
       exclude: ['/api/{*path}'],
     }),
     AuthModule,
