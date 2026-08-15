@@ -119,7 +119,7 @@ export async function saveSharedData<T>(namespace: string, payload: T, expectedV
   let response: Response;
   try {
     response = await fetchWithTimeout(`/api/operational-sync/${encodeURIComponent(namespace)}`, {
-      method: 'PUT',
+      method: 'POST',
       headers: headers(),
       body: JSON.stringify({ hotelId: hotelId || undefined, payload: cleanedPayload, updatedById: userId || undefined, expectedVersion }),
     });
