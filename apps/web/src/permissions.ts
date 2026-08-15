@@ -51,7 +51,7 @@ export function currentRole(): AppRole { return roleFromValue(sessionUser().role
 
 const matrix: Record<AppRole, ReadonlySet<Capability>> = {
   direction: new Set<Capability>(['dashboard.view','reception.view','reception.operate','cash.view','cash.edit','cash.validate','group-control.create','group-control.unlock','commercial.view','commercial.edit','commercial.validate-control','maintenance.view','maintenance.create','maintenance.manage','planning.view','meeting-rooms.view','meeting-rooms.edit','tasks.view','tasks.edit','instructions.view','instructions.edit','operations-center.view','operations-center.edit','journal.view','direction-reports.view','diagnostic.view','administration.view']),
-  reception_manager: new Set<Capability>(['dashboard.view','reception.view','reception.operate','cash.view','cash.edit','group-control.create','group-control.unlock','maintenance.view','maintenance.create','planning.view','meeting-rooms.view','meeting-rooms.edit','tasks.view','tasks.edit','instructions.view','instructions.edit','operations-center.view','operations-center.edit','journal.view','diagnostic.view']),
+  reception_manager: new Set<Capability>(['dashboard.view','reception.view','reception.operate','cash.view','cash.edit','group-control.create','group-control.unlock','maintenance.view','maintenance.create','planning.view','meeting-rooms.view','meeting-rooms.edit','tasks.view','tasks.edit','instructions.view','instructions.edit','operations-center.view','operations-center.edit','journal.view','direction-reports.view','diagnostic.view']),
   reception: new Set<Capability>(['dashboard.view','reception.view','reception.operate','cash.view','cash.edit','group-control.create','maintenance.view','maintenance.create','planning.view','meeting-rooms.view','meeting-rooms.edit','tasks.view','tasks.edit','instructions.view','instructions.edit','operations-center.view','operations-center.edit','journal.view']),
   night_auditor: new Set<Capability>(['dashboard.view','tasks.view','tasks.edit','instructions.view']),
   commercial: new Set<Capability>(['dashboard.view','commercial.view','commercial.edit','commercial.validate-control','group-control.unlock','maintenance.view','maintenance.create','planning.view','meeting-rooms.view','meeting-rooms.edit','tasks.view','tasks.edit','instructions.view','instructions.edit','journal.view']),
@@ -67,11 +67,12 @@ function sessionPermissions():ReadonlySet<Capability>|null{const raw=sessionUser
 export function can(capability: Capability, role: AppRole = currentRole()) {
   const current=currentRole();
   if(role!==current)return matrix[role].has(capability);
-  // Les permissions renvoyées par l'API sont les droits effectifs du compte :
-  // elles doivent primer pour TOUS les profils, y compris les profils standards.
-  // Auparavant la matrice locale écrasait les droits personnalisés (ex. accès
-  // Commercial accordé à un compte Réception), créant un écart entre Administration,
-  // "Mes droits" et la navigation réellement disponible.
+  // L'accès au rapport Direction est un droit socle des profils d'encadrement.
+  // Il reste disponible même si une session plus ancienne ne contient pas encore
+  // la permission direction-reports.view dans la liste renvoyée par l'API.
+  if(capability==='direction-reports.view'&&(current==='direction'||current==='reception_manager'))return true;
+  // Les permissions renvoyées par l'API restent les droits effectifs du compte
+  // pour toutes les autres fonctionnalités et conservent les personnalisations.
   const effective=sessionPermissions();
   return effective ? effective.has(capability) : matrix[current].has(capability);
 }
