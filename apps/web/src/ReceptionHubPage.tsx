@@ -1,10 +1,11 @@
-import { ArrowLeft, Calculator, CalendarDays, ClipboardCheck, FileArchive, FileText, MessageSquareWarning, MoonStar } from 'lucide-react';
+import { ArrowLeft, Calculator, CalendarDays, ClipboardCheck, FileArchive, FileText, MessageSquareWarning, MoonStar, PackageCheck } from 'lucide-react';
 import { canAccessPath, currentRole } from './permissions';
 
 export function ReceptionHubPage(){
  const role=currentRole();
  const cards=[
   {title:'Arrivées / Départs',description:'Saisir manuellement les mouvements, horaires, pax, guide, transport et consignes.',href:'/reception/arrivees-departs',icon:CalendarDays},
+  {title:'Paniers repas & PDJ Box',description:'Créer les commandes de paniers déjeuner, paniers dîner et petits-déjeuners box.',href:'/reception/paniers-repas-pdj',icon:PackageCheck},
   {title:'Contrôle Groupe',description:'Matrice manuelle unique : groupe, séjour, guide, chambres, effectifs et repas.',href:'/reception/controles',icon:ClipboardCheck},
   {title:'Caisse',description:'Saisie, rapprochement, impression et verrouillage de la caisse.',href:'/reception/caisse',icon:Calculator},
   {title:'Plaintes',description:'Enregistrement et suivi des plaintes clients.',href:'/reception/plaintes',icon:MessageSquareWarning},
