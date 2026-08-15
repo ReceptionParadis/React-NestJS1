@@ -21,10 +21,9 @@ async function bootstrap() {
     next();
   });
 
-  // Render a déjà servi des images où le contrôleur Nest était présent dans le
-  // bundle mais PUT /api/operational-sync/:namespace répondait encore 404.
-  // Cette garde est enregistrée avant le routeur Nest et garantit la route de
-  // sauvegarde critique indépendamment du montage des contrôleurs.
+  // Garde de persistance enregistrée avant le routeur Nest. HospiCore utilise
+  // désormais POST pour les sauvegardes opérationnelles, mais PUT reste accepté
+  // pour compatibilité avec les anciennes versions.
   const operationalSync = app.get(OperationalSyncService);
   app.use(
     '/api/operational-sync/:namespace',
@@ -33,7 +32,7 @@ async function bootstrap() {
       response: { status: (code: number) => { json: (value: unknown) => void }; json: (value: unknown) => void },
       next: (error?: unknown) => void,
     ) => {
-      if (request.method !== 'PUT') {
+      if (request.method !== 'PUT' && request.method !== 'POST') {
         next();
         return;
       }
