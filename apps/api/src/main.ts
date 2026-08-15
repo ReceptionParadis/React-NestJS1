@@ -1,5 +1,6 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
+import { OperationalSyncService } from './operational-sync/operational-sync.service';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -19,6 +20,45 @@ async function bootstrap() {
     }
     next();
   });
+
+  // Render a déjà servi des images où le contrôleur Nest était présent dans le
+  // bundle mais PUT /api/operational-sync/:namespace répondait encore 404.
+  // Cette garde est enregistrée avant le routeur Nest et garantit la route de
+  // sauvegarde critique indépendamment du montage des contrôleurs.
+  const operationalSync = app.get(OperationalSyncService);
+  app.use(
+    '/api/operational-sync/:namespace',
+    async (
+      request: { method?: string; params?: { namespace?: string }; body?: Record<string, unknown> },
+      response: { status: (code: number) => { json: (value: unknown) => void }; json: (value: unknown) => void },
+      next: (error?: unknown) => void,
+    ) => {
+      if (request.method !== 'PUT') {
+        next();
+        return;
+      }
+
+      try {
+        const namespace = request.params?.namespace;
+        if (!namespace) {
+          response.status(400).json({ message: 'Namespace manquant' });
+          return;
+        }
+
+        const body = request.body ?? {};
+        const saved = await operationalSync.save({
+          namespace,
+          hotelId: typeof body.hotelId === 'string' ? body.hotelId : undefined,
+          payload: body.payload as never,
+          updatedById: typeof body.updatedById === 'string' ? body.updatedById : undefined,
+          expectedVersion: typeof body.expectedVersion === 'number' ? body.expectedVersion : undefined,
+        });
+        response.json(saved);
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
 
   app.setGlobalPrefix('api');
 
