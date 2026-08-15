@@ -8,23 +8,7 @@ import { CashValidatedBannerScopeBridge } from './CashValidatedBannerScopeBridge
 import { ComplaintsPrintBridge } from './ComplaintsPrintBridge';
 import { OperationalPrintRecovery } from './OperationalPrintRecovery';
 import { cleanupLegacyLocalData } from './legacy-cleanup';
-import './styles.css';
-import './auth.css';
-import './meeting-rooms.css';
-import './general-instructions.css';
-import './tasks.css';
-import './reception-group-control.css';
-import './reception-hub.css';
-import './reception-night.css';
-import './reception-workspace.css';
-import './reception-archives-tree.css';
-import './complaints.css';
-import './direction-reports.css';
-import './user-account-menu.css';
-import './hospicore-live.css';
-import './core-dashboard.css';
-import './control-matrix.css';
-
+import './styles.css';import './executive-dashboard.css';import './tickets.css';import './maintenance-v2.css';import './maintenance-readability.css';import './groups.css';import './group-delete-action.css';import './group-meal-highlights.css';import './rooming-import.css';import './auth.css';import './meeting-rooms.css';import './weekly-planning.css';import './function-sheet-auto-print.css';import './operations-center.css';import './general-instructions.css';import './activity-journal.css';import './tasks.css';import './administration.css';import './administration-security.css';import './diagnostic.css';import './hospicore-live.css';import './command-center.css';import './command-journal-readability.css';import './dashboard-journal-sync.css';import './command-role-filter.css';import './command-maintenance-widget.css';import './role-aware-command-center.css';import './commercial-hub.css';import './function-sheet-notice.css';import './daily-group-board.css';import './operational-planning.css';import './reception-group-control.css';import './group-control-workflow.css';import './reception-control-uniform.css';import './group-control-print-fix.css';import './operational-group-buckets.css';import './reception-hub.css';import './reception-nav.css';import './reception-night.css';import './reception-workspace.css';import './reception-operations-readability.css';import './reception-archives-tree.css';import './complaints.css';import './direction-reports.css';import './user-account-menu.css';import './command-center-button.css';import './hospicore-consistency.css';import './unified-notifications.css';import './individual-requests-command.css';import './operational-archive-additions.css';import './core-dashboard.css';import './control-matrix.css';
 cleanupLegacyLocalData();
 const path=window.location.pathname,cashRoute=path.startsWith('/reception/caisse'),complaintsRoute=path.startsWith('/reception/plaintes'),nightRoute=path.startsWith('/reception/feuille-route-veilleur');
 function RouteScopedBridges(){return <><OperationalToastHost/><UserAccountMenu/>{cashRoute&&<><DirectionCashUnlockBridge/><CashValidatedBannerScopeBridge/><OperationalPrintRecovery/></>}{complaintsRoute&&<ComplaintsPrintBridge/>}{(nightRoute||complaintsRoute)&&<OperationalPrintRecovery/>}</>}
