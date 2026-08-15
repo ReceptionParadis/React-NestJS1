@@ -4,6 +4,8 @@ import { PrismaService } from '../prisma.service';
 
 const JOURNAL_NAMESPACE = 'activity-journal';
 const DIRECTION_REPORT_NAMESPACE='direction-daily-reports';
+const CANONICAL_HOTEL_SLUG='hotel-paradis-lourdes';
+const SHARED_STORE_MIGRATION_MARKER='_system-shared-store-canonical-1.0.0';
 type JournalEntry={id:string;at:string;actorId?:string;actor:string;role:string;service:string;namespace:string;source:string;action:string};
 type Group360Like={id?:string;name?:string;commercialValidated?:boolean;validatedAt?:string;audit?:Array<{action?:string}>};
 type JsonRecord=Record<string,unknown>;
@@ -11,21 +13,24 @@ type JsonRecord=Record<string,unknown>;
 const DEFAULT_STORES: Record<string, Prisma.InputJsonValue> = {
   tasks: [],
   'general-instructions': [],
-  'operations-center': { loans: [], equipment: [] },
-  'loans-equipment': { loans: [], equipment: [] },
-  'function-sheets': [],
   'meeting-rooms': [],
-  'group-360': [],
-  'group-wakeups': [],
-  'maintenance-interventions': [],
-  'individual-requests': [],
   'client-complaints': [],
   'night-route-notes': [],
   'reception-cash-day': [],
   'meal-orders': [],
+  'group-controls': [],
+  'manual-arrivals-departures': [],
   [JOURNAL_NAMESPACE]: [],
   [DIRECTION_REPORT_NAMESPACE]: [],
   'administration-settings': { users: [], rooms: [], categories: [] },
+  // Stores historiques conservés pour compatibilité des anciennes données.
+  'operations-center': { loans: [], equipment: [] },
+  'loans-equipment': { loans: [], equipment: [] },
+  'function-sheets': [],
+  'group-360': [],
+  'group-wakeups': [],
+  'maintenance-interventions': [],
+  'individual-requests': [],
 };
 
 const PRODUCTION_RESET_MARKER = '_system-production-baseline-1.0.0';
@@ -44,6 +49,8 @@ const PRODUCTION_RESET_PAYLOADS: Record<string, Prisma.InputJsonValue> = {
 };
 
 const JOURNAL_META:Record<string,{service:string;source:string}>={
+  'group-controls':{service:'Réception',source:'Contrôles Groupe'},
+  'manual-arrivals-departures':{service:'Réception',source:'Arrivées / Départs'},
   'group-360':{service:'Réception',source:'Groupe 360°'},
   'group-wakeups':{service:'Réception',source:'Réveils groupes'},
   'individual-requests':{service:'Réception',source:'Demandes clients'},
@@ -64,7 +71,12 @@ const JOURNAL_META:Record<string,{service:string;source:string}>={
 @Injectable()
 export class OperationalSyncService implements OnModuleInit {
   constructor(private readonly prisma: PrismaService) {}
-  async onModuleInit() { await this.resetHotelParadisProductionDataOnce(); }
+  async onModuleInit() {
+    await this.resetHotelParadisProductionDataOnce();
+    await this.migrateAllOperationalStoresToCanonicalHotelOnce();
+    const hotelId=await this.resolveHotelId();
+    await this.ensureDefaultStores(hotelId);
+  }
 
   async get(hotelId: string | undefined, namespace: string, userId?: string) {
     if(namespace===DIRECTION_REPORT_NAMESPACE)await this.assertDirection(userId);
@@ -108,9 +120,39 @@ export class OperationalSyncService implements OnModuleInit {
 
   async list(hotelId?:string,userId?:string){const resolvedHotelId=await this.resolveHotelId(hotelId,userId);await this.ensureDefaultStores(resolvedHotelId,userId);return this.prisma.operationalStore.findMany({where:{hotelId:resolvedHotelId,namespace:{not:DIRECTION_REPORT_NAMESPACE}},select:{namespace:true,version:true,updatedAt:true,updatedById:true},orderBy:{updatedAt:'desc'}})}
 
-  async diagnostic(hotelId?:string,userId?:string){const startedAt=Date.now(),resolvedHotelId=await this.resolveHotelId(hotelId,userId);await this.ensureDefaultStores(resolvedHotelId,userId);const[hotel,user,stores,databaseProbe]=await Promise.all([this.prisma.hotel.findUnique({where:{id:resolvedHotelId},select:{id:true,name:true,slug:true}}),userId?this.prisma.user.findUnique({where:{id:userId},select:{id:true,firstName:true,lastName:true,email:true,hotelId:true,role:{select:{name:true}}}}):null,this.prisma.operationalStore.findMany({where:{hotelId:resolvedHotelId,namespace:{not:{startsWith:'_system-'}}},select:{namespace:true,version:true,updatedAt:true,updatedById:true},orderBy:{namespace:'asc'}}),this.prisma.$queryRaw<Array<{now:Date}>>`SELECT NOW() as now`]);return{status:'ok',checkedAt:new Date().toISOString(),responseTimeMs:Date.now()-startedAt,database:{connected:true,serverTime:databaseProbe[0]?.now??null},hotel,user,operationalStore:{available:true,namespaces:stores}}}
+  async diagnostic(hotelId?:string,userId?:string){const startedAt=Date.now(),resolvedHotelId=await this.resolveHotelId(hotelId,userId);await this.ensureDefaultStores(resolvedHotelId,userId);const[hotel,user,stores,databaseProbe]=await Promise.all([this.prisma.hotel.findUnique({where:{id:resolvedHotelId},select:{id:true,name:true,slug:true}}),userId?this.prisma.user.findUnique({where:{id:userId},select:{id:true,firstName:true,lastName:true,email:true,hotelId:true,role:{select:{name:true}}}}):null,this.prisma.operationalStore.findMany({where:{hotelId:resolvedHotelId,namespace:{not:{startsWith:'_system-'}}},select:{namespace:true,version:true,updatedAt:true,updatedById:true},orderBy:{namespace:'asc'}}),this.prisma.$queryRaw<Array<{now:Date}>>`SELECT NOW() as now`]);return{status:'ok',checkedAt:new Date().toISOString(),responseTimeMs:Date.now()-startedAt,database:{connected:true,serverTime:databaseProbe[0]?.now??null},hotel,user,canonicalHotel:true,operationalStore:{available:true,namespaces:stores}}}
 
   private asRecord(value:unknown):JsonRecord|null{return value&&typeof value==='object'&&!Array.isArray(value)?value as JsonRecord:null}
+  private mergePayload(base:unknown,incoming:unknown):unknown{
+    if(Array.isArray(base)&&Array.isArray(incoming)){
+      const result:unknown[]=[];
+      const positions=new Map<string,number>();
+      const add=(value:unknown)=>{
+        const record=this.asRecord(value);
+        const key=record?.id?`id:${String(record.id)}`:`json:${JSON.stringify(value)}`;
+        const position=positions.get(key);
+        if(position===undefined){positions.set(key,result.length);result.push(value)}else result[position]=value;
+      };
+      base.forEach(add);incoming.forEach(add);return result;
+    }
+    if(this.asRecord(base)&&this.asRecord(incoming))return{...this.asRecord(base),...this.asRecord(incoming)};
+    return incoming??base;
+  }
+
+  private async migrateAllOperationalStoresToCanonicalHotelOnce(){
+    const hotel=await this.prisma.hotel.findUnique({where:{slug:CANONICAL_HOTEL_SLUG},select:{id:true}});
+    if(!hotel)return;
+    const marker=await this.prisma.operationalStore.findUnique({where:{hotelId_namespace:{hotelId:hotel.id,namespace:SHARED_STORE_MIGRATION_MARKER}},select:{id:true}});
+    if(marker)return;
+    for(const namespace of Object.keys(DEFAULT_STORES)){
+      if(namespace===DIRECTION_REPORT_NAMESPACE)continue;
+      const stores=await this.prisma.operationalStore.findMany({where:{namespace},select:{payload:true,updatedAt:true},orderBy:{updatedAt:'asc'}});
+      let merged:unknown=DEFAULT_STORES[namespace];
+      for(const store of stores)merged=this.mergePayload(merged,store.payload);
+      await this.prisma.operationalStore.upsert({where:{hotelId_namespace:{hotelId:hotel.id,namespace}},create:{hotelId:hotel.id,namespace,payload:merged as Prisma.InputJsonValue},update:{payload:merged as Prisma.InputJsonValue,version:{increment:1}}});
+    }
+    await this.prisma.operationalStore.create({data:{hotelId:hotel.id,namespace:SHARED_STORE_MIGRATION_MARKER,payload:{migratedAt:new Date().toISOString(),reason:'Unification des données HospiCore entre tous les comptes'}}});
+  }
 
   private async cascadeDeletedGroups(hotelId:string,groupIds:string[],userId?:string){
     const removed=new Set(groupIds);
@@ -169,6 +211,6 @@ export class OperationalSyncService implements OnModuleInit {
   private serviceFromRole(role:string,fallback:string){const r=role.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();if(r.includes('direction')||r.includes('directeur')||r.includes('admin'))return'Direction';if(r.includes('commercial')||r.includes('vente'))return'Commercial';if(r.includes('maintenance')||r.includes('technique')||r.includes('technicien'))return'Maintenance';if(r.includes('reception')||r.includes('front'))return'Réception';return fallback}
   private async assertDirection(userId?:string){if(!userId)throw new ForbiddenException('Accès réservé à la Direction.');const user=await this.prisma.user.findUnique({where:{id:userId},select:{role:{select:{name:true}}}});const r=String(user?.role?.name||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();if(!(r.includes('direction')||r.includes('directeur')||r.includes('admin')))throw new ForbiddenException('Accès réservé à la Direction.')}
   private async ensureDefaultStores(hotelId:string,userId?:string){await this.prisma.$transaction(Object.entries(DEFAULT_STORES).filter(([namespace])=>namespace!==DIRECTION_REPORT_NAMESPACE).map(([namespace,payload])=>this.prisma.operationalStore.upsert({where:{hotelId_namespace:{hotelId,namespace}},create:{hotelId,namespace,payload,updatedById:userId},update:{}})))}
-  private async resetHotelParadisProductionDataOnce(){const hotel=await this.prisma.hotel.findUnique({where:{slug:'hotel-paradis-lourdes'},select:{id:true}});if(!hotel)return;const marker=await this.prisma.operationalStore.findUnique({where:{hotelId_namespace:{hotelId:hotel.id,namespace:PRODUCTION_RESET_MARKER}},select:{id:true}});if(marker)return;const operations=Object.entries(PRODUCTION_RESET_PAYLOADS).map(([namespace,payload])=>this.prisma.operationalStore.upsert({where:{hotelId_namespace:{hotelId:hotel.id,namespace}},create:{hotelId:hotel.id,namespace,payload},update:{payload,updatedById:null,version:{increment:1}}}));operations.push(this.prisma.operationalStore.create({data:{hotelId:hotel.id,namespace:PRODUCTION_RESET_MARKER,payload:{resetAt:new Date().toISOString(),release:'1.0.0',reason:'Initialisation production Hôtel Paradis'}}}));await this.prisma.$transaction(operations)}
-  private async resolveHotelId(hotelId?:string,userId?:string){if(hotelId)return hotelId;if(!userId)throw new BadRequestException('Hôtel et utilisateur absents.');const user=await this.prisma.user.findUnique({where:{id:userId},select:{hotelId:true}});if(!user)throw new BadRequestException('Utilisateur introuvable.');return user.hotelId}
+  private async resetHotelParadisProductionDataOnce(){const hotel=await this.prisma.hotel.findUnique({where:{slug:CANONICAL_HOTEL_SLUG},select:{id:true}});if(!hotel)return;const marker=await this.prisma.operationalStore.findUnique({where:{hotelId_namespace:{hotelId:hotel.id,namespace:PRODUCTION_RESET_MARKER}},select:{id:true}});if(marker)return;const operations=Object.entries(PRODUCTION_RESET_PAYLOADS).map(([namespace,payload])=>this.prisma.operationalStore.upsert({where:{hotelId_namespace:{hotelId:hotel.id,namespace}},create:{hotelId:hotel.id,namespace,payload},update:{payload,updatedById:null,version:{increment:1}}}));operations.push(this.prisma.operationalStore.create({data:{hotelId:hotel.id,namespace:PRODUCTION_RESET_MARKER,payload:{resetAt:new Date().toISOString(),release:'1.0.0',reason:'Initialisation production Hôtel Paradis'}}}));await this.prisma.$transaction(operations)}
+  private async resolveHotelId(_hotelId?:string,_userId?:string){const hotel=await this.prisma.hotel.findUnique({where:{slug:CANONICAL_HOTEL_SLUG},select:{id:true}});if(hotel)return hotel.id;throw new BadRequestException('Hôtel Paradis introuvable dans PostgreSQL.')}
 }
