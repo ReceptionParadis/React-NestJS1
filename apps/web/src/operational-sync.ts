@@ -37,9 +37,8 @@ function headers() {
 }
 
 function readKey(namespace: string, current: Session) {
-  const hotelId = hotelIdFromSession(current);
   const userId = current.user?.id || '';
-  return `${hotelId || 'no-hotel'}:${userId || 'no-user'}:${namespace}`;
+  return `shared-hotel:${userId || 'no-user'}:${namespace}`;
 }
 
 function invalidateNamespace(namespace: string, current: Session) {
@@ -59,14 +58,17 @@ async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit = {}
 }
 
 async function fetchSharedData<T>(namespace: string, fallback: T, current: Session): Promise<StoreEnvelope<T>> {
-  const hotelId = hotelIdFromSession(current);
   const userId = current.user?.id || '';
-  if (!hotelId && !userId) return { payload: cleanOperationalPayload(namespace, fallback), version: 0, updatedAt: '', connected: false, error: 'Session sans hôtel ni utilisateur.' };
+  const fallbackHotelId = hotelIdFromSession(current);
+  if (!userId && !fallbackHotelId) return { payload: cleanOperationalPayload(namespace, fallback), version: 0, updatedAt: '', connected: false, error: 'Session sans hôtel ni utilisateur.' };
 
   try {
     const params = new URLSearchParams();
-    if (hotelId) params.set('hotelId', hotelId);
+    // Pour une session authentifiée, le serveur recalcule toujours l'hôtel depuis
+    // l'utilisateur en base. On ne transmet plus le hotelId potentiellement périmé
+    // stocké dans localStorage, afin que tous les comptes partagent le même store.
     if (userId) params.set('userId', userId);
+    else if (fallbackHotelId) params.set('hotelId', fallbackHotelId);
     const response = await fetchWithTimeout(`/api/operational-sync/${encodeURIComponent(namespace)}?${params.toString()}`, { headers: headers(), cache: 'no-store' });
     if (!response.ok) {
       const body = await response.text();
@@ -86,9 +88,9 @@ async function fetchSharedData<T>(namespace: string, fallback: T, current: Sessi
 
 export async function loadSharedData<T>(namespace: string, fallback: T): Promise<StoreEnvelope<T>> {
   const current = session();
-  const hotelId = hotelIdFromSession(current);
   const userId = current.user?.id || '';
-  if (!hotelId && !userId) return { payload: cleanOperationalPayload(namespace, fallback), version: 0, updatedAt: '', connected: false, error: 'Session sans hôtel ni utilisateur.' };
+  const fallbackHotelId = hotelIdFromSession(current);
+  if (!userId && !fallbackHotelId) return { payload: cleanOperationalPayload(namespace, fallback), version: 0, updatedAt: '', connected: false, error: 'Session sans hôtel ni utilisateur.' };
 
   const key = readKey(namespace, current);
   const cached = readCache.get(key);
@@ -110,9 +112,9 @@ export async function loadSharedData<T>(namespace: string, fallback: T): Promise
 
 export async function saveSharedData<T>(namespace: string, payload: T, expectedVersion?: number): Promise<StoreEnvelope<T>> {
   const current = session();
-  const hotelId = hotelIdFromSession(current);
   const userId = current.user?.id || '';
-  if (!hotelId && !userId) throw new Error('Hôtel et utilisateur introuvables dans la session.');
+  const fallbackHotelId = hotelIdFromSession(current);
+  if (!userId && !fallbackHotelId) throw new Error('Hôtel et utilisateur introuvables dans la session.');
 
   invalidateNamespace(namespace, current);
   const cleanedPayload = cleanOperationalPayload(namespace, payload);
@@ -121,7 +123,13 @@ export async function saveSharedData<T>(namespace: string, payload: T, expectedV
     response = await fetchWithTimeout(`/api/operational-sync/${encodeURIComponent(namespace)}`, {
       method: 'POST',
       headers: headers(),
-      body: JSON.stringify({ hotelId: hotelId || undefined, payload: cleanedPayload, updatedById: userId || undefined, expectedVersion }),
+      body: JSON.stringify({
+        // L'utilisateur authentifié est la source de vérité. Le backend résout son
+        // hotelId courant en PostgreSQL, ce qui évite les stores séparés par session.
+        ...(userId ? { updatedById: userId } : { hotelId: fallbackHotelId || undefined }),
+        payload: cleanedPayload,
+        expectedVersion,
+      }),
     });
   } catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError') throw new Error('Enregistrement trop lent. Réessayez sans recharger la page.');
